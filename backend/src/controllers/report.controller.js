@@ -68,7 +68,7 @@ const getLogsReport = async (req, res) => {
     res.json(enrichedLogs);
   } catch (error) {
     console.error('Error fetching logs report:', error);
-    res.status(500).json({ message: 'Internal Server Error' });
+    res.status(500).json({ message: error.message || 'Internal Server Error' });
   }
 };
 
@@ -174,7 +174,7 @@ const getDashboardStats = async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching dashboard stats:', error);
-    res.status(500).json({ message: 'Internal Server Error' });
+    res.status(500).json({ message: error.message || 'Internal Server Error' });
   }
 };
 

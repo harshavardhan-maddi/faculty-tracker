@@ -103,7 +103,7 @@ const getClassrooms = async (req, res) => {
     res.json(result);
   } catch (error) {
     console.error('Error fetching classrooms:', error);
-    res.status(500).json({ message: 'Internal Server Error' });
+    res.status(500).json({ message: error.message || 'Internal Server Error' });
   }
 };
 
@@ -132,7 +132,7 @@ const createClassroom = async (req, res) => {
     res.status(201).json(classroom);
   } catch (error) {
     console.error('Error creating classroom:', error);
-    res.status(500).json({ message: 'Internal Server Error' });
+    res.status(500).json({ message: error.message || 'Internal Server Error' });
   }
 };
 
@@ -155,7 +155,7 @@ const deleteClassroom = async (req, res) => {
     res.json({ message: 'Classroom deleted successfully' });
   } catch (error) {
     console.error('Error deleting classroom:', error);
-    res.status(500).json({ message: 'Internal Server Error' });
+    res.status(500).json({ message: error.message || 'Internal Server Error' });
   }
 };
 
@@ -186,7 +186,7 @@ const getClassroomDetails = async (req, res) => {
     res.json(classroom);
   } catch (error) {
     console.error('Error fetching classroom details:', error);
-    res.status(500).json({ message: 'Internal Server Error' });
+    res.status(500).json({ message: error.message || 'Internal Server Error' });
   }
 };
 

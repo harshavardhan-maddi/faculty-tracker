@@ -25,6 +25,7 @@ const Dashboard = () => {
   const [activity, setActivity] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   // Detail Modal States
   const [selectedClassroom, setSelectedClassroom] = useState(null);
@@ -38,6 +39,9 @@ const Dashboard = () => {
         headers: { 'Authorization': `Bearer ${token}` },
       });
       const classData = await classRes.json();
+      if (!classRes.ok) {
+        throw new Error(classData.message || 'Failed to fetch classrooms');
+      }
       setClassrooms(classData);
 
       // 2. Fetch stats
@@ -45,10 +49,14 @@ const Dashboard = () => {
         headers: { 'Authorization': `Bearer ${token}` },
       });
       const statsData = await statsRes.json();
+      if (!statsRes.ok) {
+        throw new Error(statsData.message || 'Failed to fetch stats');
+      }
       setStats(statsData.stats);
-      setActivity(statsData.recentActivity);
-    } catch (error) {
-      console.error('Failed to load dashboard:', error);
+      setActivity(statsData.recentActivity || []);
+    } catch (err) {
+      console.error('Failed to load dashboard:', err);
+      setError(err.message);
     } finally {
       setLoading(false);
     }
@@ -167,6 +175,11 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-6">
+      {error && (
+        <div className="p-4 bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-sm font-semibold rounded-xl">
+          ⚠️ {error}
+        </div>
+      )}
       
       {/* Overview stats cards Row */}
       {stats && (

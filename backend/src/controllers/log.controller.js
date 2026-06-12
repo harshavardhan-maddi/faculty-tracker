@@ -108,7 +108,7 @@ const createEntryLog = async (req, res) => {
     res.status(201).json(log);
   } catch (error) {
     console.error('Error logging entry:', error);
-    res.status(500).json({ message: 'Internal Server Error' });
+    res.status(500).json({ message: error.message || 'Internal Server Error' });
   }
 };
 

@@ -61,7 +61,7 @@ const upsertTimetable = async (req, res) => {
     res.json(timetable);
   } catch (error) {
     console.error('Error upserting timetable:', error);
-    res.status(500).json({ message: 'Internal Server Error' });
+    res.status(500).json({ message: error.message || 'Internal Server Error' });
   }
 };
 
@@ -79,7 +79,7 @@ const getTimetableByClassroom = async (req, res) => {
     res.json(timetable);
   } catch (error) {
     console.error('Error fetching timetable:', error);
-    res.status(500).json({ message: 'Internal Server Error' });
+    res.status(500).json({ message: error.message || 'Internal Server Error' });
   }
 };
 
@@ -93,7 +93,7 @@ const deleteTimetable = async (req, res) => {
     res.json({ message: 'Timetable entry deleted successfully' });
   } catch (error) {
     console.error('Error deleting timetable:', error);
-    res.status(500).json({ message: 'Internal Server Error' });
+    res.status(500).json({ message: error.message || 'Internal Server Error' });
   }
 };
 
@@ -175,7 +175,7 @@ const getCRSchedule = async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching CR schedule:', error);
-    res.status(500).json({ message: 'Internal Server Error' });
+    res.status(500).json({ message: error.message || 'Internal Server Error' });
   }
 };
 
@@ -187,7 +187,7 @@ const getFaculties = async (req, res) => {
     res.json(faculties);
   } catch (error) {
     console.error('Error fetching faculties:', error);
-    res.status(500).json({ message: 'Internal Server Error' });
+    res.status(500).json({ message: error.message || 'Internal Server Error' });
   }
 };
 
