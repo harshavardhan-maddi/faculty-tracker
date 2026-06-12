@@ -134,7 +134,7 @@ const Layout = ({ children }) => {
               Faculty Tracker
             </h1>
             <span className="text-[10px] text-customText-muted dark:text-customText-mutedDark font-semibold tracking-wider uppercase">
-              Soft Academic
+              NEC
             </span>
           </div>
         </div>
