@@ -1,5 +1,17 @@
+const getCleanTimeZone = () => {
+  let tz = process.env.TZ || 'Asia/Kolkata';
+  if (tz.startsWith(':')) {
+    tz = tz.slice(1);
+  }
+  // Vercel serverless default is :UTC/UTC. Fallback to Asia/Kolkata unless explicitly set to a specific timezone.
+  if (tz === 'UTC' || tz === 'utc') {
+    return 'Asia/Kolkata';
+  }
+  return tz;
+};
+
 const getLocalTimeParts = () => {
-  const tz = process.env.TZ || 'Asia/Kolkata';
+  const tz = getCleanTimeZone();
   const formatter = new Intl.DateTimeFormat('en-US', {
     timeZone: tz,
     hour12: false,
@@ -29,7 +41,7 @@ const getCurrentTimeInHHMM = () => {
 };
 
 const getLocalDayBounds = (dateStr) => {
-  const tz = process.env.TZ || 'Asia/Kolkata';
+  const tz = getCleanTimeZone();
   let year, month, day;
   if (!dateStr) {
     const parts = getLocalTimeParts();
@@ -72,7 +84,7 @@ const getLocalDayBounds = (dateStr) => {
 };
 
 const getWeekdayForDate = (date) => {
-  const tz = process.env.TZ || 'Asia/Kolkata';
+  const tz = getCleanTimeZone();
   const formatter = new Intl.DateTimeFormat('en-US', {
     timeZone: tz,
     weekday: 'long',
