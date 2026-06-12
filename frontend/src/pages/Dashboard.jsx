@@ -4,6 +4,7 @@ import { useSocket } from '../context/SocketContext';
 import StatCard from '../components/StatCard';
 import ClassroomCard from '../components/ClassroomCard';
 import ActivityFeed from '../components/ActivityFeed';
+import Loading from '../components/Loading';
 import { 
   Building, 
   Users2, 
@@ -169,19 +170,7 @@ const Dashboard = () => {
   );
 
   if (loading) {
-    return (
-      <div className="space-y-6">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 animate-pulse">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-28 bg-slate-200 dark:bg-slate-800 rounded-2xl"></div>
-          ))}
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-pulse">
-          <div className="lg:col-span-2 h-96 bg-slate-200 dark:bg-slate-800 rounded-2xl"></div>
-          <div className="h-96 bg-slate-200 dark:bg-slate-800 rounded-2xl"></div>
-        </div>
-      </div>
-    );
+    return <Loading />;
   }
 
   return (

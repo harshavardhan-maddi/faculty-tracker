@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
+import logo from '../neclogo.png';
 import { 
   LayoutDashboard, 
   CalendarDays, 
@@ -125,8 +126,8 @@ const Layout = ({ children }) => {
       {/* SIDEBAR FOR DESKTOP */}
       <aside className="hidden md:flex flex-col w-64 fixed inset-y-0 left-0 z-30 glass-sidebar">
         <div className="h-16 flex items-center px-6 border-b border-slate-200/50 dark:border-slate-800/30 gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-primary to-primary-dark flex items-center justify-center text-white shadow-md">
-            <UserCheck size={20} />
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center shadow-md overflow-hidden bg-white">
+            <img src={logo} alt="NEC Logo" className="w-9 h-9 object-contain rounded-xl" />
           </div>
           <div>
             <h1 className="font-bold text-lg leading-tight bg-gradient-to-r from-primary-dark to-slate-700 dark:to-slate-300 bg-clip-text text-transparent">
@@ -199,7 +200,10 @@ const Layout = ({ children }) => {
           <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setMobileMenuOpen(false)} />
           <aside className="relative flex flex-col w-64 bg-customBg dark:bg-customBg-dark border-r border-slate-200 dark:border-slate-800 h-full p-4 z-10 animate-fade-in">
             <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-slate-800">
-              <span className="font-bold text-lg text-primary-dark">Faculty Tracker</span>
+              <div className="flex items-center gap-2">
+                <img src={logo} alt="NEC Logo" className="w-7 h-7 rounded-lg object-contain bg-white" />
+                <span className="font-bold text-lg text-primary-dark">Faculty Tracker</span>
+              </div>
               <button onClick={() => setMobileMenuOpen(false)} className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">
                 <X size={20} />
               </button>

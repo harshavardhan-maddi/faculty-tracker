@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { ShieldCheck, Eye, EyeOff, User, Lock } from 'lucide-react';
+import { Eye, EyeOff, User, Lock } from 'lucide-react';
+import logo from '../neclogo.png';
+import Loading from '../components/Loading';
 
 const Login = () => {
   const { login } = useAuth();
@@ -39,22 +41,26 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-4 relative overflow-hidden transition-colors duration-300">
-      
-      {/* Background glass decorative bubbles */}
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full bg-primary/10 dark:bg-primary-dark/5 blur-3xl" />
-      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 rounded-full bg-secondary/10 dark:bg-secondary-dark/5 blur-3xl" />
-
-      <div className="w-full max-w-md glass-card p-8 border border-white/60 dark:border-slate-800/65 relative z-10 animate-fade-in">
+    <>
+      {loading && <Loading />}
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-4 relative overflow-hidden transition-colors duration-300">
         
-        {/* Logo and Header */}
-        <div className="flex flex-col items-center mb-8 text-center">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-primary to-primary-dark flex items-center justify-center text-white shadow-lg mb-4">
-            <ShieldCheck size={32} />
-          </div>
-          <h2 className="text-2xl font-extrabold text-customText dark:text-customText-dark tracking-tight">
-            Welcome to Faculty Tracker
-          </h2>
+        {/* Background glass decorative bubbles */}
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full bg-primary/10 dark:bg-primary-dark/5 blur-3xl" />
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 rounded-full bg-secondary/10 dark:bg-secondary-dark/5 blur-3xl" />
+
+        <div className="w-full max-w-md glass-card p-8 border border-white/60 dark:border-slate-800/65 relative z-10 animate-fade-in">
+          
+          {/* Logo and Header */}
+          <div className="flex flex-col items-center mb-8 text-center">
+            <div className="relative w-20 h-20 flex items-center justify-center mb-4">
+              {/* Spinning ring for decoration */}
+              <div className="absolute inset-0 rounded-full border-2 border-t-primary-dark border-r-transparent border-b-secondary border-l-transparent animate-spin" style={{ animationDuration: '3s' }}></div>
+              <img src={logo} alt="NEC Logo" className="w-16 h-16 rounded-full object-contain relative z-10 shadow-md" />
+            </div>
+            <h2 className="text-2xl font-extrabold text-customText dark:text-customText-dark tracking-tight">
+              Welcome to Faculty Tracker
+            </h2>
           <p className="text-sm text-customText-muted dark:text-customText-mutedDark mt-1">
             Sign in to access real-time attendance portal
           </p>

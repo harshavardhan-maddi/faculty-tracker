@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import { Clock, CheckCircle2, XCircle, AlertCircle, Sparkles } from 'lucide-react';
+import Loading from '../components/Loading';
 
 const CRDashboard = () => {
   const { token, user } = useAuth();
@@ -151,15 +152,7 @@ const CRDashboard = () => {
   };
 
   if (loading) {
-    return (
-      <div className="space-y-6">
-        <div className="animate-pulse flex flex-col gap-4">
-          <div className="h-8 bg-slate-200 dark:bg-slate-800 rounded-lg w-1/4"></div>
-          <div className="h-44 bg-slate-200 dark:bg-slate-800 rounded-2xl w-full"></div>
-          <div className="h-64 bg-slate-200 dark:bg-slate-800 rounded-2xl w-full"></div>
-        </div>
-      </div>
-    );
+    return <Loading />;
   }
 
   // Identify the currently active period — prioritize 'Active' (needs CR action)
