@@ -40,15 +40,15 @@ const CRDashboard = () => {
   useEffect(() => {
     fetchSchedule();
 
-    // Re-fetch from server every 30 seconds so period transitions are picked up
+    // Re-fetch from server every 5 seconds so period transitions are picked up immediately
     const pollInterval = setInterval(() => {
       fetchSchedule();
-    }, 30 * 1000);
+    }, 5000);
 
     return () => clearInterval(pollInterval);
   }, [token]);
 
-  // Client-side timer: re-evaluate active period every 15 seconds based on current time
+  // Client-side timer: re-evaluate active period every 5 seconds based on current time
   // This ensures the button appears immediately when the clock crosses a period boundary
   useEffect(() => {
     const tick = setInterval(() => {
@@ -56,9 +56,18 @@ const CRDashboard = () => {
         if (!prev || prev.length === 0) return prev;
 
         const now = new Date();
-        const hh = String(now.getHours()).padStart(2, '0');
-        const mm = String(now.getMinutes()).padStart(2, '0');
-        const currentTime = `${hh}:${mm}`;
+        const formatter = new Intl.DateTimeFormat('en-US', {
+          timeZone: 'Asia/Kolkata',
+          hour12: false,
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+        const parts = formatter.formatToParts(now);
+        const partMap = {};
+        parts.forEach(p => {
+          partMap[p.type] = p.value;
+        });
+        const currentTime = `${partMap.hour}:${partMap.minute}`;
 
         return prev.map((period) => {
           // Don't override server-confirmed statuses (Present, Not Entered)
@@ -79,7 +88,7 @@ const CRDashboard = () => {
           return period;
         });
       });
-    }, 15 * 1000);
+    }, 5000);
 
     return () => clearInterval(tick);
   }, []);

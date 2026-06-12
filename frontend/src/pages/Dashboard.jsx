@@ -32,8 +32,9 @@ const Dashboard = () => {
   const [classroomDetails, setClassroomDetails] = useState(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
 
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = async (isSilent = false) => {
     try {
+      if (!isSilent) setLoading(true);
       // 1. Fetch classrooms
       const classRes = await fetch('/api/classrooms', {
         headers: { 'Authorization': `Bearer ${token}` },
@@ -54,16 +55,26 @@ const Dashboard = () => {
       }
       setStats(statsData.stats);
       setActivity(statsData.recentActivity || []);
+      if (error) setError('');
     } catch (err) {
       console.error('Failed to load dashboard:', err);
-      setError(err.message);
+      if (!isSilent) {
+        setError(err.message);
+      }
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   };
 
   useEffect(() => {
     fetchDashboardData();
+
+    // Set up polling interval to fetch updates periodically (every 5 seconds)
+    const interval = setInterval(() => {
+      fetchDashboardData(true);
+    }, 5000);
+
+    return () => clearInterval(interval);
   }, [token]);
 
   // Real-time synchronization via Socket.IO
