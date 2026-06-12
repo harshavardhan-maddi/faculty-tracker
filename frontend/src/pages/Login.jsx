@@ -68,12 +68,13 @@ const Login = () => {
     <>
       {introVisible && (
         <div 
-          className={`fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-950 text-white select-none transition-all duration-700 ${
-            introFadeOut ? 'opacity-0 scale-95 pointer-events-none' : 'opacity-100 scale-100'
+          className={`fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-950 text-customText dark:text-customText-dark select-none transition-all duration-700 ${
+            introFadeOut ? 'opacity-0 scale-98 pointer-events-none' : 'opacity-100 scale-100'
           }`}
         >
-          {/* Subtle moving background mesh */}
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(124,157,255,0.08)_0%,transparent_60%)] animate-pulse" style={{ animationDuration: '4s' }} />
+          {/* Background glass decorative bubbles - matching landing page exactly */}
+          <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full bg-primary/10 dark:bg-primary-dark/5 blur-3xl animate-pulse" style={{ animationDuration: '4s' }} />
+          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 rounded-full bg-secondary/10 dark:bg-secondary-dark/5 blur-3xl animate-pulse" style={{ animationDuration: '4s' }} />
           
           <div className="flex flex-col items-center max-w-lg px-6 text-center z-10">
             {/* Spinning decorative ring & logo */}
@@ -92,24 +93,24 @@ const Login = () => {
               <img 
                 src={logo} 
                 alt="NEC Logo" 
-                className="w-24 h-24 rounded-full object-contain shadow-2xl animate-pulse bg-white p-1" 
+                className="w-24 h-24 rounded-full object-contain shadow-2xl animate-pulse bg-white dark:bg-slate-900 p-1 border border-slate-200/50 dark:border-slate-800/50" 
                 style={{ animationDuration: '2s' }}
               />
             </div>
 
             {/* Typography */}
-            <h1 className="text-xs font-extrabold tracking-[0.35em] text-primary uppercase mb-2 animate-fade-in">
+            <h1 className="text-xs font-extrabold tracking-[0.35em] text-primary-dark dark:text-primary uppercase mb-2 animate-fade-in">
               Narasaraopeta Engineering College
             </h1>
-            <h2 className="text-2xl font-extrabold tracking-tight text-white mb-2">
+            <h2 className="text-2xl font-extrabold tracking-tight text-customText dark:text-customText-dark mb-2">
               Faculty Attendance Tracker
             </h2>
-            <p className="text-[10px] text-slate-500 font-bold tracking-widest uppercase mb-8">
+            <p className="text-[10px] text-customText-muted dark:text-customText-mutedDark font-bold tracking-widest uppercase mb-8">
               Real-Time Portal
             </p>
 
             {/* Filling Progress Bar */}
-            <div className="w-48 h-1 bg-slate-800 rounded-full overflow-hidden relative">
+            <div className="w-48 h-1 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden relative border border-slate-300/30 dark:border-slate-700/30">
               <div 
                 className="h-full bg-gradient-to-r from-primary to-secondary transition-all duration-[2450ms] ease-out"
                 style={{
