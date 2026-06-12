@@ -70,7 +70,10 @@ const gracefulShutdown = async () => {
   process.exit(0);
 };
 
-process.on('SIGINT', gracefulShutdown);
-process.on('SIGTERM', gracefulShutdown);
+if (!process.env.VERCEL) {
+  startServer();
+} else {
+  console.warn('[Vercel Serverless] Running in serverless mode. WebSockets (Socket.IO) and background cron jobs are not supported.');
+}
 
-startServer();
+module.exports = app;

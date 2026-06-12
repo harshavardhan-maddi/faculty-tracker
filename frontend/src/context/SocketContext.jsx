@@ -20,8 +20,8 @@ export const SocketProvider = ({ children }) => {
       return;
     }
 
-    // Connect to server (using the explicit port since backend is on 5000)
-    const socketUrl = window.location.origin.includes('localhost') ? 'http://localhost:5000' : window.location.origin;
+    // Connect to server (using the environment variable VITE_API_URL if configured, otherwise fallback to localhost)
+    const socketUrl = import.meta.env.VITE_API_URL || (window.location.origin.includes('localhost') ? 'http://localhost:5000' : window.location.origin);
     const socketConn = io(socketUrl, {
       auth: { token },
     });
