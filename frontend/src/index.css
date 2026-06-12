@@ -1,0 +1,99 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  /* Glassmorphism card styles */
+  .glass-card {
+    @apply bg-white/70 dark:bg-slate-900/60 backdrop-blur-md border border-white/40 dark:border-slate-800/40 shadow-glass dark:shadow-glass-dark rounded-2xl transition-all duration-300;
+  }
+  
+  .glass-card-hover {
+    @apply hover:shadow-glass-hover hover:-translate-y-0.5 hover:border-primary/30 dark:hover:border-primary-dark/30;
+  }
+
+  .glass-input {
+    @apply w-full px-4 py-3 bg-white/50 dark:bg-slate-950/40 backdrop-blur-sm border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent dark:focus:ring-primary-dark transition-all text-customText dark:text-customText-dark;
+  }
+
+  /* Glassmorphism sidebar and headers */
+  .glass-navbar {
+    @apply bg-white/60 dark:bg-slate-900/60 backdrop-blur-lg border-b border-white/30 dark:border-slate-800/30 shadow-sm sticky top-0 z-40;
+  }
+
+  .glass-sidebar {
+    @apply bg-white/50 dark:bg-slate-950/40 backdrop-blur-md border-r border-slate-200/50 dark:border-slate-800/30;
+  }
+
+  /* Premium Buttons */
+  .btn-primary {
+    @apply px-4 py-2.5 bg-gradient-to-r from-primary to-primary-dark hover:from-primary-dark hover:to-primary text-white rounded-xl font-medium shadow-sm hover:shadow-md active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:pointer-events-none;
+  }
+
+  .btn-secondary {
+    @apply px-4 py-2.5 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-customText dark:text-customText-dark border border-slate-200 dark:border-slate-700 rounded-xl font-medium active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:pointer-events-none;
+  }
+
+  .btn-danger {
+    @apply px-4 py-2.5 bg-danger/15 hover:bg-danger/25 text-red-600 dark:text-red-400 rounded-xl font-medium active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-2;
+  }
+}
+
+/* Animations & Keyframes */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Pulse status animation */
+.status-dot-pulse {
+  @apply relative flex h-3.5 w-3.5;
+}
+
+.status-dot-pulse .pulse-ring {
+  @apply animate-ping absolute inline-flex h-full w-full rounded-full opacity-75;
+}
+
+.status-dot-pulse .core-dot {
+  @apply relative inline-flex rounded-full h-3.5 w-3.5;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(124, 157, 255, 0.2);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(124, 157, 255, 0.4);
+}
+
+/* Print optimizations */
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-card {
+    border: 1px solid #e2e8f0 !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    page-break-inside: avoid;
+  }
+}
