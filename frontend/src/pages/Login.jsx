@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Eye, EyeOff, User, Lock } from 'lucide-react';
@@ -14,6 +14,30 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const [introVisible, setIntroVisible] = useState(true);
+  const [introFadeOut, setIntroFadeOut] = useState(false);
+  const [progressWidth, setProgressWidth] = useState('0%');
+
+  useEffect(() => {
+    const progressTimer = setTimeout(() => {
+      setProgressWidth('100%');
+    }, 50);
+
+    const fadeTimer = setTimeout(() => {
+      setIntroFadeOut(true);
+    }, 2500);
+
+    const unmountTimer = setTimeout(() => {
+      setIntroVisible(false);
+    }, 3200);
+
+    return () => {
+      clearTimeout(progressTimer);
+      clearTimeout(fadeTimer);
+      clearTimeout(unmountTimer);
+    };
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -42,6 +66,60 @@ const Login = () => {
 
   return (
     <>
+      {introVisible && (
+        <div 
+          className={`fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-950 text-white select-none transition-all duration-700 ${
+            introFadeOut ? 'opacity-0 scale-95 pointer-events-none' : 'opacity-100 scale-100'
+          }`}
+        >
+          {/* Subtle moving background mesh */}
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(124,157,255,0.08)_0%,transparent_60%)] animate-pulse" style={{ animationDuration: '4s' }} />
+          
+          <div className="flex flex-col items-center max-w-lg px-6 text-center z-10">
+            {/* Spinning decorative ring & logo */}
+            <div className="relative w-32 h-32 flex items-center justify-center mb-6">
+              {/* Spinning loading gradient ring */}
+              <div 
+                className="absolute inset-0 rounded-full border-[3px] border-t-primary border-r-transparent border-b-secondary border-l-transparent animate-spin"
+                style={{ animationDuration: '1.2s' }}
+              />
+              {/* Secondary reverse spinning outer ring for high-end look */}
+              <div 
+                className="absolute -inset-2 rounded-full border border-t-transparent border-r-secondary/40 border-b-transparent border-l-primary/40 animate-spin"
+                style={{ animationDuration: '2.5s', animationDirection: 'reverse' }}
+              />
+              {/* Logo with scale up animation */}
+              <img 
+                src={logo} 
+                alt="NEC Logo" 
+                className="w-24 h-24 rounded-full object-contain shadow-2xl animate-pulse bg-white p-1" 
+                style={{ animationDuration: '2s' }}
+              />
+            </div>
+
+            {/* Typography */}
+            <h1 className="text-xs font-extrabold tracking-[0.35em] text-primary uppercase mb-2 animate-fade-in">
+              Narasaraopeta Engineering College
+            </h1>
+            <h2 className="text-2xl font-extrabold tracking-tight text-white mb-2">
+              Faculty Attendance Tracker
+            </h2>
+            <p className="text-[10px] text-slate-500 font-bold tracking-widest uppercase mb-8">
+              Real-Time Portal
+            </p>
+
+            {/* Filling Progress Bar */}
+            <div className="w-48 h-1 bg-slate-800 rounded-full overflow-hidden relative">
+              <div 
+                className="h-full bg-gradient-to-r from-primary to-secondary transition-all duration-[2450ms] ease-out"
+                style={{
+                  width: progressWidth
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
       {loading && <Loading />}
       <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-4 relative overflow-hidden transition-colors duration-300">
         
