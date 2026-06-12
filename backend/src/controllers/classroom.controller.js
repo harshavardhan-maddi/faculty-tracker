@@ -1,16 +1,5 @@
 const prisma = require('../db');
-
-const getTodayDay = () => {
-  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  return days[new Date().getDay()];
-};
-
-const getCurrentTimeInHHMM = () => {
-  const now = new Date();
-  const hours = String(now.getHours()).padStart(2, '0');
-  const minutes = String(now.getMinutes()).padStart(2, '0');
-  return `${hours}:${minutes}`;
-};
+const { getTodayDay, getCurrentTimeInHHMM, getLocalDayBounds } = require('../utils/date');
 
 const getClassrooms = async (req, res) => {
   try {
@@ -21,10 +10,7 @@ const getClassrooms = async (req, res) => {
     const today = getTodayDay();
     const currentTime = getCurrentTimeInHHMM();
 
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
-    const endOfToday = new Date();
-    endOfToday.setHours(23, 59, 59, 999);
+    const { start: startOfToday, end: endOfToday } = getLocalDayBounds();
 
     const result = [];
 

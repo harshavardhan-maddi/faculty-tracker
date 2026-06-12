@@ -1,9 +1,5 @@
 const prisma = require('../db');
-
-const getTodayDay = () => {
-  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  return days[new Date().getDay()];
-};
+const { getTodayDay, getLocalDayBounds, getWeekdayForDate } = require('../utils/date');
 
 const getLogsReport = async (req, res) => {
   const { faculty, classroomId, date } = req.query;
@@ -19,10 +15,7 @@ const getLogsReport = async (req, res) => {
   }
 
   if (date) {
-    const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
+    const { start: startOfDay, end: endOfDay } = getLocalDayBounds(date);
     
     where.createdAt = {
       gte: startOfDay,
@@ -45,8 +38,7 @@ const getLogsReport = async (req, res) => {
 
     for (const log of logs) {
       // Find day name from log date to locate timetable
-      const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-      const logDay = days[new Date(log.createdAt).getDay()];
+      const logDay = getWeekdayForDate(log.createdAt);
 
       const timetable = await prisma.timetable.findFirst({
         where: {
@@ -82,10 +74,7 @@ const getLogsReport = async (req, res) => {
 
 const getDashboardStats = async (req, res) => {
   try {
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
-    const endOfToday = new Date();
-    endOfToday.setHours(23, 59, 59, 999);
+    const { start: startOfToday, end: endOfToday } = getLocalDayBounds();
 
     // Basic counts
     const classroomCount = await prisma.classroom.count();
@@ -148,8 +137,7 @@ const getDashboardStats = async (req, res) => {
 
     const enrichedRecent = [];
     for (const log of recentLogs) {
-      const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-      const logDay = days[new Date(log.createdAt).getDay()];
+      const logDay = getWeekdayForDate(log.createdAt);
 
       const tt = await prisma.timetable.findFirst({
         where: {

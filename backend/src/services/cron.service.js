@@ -1,28 +1,14 @@
 const cron = require('node-cron');
 const prisma = require('../db');
 const { emitClassroomStatusUpdate, emitNotification } = require('./socket.service');
-
-const getTodayDay = () => {
-  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  return days[new Date().getDay()];
-};
-
-const getCurrentTimeInHHMM = () => {
-  const now = new Date();
-  const hours = String(now.getHours()).padStart(2, '0');
-  const minutes = String(now.getMinutes()).padStart(2, '0');
-  return `${hours}:${minutes}`;
-};
+const { getTodayDay, getCurrentTimeInHHMM, getLocalDayBounds } = require('../utils/date');
 
 const checkExpiredPeriods = async () => {
   try {
     const today = getTodayDay();
     const currentTime = getCurrentTimeInHHMM();
 
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
-    const endOfToday = new Date();
-    endOfToday.setHours(23, 59, 59, 999);
+    const { start: startOfToday, end: endOfToday } = getLocalDayBounds();
 
     // Find all timetable periods for today that have already ended
     const expiredPeriods = await prisma.timetable.findMany({
