@@ -183,7 +183,7 @@ const Dashboard = () => {
       
       {/* Overview stats cards Row */}
       {stats && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <StatCard
             title="Total Classrooms"
             value={stats.classrooms}
@@ -191,23 +191,10 @@ const Dashboard = () => {
             description="Monitoring live"
           />
           <StatCard
-            title="Faculty List"
-            value={stats.faculties}
+            title="Faculties Present Today"
+            value={stats.presentToday}
             icon={Users2}
-            description="Active list"
-          />
-          <StatCard
-            title="Class Representatives"
-            value={stats.crs}
-            icon={UserSquare}
-            description="Reporting accounts"
-          />
-          <StatCard
-            title="Faculty Presence"
-            value={`${stats.presencePercentage}%`}
-            icon={Percent}
-            description={`Today: ${stats.presentToday} Present / ${stats.absentToday} Absent`}
-            color={stats.presencePercentage >= 75 ? 'success' : stats.presencePercentage >= 50 ? 'warning' : 'danger'}
+            description={`Out of ${stats.faculties} total faculties`}
           />
         </div>
       )}
