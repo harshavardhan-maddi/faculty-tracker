@@ -78,7 +78,11 @@ const getDashboardStats = async (req, res) => {
 
     // Basic counts
     const classroomCount = await prisma.classroom.count();
-    const facultyCount = await prisma.faculty.count();
+    const uniqueFaculties = await prisma.timetable.findMany({
+      select: { facultyName: true },
+      distinct: ['facultyName'],
+    });
+    const facultyCount = uniqueFaculties.length;
     const crCount = await prisma.user.count({ where: { role: 'CR' } });
 
     // Today's logs counts
