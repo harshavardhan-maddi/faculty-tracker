@@ -141,30 +141,6 @@ const Login = () => {
           </button>
         </form>
 
-        {/* Demo accounts cheat sheet footer */}
-        <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800 text-center">
-          <p className="text-[11px] font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider mb-2.5">
-            Quick Sandbox Accounts:
-          </p>
-          <div className="grid grid-cols-3 gap-2 text-[10px] text-slate-500 font-medium bg-slate-100/50 dark:bg-slate-900/30 p-2.5 rounded-xl border border-slate-200/20 dark:border-slate-800/20">
-            <div>
-              <p className="font-bold text-slate-700 dark:text-slate-300">HOD</p>
-              <code className="text-primary-dark">hod123</code>
-            </div>
-            <div>
-              <p className="font-bold text-slate-700 dark:text-slate-300">Sub Admin</p>
-              <code className="text-primary-dark">subadmin123</code>
-            </div>
-            <div>
-              <p className="font-bold text-slate-700 dark:text-slate-300">CR (CSE 3)</p>
-              <code className="text-primary-dark">cr_cse3</code>
-            </div>
-          </div>
-          <p className="text-[9px] text-customText-muted dark:text-customText-mutedDark mt-2 italic">
-            Password is <code className="font-bold">password123</code> for all sandbox users.
-          </p>
-        </div>
-
       </div>
     </div>
     </>
