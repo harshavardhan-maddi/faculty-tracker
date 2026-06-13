@@ -51,7 +51,7 @@ const AppRoutes = () => {
       />
 
       <Route
-        path="/timetables"
+        path="/classrooms"
         element={
           <PrivateRoute allowedRoles={['HOD', 'SUB_ADMIN']}>
             <Layout>

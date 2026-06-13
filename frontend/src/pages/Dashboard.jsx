@@ -14,11 +14,12 @@ import {
   Search, 
   X,
   History,
-  Info
+  Info,
+  Edit
 } from 'lucide-react';
 
 const Dashboard = () => {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const { socket } = useSocket();
 
   const [classrooms, setClassrooms] = useState([]);
@@ -33,6 +34,53 @@ const Dashboard = () => {
   const [classroomDetails, setClassroomDetails] = useState(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [modalDateFilter, setModalDateFilter] = useState('');
+
+  // Edit Classroom States (for admin/sub-admin quick edit from modal)
+  const [isEditing, setIsEditing] = useState(false);
+  const [editRoomNumber, setEditRoomNumber] = useState('');
+  const [editClassName, setEditClassName] = useState('');
+  const [editError, setEditError] = useState('');
+  const [editSubmitting, setEditSubmitting] = useState(false);
+
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedClassroom) return;
+    setEditSubmitting(true);
+    setEditError('');
+
+    try {
+      const res = await fetch(`/api/classrooms/${selectedClassroom.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ roomNumber: editRoomNumber, className: editClassName }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to update classroom');
+
+      // Update local classroom details view
+      setSelectedClassroom(data);
+      if (classroomDetails) {
+        setClassroomDetails(prev => ({
+          ...prev,
+          roomNumber: data.roomNumber,
+          className: data.className
+        }));
+      }
+
+      // Turn off editing
+      setIsEditing(false);
+
+      // Silently refresh dashboard classrooms grid
+      fetchDashboardData(true);
+    } catch (err) {
+      setEditError(err.message);
+    } finally {
+      setEditSubmitting(false);
+    }
+  };
 
   const fetchDashboardData = async (isSilent = false) => {
     try {
@@ -194,18 +242,12 @@ const Dashboard = () => {
       
       {/* Overview stats cards Row */}
       {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4">
           <StatCard
             title="Total Classrooms"
             value={stats.classrooms}
             icon={Building}
             description="Monitoring live"
-          />
-          <StatCard
-            title="Faculty Entries Today"
-            value={stats.presentToday}
-            icon={Users2}
-            description="Total successful entries logged today"
           />
         </div>
       )}
@@ -271,25 +313,94 @@ const Dashboard = () => {
       {/* CLASSROOM DETAILS MODAL (TIMETABLE & HISTORY LOGS) */}
       {selectedClassroom && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => setSelectedClassroom(null)} />
+          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => { setSelectedClassroom(null); setIsEditing(false); }} />
           
           <div className="relative glass-card bg-white dark:bg-slate-900 border border-white/60 w-full max-w-4xl max-h-[85vh] overflow-y-auto p-6 shadow-2xl animate-fade-in z-10">
             <button
-              onClick={() => setSelectedClassroom(null)}
+              onClick={() => { setSelectedClassroom(null); setIsEditing(false); }}
               className="absolute top-4 right-4 p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
             >
               <X size={20} />
             </button>
 
             {/* Modal Title */}
-            <div className="mb-6">
-              <span className="text-xs font-bold text-primary tracking-wide uppercase">
-                {selectedClassroom.roomNumber} Detail Monitor
-              </span>
-              <h2 className="text-2xl font-extrabold text-customText dark:text-customText-dark">
-                {selectedClassroom.className}
-              </h2>
-            </div>
+            {isEditing ? (
+              <form onSubmit={handleEditSubmit} className="mb-6 bg-slate-50/50 dark:bg-slate-950/20 p-4 rounded-xl border border-slate-200/40 dark:border-slate-800/40 animate-fade-in space-y-3 mr-8">
+                <div className="flex items-center justify-between pb-2 border-b">
+                  <h3 className="font-extrabold text-sm text-customText dark:text-customText-dark">Edit Classroom Info</h3>
+                  {editError && <span className="text-[10px] text-red-500 font-bold">⚠️ {editError}</span>}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider mb-1">
+                      Room Number
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={editRoomNumber}
+                      onChange={(e) => setEditRoomNumber(e.target.value)}
+                      className="glass-input text-xs py-1.5"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider mb-1">
+                      Class Name
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={editClassName}
+                      onChange={(e) => setEditClassName(e.target.value)}
+                      className="glass-input text-xs py-1.5"
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2 pt-2 border-t text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditing(false)}
+                    className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 font-semibold"
+                    disabled={editSubmitting}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-3 py-1.5 rounded-lg bg-primary hover:bg-primary-dark text-white font-semibold flex items-center gap-1"
+                    disabled={editSubmitting}
+                  >
+                    {editSubmitting ? 'Saving...' : 'Save Changes'}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="mb-6 flex justify-between items-start mr-8">
+                <div>
+                  <span className="text-xs font-semibold text-primary tracking-wide uppercase">
+                    {selectedClassroom.roomNumber} Detail Monitor
+                  </span>
+                  <h2 className="text-2xl font-extrabold text-customText dark:text-customText-dark">
+                    {selectedClassroom.className}
+                  </h2>
+                </div>
+                {(user?.role === 'HOD' || user?.role === 'SUB_ADMIN') && (
+                  <button
+                    onClick={() => {
+                      setIsEditing(true);
+                      setEditRoomNumber(selectedClassroom.roomNumber);
+                      setEditClassName(selectedClassroom.className);
+                      setEditError('');
+                    }}
+                    className="flex items-center gap-1 text-xs font-bold text-primary hover:bg-primary/10 px-2.5 py-1.5 rounded-lg border border-primary/20 transition-all shrink-0"
+                    title="Edit Classroom Info"
+                  >
+                    <Edit size={14} />
+                    <span>Edit Info</span>
+                  </button>
+                )}
+              </div>
+            )}
 
             {loadingDetails ? (
               <div className="flex flex-col items-center justify-center py-20 gap-3">

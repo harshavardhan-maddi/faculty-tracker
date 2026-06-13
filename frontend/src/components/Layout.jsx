@@ -102,7 +102,7 @@ const Layout = ({ children }) => {
   if (user?.role === 'HOD' || user?.role === 'SUB_ADMIN') {
     navLinks.push(
       { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-      { name: 'Timetables', path: '/timetables', icon: CalendarDays },
+      { name: 'Classrooms', path: '/classrooms', icon: CalendarDays },
       { name: 'Reports', path: '/reports', icon: FileSpreadsheet }
     );
     if (user?.role === 'HOD') {

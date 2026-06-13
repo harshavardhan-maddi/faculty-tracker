@@ -2,13 +2,9 @@ const prisma = require('../db');
 const { getTodayDay, getLocalDayBounds, getWeekdayForDate, STANDARD_PERIODS } = require('../utils/date');
 
 const getLogsReport = async (req, res) => {
-  const { faculty, classroomId, date } = req.query;
+  const { classroomId, date, startDate, endDate } = req.query;
 
   const where = {};
-
-  if (faculty) {
-    where.facultyName = faculty;
-  }
 
   if (classroomId) {
     where.classroomId = parseInt(classroomId);
@@ -20,6 +16,14 @@ const getLogsReport = async (req, res) => {
     where.createdAt = {
       gte: startOfDay,
       lte: endOfDay,
+    };
+  } else if (startDate && endDate) {
+    const { start: startOfRange } = getLocalDayBounds(startDate);
+    const { end: endOfRange } = getLocalDayBounds(endDate);
+
+    where.createdAt = {
+      gte: startOfRange,
+      lte: endOfRange,
     };
   }
 

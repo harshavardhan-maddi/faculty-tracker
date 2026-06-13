@@ -19,15 +19,16 @@ const Reports = () => {
   // Logs list
   const [logs, setLogs] = useState([]);
   const [classrooms, setClassrooms] = useState([]);
-  const [faculties, setFaculties] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Filters state
+  const [reportMode, setReportMode] = useState('single'); // 'single' (By Classroom and Date) or 'range' (Date Range)
   const [filterClassroom, setFilterClassroom] = useState('');
-  const [filterFaculty, setFilterFaculty] = useState('');
   const [filterDate, setFilterDate] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
-  // Fetch unique faculties list
+  // Fetch unique filter options
   const fetchFilterOptions = async () => {
     try {
       const classRes = await fetch('/api/classrooms', {
@@ -35,12 +36,6 @@ const Reports = () => {
       });
       const classData = await classRes.json();
       setClassrooms(classData);
-
-      const facultyRes = await fetch('/api/timetables/faculties', {
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
-      const facultyData = await facultyRes.json();
-      setFaculties(facultyData);
     } catch (error) {
       console.error('Failed to load filter options:', error);
     }
@@ -50,9 +45,13 @@ const Reports = () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      if (filterClassroom) params.append('classroomId', filterClassroom);
-      if (filterFaculty) params.append('faculty', filterFaculty);
-      if (filterDate) params.append('date', filterDate);
+      if (reportMode === 'single') {
+        if (filterClassroom) params.append('classroomId', filterClassroom);
+        if (filterDate) params.append('date', filterDate);
+      } else {
+        if (startDate) params.append('startDate', startDate);
+        if (endDate) params.append('endDate', endDate);
+      }
 
       const res = await fetch(`/api/reports?${params.toString()}`, {
         headers: { 'Authorization': `Bearer ${token}` },
@@ -72,13 +71,13 @@ const Reports = () => {
 
   useEffect(() => {
     fetchLogsReport();
-  }, [token, filterClassroom, filterFaculty, filterDate]);
+  }, [token, reportMode, filterClassroom, filterDate, startDate, endDate]);
 
   // Real-time log appending if socket triggers status update
   useEffect(() => {
     if (!socket) return;
 
-    socket.on('classroom_status_update', (data) => {
+    socket.on('classroom_status_update', () => {
       // Re-fetch report data to include new logs in database
       fetchLogsReport();
     });
@@ -86,7 +85,7 @@ const Reports = () => {
     return () => {
       socket.off('classroom_status_update');
     };
-  }, [socket, filterClassroom, filterFaculty, filterDate]);
+  }, [socket, reportMode, filterClassroom, filterDate, startDate, endDate]);
 
   // Excel/CSV Export
   const handleExportCSV = () => {
@@ -160,88 +159,137 @@ const Reports = () => {
       </div>
 
       {/* FILTER TOOLBAR PANEL (Hidden on print) */}
-      <div className="glass-card p-5 border border-slate-200/50 dark:border-slate-800/40 no-print">
-        <div className="flex items-center gap-2 mb-4 font-bold text-xs uppercase text-customText-muted dark:text-customText-mutedDark tracking-wider">
+      <div className="glass-card p-5 border border-slate-200/50 dark:border-slate-800/40 no-print space-y-4">
+        {/* Toggle mode selector tabs */}
+        <div className="flex bg-slate-100 dark:bg-slate-950/40 p-1 rounded-xl border border-slate-200/40 dark:border-slate-800/60 max-w-md">
+          <button
+            onClick={() => {
+              setReportMode('single');
+              setStartDate('');
+              setEndDate('');
+            }}
+            className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all ${
+              reportMode === 'single'
+                ? 'bg-white dark:bg-slate-900 text-primary-dark dark:text-primary shadow-sm'
+                : 'text-customText-muted dark:text-customText-mutedDark hover:text-customText'
+            }`}
+          >
+            By Classroom and Date
+          </button>
+          <button
+            onClick={() => {
+              setReportMode('range');
+              setFilterClassroom('');
+              setFilterDate('');
+            }}
+            className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all ${
+              reportMode === 'range'
+                ? 'bg-white dark:bg-slate-900 text-primary-dark dark:text-primary shadow-sm'
+                : 'text-customText-muted dark:text-customText-mutedDark hover:text-customText'
+            }`}
+          >
+            All Classrooms with Date Range
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2 mb-2 font-bold text-xs uppercase text-customText-muted dark:text-customText-mutedDark tracking-wider">
           <Filter size={14} />
-          <span>Filter Criteria</span>
+          <span>Filter Criteria ({reportMode === 'single' ? 'Classroom & Date' : 'All Classrooms Date Range'})</span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {/* Classroom filter */}
-          <div>
-            <label className="block text-xs font-bold text-customText-muted dark:text-customText-mutedDark uppercase mb-1.5">
-              Classroom
-            </label>
-            <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
-                <Building size={14} />
-              </span>
-              <select
-                value={filterClassroom}
-                onChange={(e) => setFilterClassroom(e.target.value)}
-                className="glass-input pl-9 text-xs py-2.5"
-              >
-                <option value="">All Classrooms</option>
-                {classrooms.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.className} ({c.roomNumber})
-                  </option>
-                ))}
-              </select>
+        {reportMode === 'single' ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Classroom filter */}
+            <div>
+              <label className="block text-xs font-bold text-customText-muted dark:text-customText-mutedDark uppercase mb-1.5">
+                Classroom
+              </label>
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
+                  <Building size={14} />
+                </span>
+                <select
+                  value={filterClassroom}
+                  onChange={(e) => setFilterClassroom(e.target.value)}
+                  className="glass-input pl-9 text-xs py-2.5"
+                >
+                  <option value="">All Classrooms</option>
+                  {classrooms.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.className} ({c.roomNumber})
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
-          </div>
 
-          {/* Faculty filter */}
-          <div>
-            <label className="block text-xs font-bold text-customText-muted dark:text-customText-mutedDark uppercase mb-1.5">
-              Faculty Member
-            </label>
-            <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
-                <User size={14} />
-              </span>
-              <select
-                value={filterFaculty}
-                onChange={(e) => setFilterFaculty(e.target.value)}
-                className="glass-input pl-9 text-xs py-2.5"
-              >
-                <option value="">All Faculty</option>
-                {faculties.map((f) => (
-                  <option key={f.id} value={f.facultyName}>
-                    {f.facultyName}
-                  </option>
-                ))}
-              </select>
+            {/* Date filter */}
+            <div>
+              <label className="block text-xs font-bold text-customText-muted dark:text-customText-mutedDark uppercase mb-1.5">
+                Report Date
+              </label>
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
+                  <Calendar size={14} />
+                </span>
+                <input
+                  type="date"
+                  value={filterDate}
+                  onChange={(e) => setFilterDate(e.target.value)}
+                  className="glass-input pl-9 text-xs py-2.5"
+                />
+              </div>
             </div>
           </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Start Date filter */}
+            <div>
+              <label className="block text-xs font-bold text-customText-muted dark:text-customText-mutedDark uppercase mb-1.5">
+                Start Date
+              </label>
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
+                  <Calendar size={14} />
+                </span>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="glass-input pl-9 text-xs py-2.5"
+                />
+              </div>
+            </div>
 
-          {/* Date filter */}
-          <div>
-            <label className="block text-xs font-bold text-customText-muted dark:text-customText-mutedDark uppercase mb-1.5">
-              Report Date
-            </label>
-            <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
-                <Calendar size={14} />
-              </span>
-              <input
-                type="date"
-                value={filterDate}
-                onChange={(e) => setFilterDate(e.target.value)}
-                className="glass-input pl-9 text-xs py-2.5"
-              />
+            {/* End Date filter */}
+            <div>
+              <label className="block text-xs font-bold text-customText-muted dark:text-customText-mutedDark uppercase mb-1.5">
+                End Date
+              </label>
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
+                  <Calendar size={14} />
+                </span>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="glass-input pl-9 text-xs py-2.5"
+                />
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Clear filters buttons */}
-        {(filterClassroom || filterFaculty || filterDate) && (
+        {(filterClassroom || filterDate || startDate || endDate) && (
           <div className="flex justify-end mt-4">
             <button
               onClick={() => {
                 setFilterClassroom('');
-                setFilterFaculty('');
                 setFilterDate('');
+                setStartDate('');
+                setEndDate('');
               }}
               className="text-xs font-semibold text-primary hover:underline flex items-center gap-1"
             >
@@ -254,13 +302,20 @@ const Reports = () => {
 
       {/* PRINT-READY HEADER (Shown ONLY on print) */}
       <div className="hidden print:block mb-6 text-center">
-        <h1 className="text-2xl font-extrabold text-slate-900">Faculty Entry logs Report</h1>
+        <h1 className="text-2xl font-extrabold text-slate-900">Classroom Presence Logs Report</h1>
         <p className="text-xs text-slate-500 mt-1">Generated dynamically from Faculty Tracker</p>
         <div className="flex justify-center gap-6 text-[10px] text-slate-500 mt-2 font-medium">
           <span>Date Run: {new Date().toLocaleDateString()}</span>
-          {filterClassroom && <span>Classroom Filter Applied</span>}
-          {filterFaculty && <span>Faculty Filter: {filterFaculty}</span>}
-          {filterDate && <span>Report Date: {new Date(filterDate).toLocaleDateString()}</span>}
+          {reportMode === 'single' ? (
+            <>
+              {filterClassroom && <span>Classroom Filter Applied</span>}
+              {filterDate && <span>Report Date: {new Date(filterDate).toLocaleDateString()}</span>}
+            </>
+          ) : (
+            <>
+              {startDate && endDate && <span>Date Range: {new Date(startDate).toLocaleDateString()} - {new Date(endDate).toLocaleDateString()}</span>}
+            </>
+          )}
         </div>
       </div>
 
