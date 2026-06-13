@@ -23,6 +23,17 @@ const login = async (req, res) => {
       return res.status(401).json({ message: 'Invalid User ID or password' });
     }
 
+    if (user.role === 'CR') {
+      const trackingSetting = await prisma.systemSetting.findUnique({
+        where: { key: 'trackingEnabled' },
+      });
+      const trackingEnabled = trackingSetting ? trackingSetting.value === 'true' : true;
+
+      if (!trackingEnabled) {
+        return res.status(403).json({ message: 'Tracking is disabled. College is on Holiday.' });
+      }
+    }
+
     const token = jwt.sign(
       {
         id: user.id,

@@ -42,6 +42,103 @@ const Dashboard = () => {
   const [editError, setEditError] = useState('');
   const [editSubmitting, setEditSubmitting] = useState(false);
 
+  // Tracking control & Clear history states
+  const [trackingEnabled, setTrackingEnabled] = useState(true);
+  const [loadingTracking, setLoadingTracking] = useState(true);
+  const [toggleSubmitting, setToggleSubmitting] = useState(false);
+  const [clearAction, setClearAction] = useState('');
+  const [clearClassroomId, setClearClassroomId] = useState('');
+  const [clearStartDate, setClearStartDate] = useState('');
+  const [clearEndDate, setClearEndDate] = useState('');
+  const [clearSubmitting, setClearSubmitting] = useState(false);
+  const [clearSuccess, setClearSuccess] = useState('');
+  const [clearError, setClearError] = useState('');
+
+  const fetchTrackingStatus = async () => {
+    try {
+      const res = await fetch('/api/settings/tracking', {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setTrackingEnabled(data.trackingEnabled);
+      }
+    } catch (err) {
+      console.error('Failed to fetch tracking status:', err);
+    } finally {
+      setLoadingTracking(false);
+    }
+  };
+
+  const handleToggleTracking = async () => {
+    if (toggleSubmitting) return;
+    setToggleSubmitting(true);
+    try {
+      const newValue = !trackingEnabled;
+      const res = await fetch('/api/settings/tracking', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ trackingEnabled: newValue }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to update tracking status');
+      setTrackingEnabled(data.trackingEnabled);
+      fetchDashboardData(true);
+    } catch (err) {
+      console.error('Failed to toggle tracking:', err);
+    } finally {
+      setToggleSubmitting(false);
+    }
+  };
+
+  const handleClearHistory = async (e) => {
+    e.preventDefault();
+    if (!clearAction) return;
+
+    let confirmMsg = 'Are you sure you want to perform this clear logs action? This cannot be undone.';
+    if (clearAction === 'all') {
+      confirmMsg = '⚠️ WARNING: Are you sure you want to clear ALL entry logs history across all classrooms? This will permanently delete all records.';
+    }
+    if (!window.confirm(confirmMsg)) return;
+
+    setClearSubmitting(true);
+    setClearError('');
+    setClearSuccess('');
+
+    try {
+      const res = await fetch('/api/settings/clear-history', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          action: clearAction,
+          classroomId: clearClassroomId ? parseInt(clearClassroomId) : undefined,
+          startDate: clearStartDate || undefined,
+          endDate: clearEndDate || undefined,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to clear log history');
+
+      setClearSuccess(data.message || 'Logs history cleared successfully.');
+      setClearAction('');
+      setClearClassroomId('');
+      setClearStartDate('');
+      setClearEndDate('');
+      fetchDashboardData();
+    } catch (err) {
+      setClearError(err.message);
+    } finally {
+      setClearSubmitting(false);
+    }
+  };
+
   const handleEditSubmit = async (e) => {
     e.preventDefault();
     if (!selectedClassroom) return;
@@ -118,6 +215,7 @@ const Dashboard = () => {
 
   useEffect(() => {
     fetchDashboardData();
+    fetchTrackingStatus();
 
     // Set up polling interval to fetch updates periodically (every 5 seconds)
     const interval = setInterval(() => {
@@ -131,8 +229,19 @@ const Dashboard = () => {
   useEffect(() => {
     if (!socket) return;
 
+    socket.on('tracking_status_update', (data) => {
+      console.log('[Socket Event] Tracking status update:', data);
+      setTrackingEnabled(data.trackingEnabled);
+      fetchDashboardData(true);
+    });
+
     socket.on('classroom_status_update', (data) => {
       console.log('[Socket Event] Classroom update received:', data);
+
+      if (data.cleared) {
+        fetchDashboardData();
+        return;
+      }
 
       // Update Classroom Card state locally
       setClassrooms((prev) =>
@@ -240,17 +349,167 @@ const Dashboard = () => {
         </div>
       )}
       
-      {/* Overview stats cards Row */}
-      {stats && (
-        <div className="grid grid-cols-1 gap-4">
-          <StatCard
-            title="Total Classrooms"
-            value={stats.classrooms}
-            icon={Building}
-            description="Monitoring live"
-          />
-        </div>
-      )}
+      {/* Overview stats cards Row & System Control Panel */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
+        {stats && (
+          <div className="lg:col-span-1 flex">
+            <StatCard
+              title="Total Classrooms"
+              value={stats.classrooms}
+              icon={Building}
+              description={trackingEnabled ? "Monitoring live" : "Tracking is disabled"}
+            />
+          </div>
+        )}
+
+        {(user?.role === 'HOD' || user?.role === 'SUB_ADMIN') && (
+          <div className="lg:col-span-2 glass-card p-5 border border-slate-200/50 dark:border-slate-800/40 flex flex-col justify-between space-y-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div>
+                <h3 className="font-extrabold text-sm text-customText dark:text-customText-dark uppercase tracking-wider">
+                  System Settings & Controls
+                </h3>
+                <p className="text-[11px] text-customText-muted dark:text-customText-mutedDark mt-0.5">
+                  Configure tracking status and manage database records
+                </p>
+              </div>
+
+              {/* Electric Switch Toggle */}
+              <div className="flex items-center gap-3 shrink-0">
+                <span className="text-xs font-bold text-customText">
+                  {trackingEnabled ? (
+                    <span className="text-green-600 dark:text-green-400 font-extrabold uppercase bg-green-500/10 px-2 py-0.5 rounded border border-green-500/10">Classes Running</span>
+                  ) : (
+                    <span className="text-purple-600 dark:text-purple-400 font-extrabold uppercase bg-purple-500/10 px-2 py-0.5 rounded border border-purple-500/10">College on Holiday</span>
+                  )}
+                </span>
+                
+                <button
+                  type="button"
+                  onClick={handleToggleTracking}
+                  disabled={toggleSubmitting}
+                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    trackingEnabled ? 'bg-primary' : 'bg-slate-300 dark:bg-slate-700'
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      trackingEnabled ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
+
+            {/* Clear History Action */}
+            <div className="border-t border-slate-100 dark:border-slate-850 pt-3">
+              <form onSubmit={handleClearHistory} className="space-y-3">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div className="w-full sm:w-auto">
+                    <label className="block text-[10px] font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider mb-1">
+                      Clear Log History Action
+                    </label>
+                    <select
+                      value={clearAction}
+                      onChange={(e) => {
+                        setClearAction(e.target.value);
+                        setClearClassroomId('');
+                        setClearStartDate('');
+                        setClearEndDate('');
+                        setClearSuccess('');
+                        setClearError('');
+                      }}
+                      className="glass-input text-xs py-1.5 min-w-[200px]"
+                    >
+                      <option value="">Select action...</option>
+                      <option value="all">Clear All Log History</option>
+                      <option value="classroom">Clear Logs by Classroom</option>
+                      <option value="date_range">Clear Logs by Date Range</option>
+                    </select>
+                  </div>
+
+                  {clearAction && (
+                    <button
+                      type="submit"
+                      disabled={clearSubmitting}
+                      className="w-full sm:w-auto px-4 py-2 bg-red-600 hover:bg-red-750 text-white text-xs font-bold rounded-xl shadow transition-all active:scale-[0.98] shrink-0"
+                    >
+                      {clearSubmitting ? 'Clearing...' : 'Execute Clear'}
+                    </button>
+                  )}
+                </div>
+
+                {clearAction === 'classroom' && (
+                  <div className="bg-slate-50 dark:bg-slate-950/20 p-3 rounded-xl border border-slate-200/40 dark:border-slate-800/40 grid grid-cols-1 sm:grid-cols-2 gap-3 animate-fade-in">
+                    <div>
+                      <label className="block text-[9px] font-bold text-customText-muted uppercase mb-1">
+                        Target Classroom
+                      </label>
+                      <select
+                        required
+                        value={clearClassroomId}
+                        onChange={(e) => setClearClassroomId(e.target.value)}
+                        className="glass-input text-xs py-1.5"
+                      >
+                        <option value="">Choose classroom...</option>
+                        {classrooms.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.className} ({c.roomNumber})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="flex items-end text-[10px] text-customText-muted dark:text-customText-mutedDark italic pb-1">
+                      All logs recorded for this classroom will be deleted.
+                    </div>
+                  </div>
+                )}
+
+                {clearAction === 'date_range' && (
+                  <div className="bg-slate-50 dark:bg-slate-950/20 p-3 rounded-xl border border-slate-200/40 dark:border-slate-800/40 grid grid-cols-1 sm:grid-cols-2 gap-3 animate-fade-in">
+                    <div>
+                      <label className="block text-[9px] font-bold text-customText-muted uppercase mb-1">
+                        Start Date
+                      </label>
+                      <input
+                        type="date"
+                        required
+                        value={clearStartDate}
+                        onChange={(e) => setClearStartDate(e.target.value)}
+                        className="glass-input text-xs py-1.5"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[9px] font-bold text-customText-muted uppercase mb-1">
+                        End Date
+                      </label>
+                      <input
+                        type="date"
+                        required
+                        value={clearEndDate}
+                        onChange={(e) => setClearEndDate(e.target.value)}
+                        className="glass-input text-xs py-1.5"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {clearSuccess && (
+                  <p className="text-[11px] text-green-600 dark:text-green-400 font-bold bg-green-500/10 px-2.5 py-1.5 rounded-lg border border-green-500/15">
+                    ✅ {clearSuccess}
+                  </p>
+                )}
+
+                {clearError && (
+                  <p className="text-[11px] text-red-600 dark:text-red-400 font-bold bg-red-500/10 px-2.5 py-1.5 rounded-lg border border-red-500/15">
+                    ⚠️ {clearError}
+                  </p>
+                )}
+              </form>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Main Grid: Card Grid + Activity Feed */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">

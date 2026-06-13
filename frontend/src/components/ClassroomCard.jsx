@@ -28,6 +28,12 @@ const ClassroomCard = ({ roomNumber, className, status, currentPeriod, onClick }
     pulseColorClass = 'bg-warning';
     statusText = 'Attendance Pending';
     statusIcon = <AlertTriangle size={16} className="text-warning" />;
+  } else if (status === 'College is on Holiday') {
+    cardClass = 'border-purple-400 dark:border-purple-600/80 shadow-md shadow-purple-500/5 bg-purple-500/5';
+    statusDotClass = 'bg-purple-500';
+    pulseColorClass = 'bg-purple-400';
+    statusText = 'College is on Holiday';
+    statusIcon = <Clock size={16} className="text-purple-500" />;
   }
 
   return (

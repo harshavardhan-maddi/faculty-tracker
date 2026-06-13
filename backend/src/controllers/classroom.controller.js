@@ -7,6 +7,22 @@ const getClassrooms = async (req, res) => {
       orderBy: { className: 'asc' },
     });
 
+    const trackingSetting = await prisma.systemSetting.findUnique({
+      where: { key: 'trackingEnabled' },
+    });
+    const trackingEnabled = trackingSetting ? trackingSetting.value === 'true' : true;
+
+    if (!trackingEnabled) {
+      const holidayResponse = classrooms.map((c) => ({
+        id: c.id,
+        roomNumber: c.roomNumber,
+        className: c.className,
+        status: 'College is on Holiday',
+        currentPeriod: null,
+      }));
+      return res.json(holidayResponse);
+    }
+
     const today = getTodayDay();
     const currentTime = getCurrentTimeInHHMM();
 

@@ -4,6 +4,15 @@ const { getTodayDay, getCurrentTimeInHHMM, getLocalDayBounds, STANDARD_PERIODS }
 
 const createEntryLog = async (req, res) => {
   try {
+    const trackingSetting = await prisma.systemSetting.findUnique({
+      where: { key: 'trackingEnabled' },
+    });
+    const trackingEnabled = trackingSetting ? trackingSetting.value === 'true' : true;
+
+    if (!trackingEnabled) {
+      return res.status(403).json({ message: 'Tracking is disabled. College is on Holiday.' });
+    }
+
     if (req.user.role !== 'CR') {
       return res.status(403).json({ message: 'Only CRs can log faculty entry' });
     }

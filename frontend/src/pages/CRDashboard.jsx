@@ -12,6 +12,7 @@ const CRDashboard = () => {
   const [schedule, setSchedule] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [isHoliday, setIsHoliday] = useState(false);
   
   // Modal tracking
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -27,10 +28,15 @@ const CRDashboard = () => {
       });
       const data = await res.json();
       if (!res.ok) {
+        if (res.status === 403 && data.message && data.message.includes('Holiday')) {
+          setIsHoliday(true);
+        }
         throw new Error(data.message || 'Failed to fetch schedule');
       }
+      setIsHoliday(false);
       setClassroom(data.classroom);
       setSchedule(data.schedule);
+      setError('');
     } catch (err) {
       setError(err.message);
     } finally {
@@ -98,14 +104,20 @@ const CRDashboard = () => {
   useEffect(() => {
     if (!socket) return;
 
+    socket.on('tracking_status_update', (data) => {
+      console.log('[Socket Event] Tracking status update:', data);
+      fetchSchedule();
+    });
+
     socket.on('classroom_status_update', (data) => {
-      // If the update is for this classroom, refresh schedule list
-      if (classroom && data.classroomId === classroom.id) {
+      // If the update is for this classroom or log history is cleared, refresh schedule list
+      if (data.cleared || (classroom && data.classroomId === classroom.id)) {
         fetchSchedule();
       }
     });
 
     return () => {
+      socket.off('tracking_status_update');
       socket.off('classroom_status_update');
     };
   }, [socket, classroom]);
@@ -153,6 +165,25 @@ const CRDashboard = () => {
 
   if (loading) {
     return <Loading />;
+  }
+
+  if (isHoliday) {
+    return (
+      <div className="min-h-[65vh] flex flex-col items-center justify-center p-6 text-center space-y-6 max-w-lg mx-auto animate-fade-in">
+        <div className="w-24 h-24 rounded-full bg-purple-100 dark:bg-purple-950/40 text-purple-650 flex items-center justify-center shadow-lg border border-purple-250 dark:border-purple-800 animate-bounce" style={{ animationDuration: '3s' }}>
+          <Clock size={44} />
+        </div>
+        <div className="space-y-2">
+          <h1 className="text-3xl font-extrabold text-customText dark:text-customText-dark tracking-tight">College is on Holiday</h1>
+          <p className="text-sm text-customText-muted dark:text-customText-mutedDark">
+            Attendance tracking has been globally disabled by the administration.
+          </p>
+        </div>
+        <div className="p-4 bg-purple-500/10 border border-purple-500/20 text-purple-600 dark:text-purple-450 text-xs font-semibold rounded-2xl w-full">
+          🌴 No class schedule or tracking activities are active at this time. Enjoy your holiday!
+        </div>
+      </div>
+    );
   }
 
   // Identify the currently active period — prioritize 'Active' (needs CR action)

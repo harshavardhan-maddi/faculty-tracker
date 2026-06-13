@@ -4,6 +4,16 @@ const { emitClassroomStatusUpdate, emitNotification } = require('./socket.servic
 const { getTodayDay, getCurrentTimeInHHMM, getLocalDayBounds, STANDARD_PERIODS } = require('../utils/date');
 const checkExpiredPeriods = async () => {
   try {
+    const trackingSetting = await prisma.systemSetting.findUnique({
+      where: { key: 'trackingEnabled' },
+    });
+    const trackingEnabled = trackingSetting ? trackingSetting.value === 'true' : true;
+
+    if (!trackingEnabled) {
+      console.log('[Auto-Status Cron] Tracking is disabled (College is on Holiday). Skipping.');
+      return;
+    }
+
     const today = getTodayDay();
     const currentTime = getCurrentTimeInHHMM();
     const { start: startOfToday, end: endOfToday } = getLocalDayBounds();
