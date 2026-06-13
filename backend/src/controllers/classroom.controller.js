@@ -142,8 +142,19 @@ const deleteClassroom = async (req, res) => {
 
 const getClassroomDetails = async (req, res) => {
   const { id } = req.params;
+  const { date } = req.query;
 
   try {
+    const whereLogs = {};
+
+    if (date) {
+      const { start: startOfDay, end: endOfDay } = getLocalDayBounds(date);
+      whereLogs.createdAt = {
+        gte: startOfDay,
+        lte: endOfDay,
+      };
+    }
+
     const classroom = await prisma.classroom.findUnique({
       where: { id: parseInt(id) },
       include: {
@@ -154,6 +165,7 @@ const getClassroomDetails = async (req, res) => {
           ],
         },
         logs: {
+          where: whereLogs,
           orderBy: { createdAt: 'desc' },
           take: 50, // Limit to recent logs
         },

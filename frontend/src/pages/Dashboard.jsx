@@ -32,6 +32,7 @@ const Dashboard = () => {
   const [selectedClassroom, setSelectedClassroom] = useState(null);
   const [classroomDetails, setClassroomDetails] = useState(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
+  const [modalDateFilter, setModalDateFilter] = useState('');
 
   const fetchDashboardData = async (isSilent = false) => {
     try {
@@ -144,14 +145,11 @@ const Dashboard = () => {
     }
   };
 
-  // Fetch specific classroom weekly timetable & history logs when clicking a card
-  const handleCardClick = async (classroomItem) => {
-    setSelectedClassroom(classroomItem);
+  const fetchClassroomDetails = async (classroomId, dateStr = '') => {
     setLoadingDetails(true);
-    setClassroomDetails(null);
-
     try {
-      const res = await fetch(`/api/classrooms/${classroomItem.id}`, {
+      const url = `/api/classrooms/${classroomId}${dateStr ? `?date=${dateStr}` : ''}`;
+      const res = await fetch(url, {
         headers: { 'Authorization': `Bearer ${token}` },
       });
       const data = await res.json();
@@ -160,6 +158,19 @@ const Dashboard = () => {
       console.error('Failed to load classroom details:', err);
     } finally {
       setLoadingDetails(false);
+    }
+  };
+
+  const handleCardClick = async (classroomItem) => {
+    setSelectedClassroom(classroomItem);
+    setModalDateFilter('');
+    fetchClassroomDetails(classroomItem.id, '');
+  };
+
+  const handleModalDateChange = (newDate) => {
+    setModalDateFilter(newDate);
+    if (selectedClassroom) {
+      fetchClassroomDetails(selectedClassroom.id, newDate);
     }
   };
 
@@ -191,10 +202,10 @@ const Dashboard = () => {
             description="Monitoring live"
           />
           <StatCard
-            title="Faculties Present Today"
+            title="Faculty Entries Today"
             value={stats.presentToday}
             icon={Users2}
-            description={`Out of ${stats.faculties} total faculties`}
+            description="Total successful entries logged today"
           />
         </div>
       )}
@@ -329,9 +340,29 @@ const Dashboard = () => {
 
                 {/* 2. Historic Logs View (Right Column) */}
                 <div className="md:col-span-1 space-y-4">
-                  <div className="flex items-center gap-1.5 font-bold text-sm text-customText border-b pb-2">
-                    <History size={16} />
-                    <span>Recent Logs History</span>
+                  <div className="flex flex-col gap-2 border-b pb-2">
+                    <div className="flex items-center gap-1.5 font-bold text-sm text-customText">
+                      <History size={16} />
+                      <span>Recent Logs History</span>
+                    </div>
+                    <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-950/20 p-2 rounded-xl border border-slate-200/50 dark:border-slate-800/40 text-xs">
+                      <Calendar size={14} className="text-slate-400 shrink-0" />
+                      <input
+                        type="date"
+                        value={modalDateFilter}
+                        onChange={(e) => handleModalDateChange(e.target.value)}
+                        className="bg-transparent border-0 outline-none p-0 text-xs text-customText w-full focus:ring-0"
+                        title="Filter logs by date"
+                      />
+                      {modalDateFilter && (
+                        <button
+                          onClick={() => handleModalDateChange('')}
+                          className="text-xs font-bold text-primary hover:underline shrink-0"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   <div className="max-h-96 overflow-y-auto space-y-2 pr-1">

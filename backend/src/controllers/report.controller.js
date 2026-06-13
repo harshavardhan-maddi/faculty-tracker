@@ -1,5 +1,5 @@
 const prisma = require('../db');
-const { getTodayDay, getLocalDayBounds, getWeekdayForDate } = require('../utils/date');
+const { getTodayDay, getLocalDayBounds, getWeekdayForDate, STANDARD_PERIODS } = require('../utils/date');
 
 const getLogsReport = async (req, res) => {
   const { faculty, classroomId, date } = req.query;
@@ -48,6 +48,12 @@ const getLogsReport = async (req, res) => {
         },
       });
 
+      const periodConfig = STANDARD_PERIODS.find(p => p.periodNo === log.periodNo);
+      const timeSlot = timetable 
+        ? `${timetable.startTime} - ${timetable.endTime}` 
+        : (periodConfig ? `${periodConfig.startTime} - ${periodConfig.endTime}` : 'N/A');
+      const subjectName = timetable ? timetable.subjectName : 'Class';
+
       enrichedLogs.push({
         id: log.id,
         createdAt: log.createdAt,
@@ -57,11 +63,11 @@ const getLogsReport = async (req, res) => {
           className: log.classroom.className,
         },
         facultyName: log.facultyName,
-        subjectName: timetable ? timetable.subjectName : 'N/A',
+        subjectName: subjectName,
         periodNo: log.periodNo,
         entryTime: log.entryTime,
         status: log.status,
-        timeSlot: timetable ? `${timetable.startTime} - ${timetable.endTime}` : 'N/A',
+        timeSlot: timeSlot,
       });
     }
 
@@ -78,11 +84,6 @@ const getDashboardStats = async (req, res) => {
 
     // Basic counts
     const classroomCount = await prisma.classroom.count();
-    const uniqueFaculties = await prisma.timetable.findMany({
-      select: { facultyName: true },
-      distinct: ['facultyName'],
-    });
-    const facultyCount = uniqueFaculties.length;
     const crCount = await prisma.user.count({ where: { role: 'CR' } });
 
     // Today's logs counts
@@ -167,7 +168,6 @@ const getDashboardStats = async (req, res) => {
     res.json({
       stats: {
         classrooms: classroomCount,
-        faculties: facultyCount,
         crs: crCount,
         presentToday: presentCount,
         absentToday: absentCount,
