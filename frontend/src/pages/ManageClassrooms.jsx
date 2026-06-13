@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { 
   Plus, 
   Trash2, 
+  Edit,
   CalendarPlus, 
   Clock, 
   BookOpen, 
@@ -49,6 +50,12 @@ const ManageClassrooms = () => {
   const [showAddClassModal, setShowAddClassModal] = useState(false);
   const [showAddPeriodModal, setShowAddPeriodModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [showEditClassModal, setShowEditClassModal] = useState(false);
+
+  // Edit classroom states
+  const [editingClassroom, setEditingClassroom] = useState(null);
+  const [editRoomNumber, setEditRoomNumber] = useState('');
+  const [editClassName, setEditClassName] = useState('');
 
   // Bulk import states
   const [importTab, setImportTab] = useState('standard'); // 'standard' or 'ai'
@@ -328,6 +335,46 @@ const ManageClassrooms = () => {
     }
   };
 
+  const handleEditClassroomClick = (classroomItem, e) => {
+    e.stopPropagation(); // Avoid triggering card selection click
+    setEditingClassroom(classroomItem);
+    setEditRoomNumber(classroomItem.roomNumber);
+    setEditClassName(classroomItem.className);
+    setShowEditClassModal(true);
+  };
+
+  const handleEditClassroomSubmit = async (e) => {
+    e.preventDefault();
+    if (!editingClassroom) return;
+    setError('');
+    setSuccess('');
+
+    try {
+      const res = await fetch(`/api/classrooms/${editingClassroom.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ roomNumber: editRoomNumber, className: editClassName }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to update classroom');
+
+      setSuccess(`Classroom updated to ${editRoomNumber} (${editClassName}) successfully!`);
+      setShowEditClassModal(false);
+      setEditingClassroom(null);
+      fetchClassrooms();
+      
+      // Update selected classroom if it was the one edited
+      if (selectedClassroom?.id === editingClassroom.id) {
+        setSelectedClassroom(data);
+      }
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
   // Delete Classroom (HOD ONLY)
   const handleDeleteClassroom = async (id, e) => {
     e.stopPropagation(); // Avoid triggering card selection click
@@ -502,15 +549,26 @@ const ManageClassrooms = () => {
                     </div>
                   </div>
 
-                  {user?.role === 'HOD' && (
-                    <button
-                      onClick={(e) => handleDeleteClassroom(c.id, e)}
-                      className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg transition-colors"
-                      title="Delete classroom"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  )}
+                  <div className="flex items-center gap-1">
+                    {(user?.role === 'HOD' || user?.role === 'SUB_ADMIN') && (
+                      <button
+                        onClick={(e) => handleEditClassroomClick(c, e)}
+                        className="p-2 text-primary hover:bg-primary/10 rounded-lg transition-colors"
+                        title="Edit classroom"
+                      >
+                        <Edit size={16} />
+                      </button>
+                    )}
+                    {user?.role === 'HOD' && (
+                      <button
+                        onClick={(e) => handleDeleteClassroom(c.id, e)}
+                        className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg transition-colors"
+                        title="Delete classroom"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -847,6 +905,74 @@ const ManageClassrooms = () => {
               </button>
               <button type="submit" className="btn-primary">
                 Add Classroom
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* MODAL: EDIT CLASSROOM */}
+      {showEditClassModal && editingClassroom && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => setShowEditClassModal(false)} />
+          
+          <form 
+            onSubmit={handleEditClassroomSubmit}
+            className="relative glass-card bg-white dark:bg-slate-900 border border-white/60 w-full max-w-md p-6 shadow-2xl animate-fade-in z-10 space-y-4"
+          >
+            <div className="flex items-center justify-between pb-3 border-b">
+              <h3 className="font-extrabold text-base text-customText dark:text-customText-dark">
+                Edit Classroom Details
+              </h3>
+              <button 
+                type="button"
+                onClick={() => setShowEditClassModal(false)} 
+                className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider mb-2">
+                  Room Number
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editRoomNumber}
+                  onChange={(e) => setEditRoomNumber(e.target.value)}
+                  placeholder="e.g. Room 301"
+                  className="glass-input"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider mb-2">
+                  Class Name
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editClassName}
+                  onChange={(e) => setEditClassName(e.target.value)}
+                  placeholder="e.g. CSE 3rd Year"
+                  className="glass-input"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-3 border-t">
+              <button 
+                type="button" 
+                onClick={() => setShowEditClassModal(false)} 
+                className="btn-secondary"
+              >
+                Cancel
+              </button>
+              <button type="submit" className="btn-primary">
+                Save Changes
               </button>
             </div>
           </form>

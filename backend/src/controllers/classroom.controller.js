@@ -183,9 +183,54 @@ const getClassroomDetails = async (req, res) => {
   }
 };
 
+const updateClassroom = async (req, res) => {
+  const { id } = req.params;
+  const { roomNumber, className } = req.body;
+
+  if (!roomNumber || !className) {
+    return res.status(400).json({ message: 'Room number and class name are required' });
+  }
+
+  try {
+    const classroom = await prisma.classroom.findUnique({
+      where: { id: parseInt(id) },
+    });
+
+    if (!classroom) {
+      return res.status(404).json({ message: 'Classroom not found' });
+    }
+
+    // Check if another classroom exists with the same roomNumber and className
+    const duplicate = await prisma.classroom.findFirst({
+      where: {
+        roomNumber,
+        className,
+        NOT: {
+          id: parseInt(id),
+        },
+      },
+    });
+
+    if (duplicate) {
+      return res.status(400).json({ message: 'Another classroom with this room number and class name already exists' });
+    }
+
+    const updated = await prisma.classroom.update({
+      where: { id: parseInt(id) },
+      data: { roomNumber, className },
+    });
+
+    res.json(updated);
+  } catch (error) {
+    console.error('Error updating classroom:', error);
+    res.status(500).json({ message: error.message || 'Internal Server Error' });
+  }
+};
+
 module.exports = {
   getClassrooms,
   createClassroom,
   deleteClassroom,
   getClassroomDetails,
+  updateClassroom,
 };
