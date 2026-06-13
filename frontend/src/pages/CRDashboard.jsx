@@ -200,13 +200,7 @@ const CRDashboard = () => {
               <span className="text-xs bg-slate-100 dark:bg-slate-800 text-customText font-bold px-2.5 py-1 rounded-md border border-slate-200/40 dark:border-slate-700/40 inline-block">
                 Period {activePeriod.periodNo}
               </span>
-              <h4 className="text-xl font-extrabold text-customText dark:text-customText-dark">
-                {activePeriod.subjectName}
-              </h4>
-              <div className="space-y-1">
-                <p className="text-sm text-customText-muted dark:text-customText-mutedDark flex items-center gap-1.5">
-                  <span className="font-semibold">Faculty:</span> {activePeriod.facultyName}
-                </p>
+              <div className="space-y-1 mt-2">
                 <p className="text-sm text-customText-muted dark:text-customText-mutedDark flex items-center gap-1.5">
                   <Clock size={14} />
                   <span>{activePeriod.startTime} - {activePeriod.endTime}</span>
@@ -254,8 +248,6 @@ const CRDashboard = () => {
               <tr className="border-b border-slate-200 dark:border-slate-800 text-xs font-semibold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider">
                 <th className="pb-3 pr-2">Period</th>
                 <th className="pb-3">Time</th>
-                <th className="pb-3">Subject</th>
-                <th className="pb-3">Faculty</th>
                 <th className="pb-3 text-right">Status</th>
               </tr>
             </thead>
@@ -315,12 +307,6 @@ const CRDashboard = () => {
                     <td className="py-3.5 text-customText-muted dark:text-customText-mutedDark font-medium">
                       {period.startTime} - {period.endTime}
                     </td>
-                    <td className="py-3.5 text-customText dark:text-customText-dark">
-                      {period.subjectName}
-                    </td>
-                    <td className="py-3.5 text-customText-muted dark:text-customText-mutedDark">
-                      {period.facultyName}
-                    </td>
                     <td className="py-3.5 text-right">
                       {statusBadge}
                     </td>
@@ -329,7 +315,7 @@ const CRDashboard = () => {
               })}
               {schedule.length === 0 && (
                 <tr>
-                  <td colSpan="5" className="text-center py-8 text-customText-muted dark:text-customText-mutedDark">
+                  <td colSpan="3" className="text-center py-8 text-customText-muted dark:text-customText-mutedDark">
                     No periods scheduled for today.
                   </td>
                 </tr>
@@ -347,23 +333,17 @@ const CRDashboard = () => {
           
           <div className="relative glass-card border border-white/60 w-full max-w-md p-6 bg-white dark:bg-slate-900 shadow-2xl animate-fade-in z-10">
             <h3 className="font-extrabold text-lg text-customText dark:text-customText-dark mb-2">
-              Confirm Faculty Entry
+              Confirm Period Presence
             </h3>
             
             <div className="py-3 px-4 bg-slate-100/50 dark:bg-slate-950/40 border border-slate-200/40 dark:border-slate-800/40 rounded-xl space-y-1 mb-4">
               <p className="text-xs text-customText-muted dark:text-customText-mutedDark font-bold uppercase tracking-wider">
                 Period {selectedPeriod.periodNo} ({selectedPeriod.startTime} - {selectedPeriod.endTime})
               </p>
-              <h4 className="font-bold text-customText dark:text-customText-dark">
-                {selectedPeriod.subjectName}
-              </h4>
-              <p className="text-sm text-customText-muted dark:text-customText-mutedDark">
-                Faculty: <span className="font-semibold text-customText dark:text-customText-dark">{selectedPeriod.facultyName}</span>
-              </p>
             </div>
 
             <p className="text-sm text-customText-muted dark:text-customText-mutedDark mb-6">
-              Are you sure you want to mark this faculty member as present? This entry log is recorded immediately and updates the HOD Dashboard in real-time.
+              Are you sure you want to log presence for this period? This entry log is recorded immediately and updates the HOD Dashboard in real-time.
             </p>
 
             <div className="flex gap-3 justify-end">

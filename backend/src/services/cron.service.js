@@ -13,11 +13,6 @@ const checkExpiredPeriods = async () => {
     if (expiredStdPeriods.length === 0) return;
 
     const classrooms = await prisma.classroom.findMany();
-    const allTimetables = await prisma.timetable.findMany({
-      where: {
-        day: today,
-      },
-    });
     const allLogs = await prisma.facultyLog.findMany({
       where: {
         createdAt: {
@@ -28,7 +23,6 @@ const checkExpiredPeriods = async () => {
     });
 
     for (const classroom of classrooms) {
-      const classroomTimetables = allTimetables.filter(t => t.classroomId === classroom.id);
       const classroomLogs = allLogs.filter(l => l.classroomId === classroom.id);
 
       for (const period of expiredStdPeriods) {
@@ -36,11 +30,10 @@ const checkExpiredPeriods = async () => {
         const existingLog = classroomLogs.find(l => l.periodNo === period.periodNo);
 
         if (!existingLog) {
-          const matchingTT = classroomTimetables.find(t => t.periodNo === period.periodNo);
-          const facultyName = matchingTT ? matchingTT.facultyName : 'Faculty';
-          const subjectName = matchingTT ? matchingTT.subjectName : 'Class';
-          const startTime = matchingTT ? matchingTT.startTime : period.startTime;
-          const endTime = matchingTT ? matchingTT.endTime : period.endTime;
+          const facultyName = 'Faculty';
+          const subjectName = 'Class';
+          const startTime = period.startTime;
+          const endTime = period.endTime;
 
           const newLog = await prisma.facultyLog.create({
             data: {

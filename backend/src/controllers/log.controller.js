@@ -34,19 +34,10 @@ const createEntryLog = async (req, res) => {
       return res.status(400).json({ message: 'Invalid period number' });
     }
 
-    // Optional timetable lookup for metadata
-    const timetableEntry = await prisma.timetable.findFirst({
-      where: {
-        classroomId: classroom.id,
-        day: today,
-        periodNo: parseInt(periodNo),
-      },
-    });
-
-    const startTime = timetableEntry ? timetableEntry.startTime : periodConfig.startTime;
-    const endTime = timetableEntry ? timetableEntry.endTime : periodConfig.endTime;
-    const facultyName = timetableEntry ? timetableEntry.facultyName : 'Faculty';
-    const subjectName = timetableEntry ? timetableEntry.subjectName : 'Class';
+    const startTime = periodConfig.startTime;
+    const endTime = periodConfig.endTime;
+    const facultyName = 'Faculty';
+    const subjectName = 'Class';
 
     // Check time constraints
     const isActive = startTime <= currentTime && currentTime < endTime;

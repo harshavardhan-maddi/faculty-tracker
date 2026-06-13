@@ -118,14 +118,6 @@ const getCRSchedule = async (req, res) => {
     const today = getTodayDay();
     const { start: startOfToday, end: endOfToday } = getLocalDayBounds();
 
-    // Fetch custom timetable entries for today in a single query
-    const timetablesToday = await prisma.timetable.findMany({
-      where: {
-        classroomId: classroom.id,
-        day: today,
-      },
-    });
-
     // Fetch all logs for today in a single query
     const logsToday = await prisma.facultyLog.findMany({
       where: {
@@ -141,9 +133,6 @@ const getCRSchedule = async (req, res) => {
     const schedule = [];
 
     for (const stdPeriod of STANDARD_PERIODS) {
-      // Find matching timetable entry if any
-      const matchingTT = timetablesToday.find(t => t.periodNo === stdPeriod.periodNo);
-
       // Find matching log if any
       const log = logsToday.find(l => l.periodNo === stdPeriod.periodNo);
 
@@ -160,12 +149,12 @@ const getCRSchedule = async (req, res) => {
       }
 
       schedule.push({
-        id: matchingTT ? matchingTT.id : `std-${stdPeriod.periodNo}`,
+        id: `std-${stdPeriod.periodNo}`,
         periodNo: stdPeriod.periodNo,
         startTime: stdPeriod.startTime,
         endTime: stdPeriod.endTime,
-        facultyName: matchingTT ? matchingTT.facultyName : 'Faculty',
-        subjectName: matchingTT ? matchingTT.subjectName : 'Class',
+        facultyName: 'Faculty',
+        subjectName: 'Class',
         status,
         entryTime: log ? log.entryTime : null,
       });
