@@ -1,6 +1,6 @@
 const prisma = require('../db');
 const { emitClassroomStatusUpdate, emitNotification } = require('../services/socket.service');
-const { getTodayDay, getCurrentTimeInHHMM, getLocalDayBounds } = require('../utils/date');
+const { getTodayDay, getCurrentTimeInHHMM, getLocalDayBounds, STANDARD_PERIODS } = require('../utils/date');
 
 const createEntryLog = async (req, res) => {
   try {
@@ -26,12 +26,16 @@ const createEntryLog = async (req, res) => {
     if (req.user.className !== classroom.className) {
       return res.status(403).json({ message: 'You can only log attendance for your assigned classroom' });
     }
-
     const today = getTodayDay();
     const currentTime = getCurrentTimeInHHMM();
 
-    // Check if the requested period is the active one
-    const activePeriod = await prisma.timetable.findFirst({
+    const periodConfig = STANDARD_PERIODS.find(p => p.periodNo === parseInt(periodNo));
+    if (!periodConfig) {
+      return res.status(400).json({ message: 'Invalid period number' });
+    }
+
+    // Optional timetable lookup for metadata
+    const timetableEntry = await prisma.timetable.findFirst({
       where: {
         classroomId: classroom.id,
         day: today,
@@ -39,15 +43,16 @@ const createEntryLog = async (req, res) => {
       },
     });
 
-    if (!activePeriod) {
-      return res.status(400).json({ message: 'Timetable entry not found for this period' });
-    }
+    const startTime = timetableEntry ? timetableEntry.startTime : periodConfig.startTime;
+    const endTime = timetableEntry ? timetableEntry.endTime : periodConfig.endTime;
+    const facultyName = timetableEntry ? timetableEntry.facultyName : 'Faculty';
+    const subjectName = timetableEntry ? timetableEntry.subjectName : 'Class';
 
     // Check time constraints
-    const isActive = activePeriod.startTime <= currentTime && currentTime < activePeriod.endTime;
+    const isActive = startTime <= currentTime && currentTime < endTime;
     if (!isActive) {
       return res.status(400).json({
-        message: `Time restriction violation: This period is active between ${activePeriod.startTime} and ${activePeriod.endTime}. Current time is ${currentTime}.`,
+        message: `Time restriction violation: This period is active between ${startTime} and ${endTime}. Current time is ${currentTime}.`,
       });
     }
 
@@ -57,7 +62,7 @@ const createEntryLog = async (req, res) => {
     const existingLog = await prisma.facultyLog.findFirst({
       where: {
         classroomId: classroom.id,
-        periodNo: activePeriod.periodNo,
+        periodNo: parseInt(periodNo),
         createdAt: {
           gte: startOfToday,
           lte: endOfToday,
@@ -73,8 +78,8 @@ const createEntryLog = async (req, res) => {
     const log = await prisma.facultyLog.create({
       data: {
         classroomId: classroom.id,
-        facultyName: activePeriod.facultyName,
-        periodNo: activePeriod.periodNo,
+        facultyName: facultyName,
+        periodNo: parseInt(periodNo),
         entryTime: new Date(),
         status: 'Present',
       },
@@ -88,18 +93,18 @@ const createEntryLog = async (req, res) => {
       classroomId: classroom.id,
       roomNumber: classroom.roomNumber,
       className: classroom.className,
-      periodNo: activePeriod.periodNo,
-      facultyName: activePeriod.facultyName,
+      periodNo: parseInt(periodNo),
+      facultyName: facultyName,
       status: 'Present',
-      subjectName: activePeriod.subjectName,
-      startTime: activePeriod.startTime,
-      endTime: activePeriod.endTime,
+      subjectName: subjectName,
+      startTime: startTime,
+      endTime: endTime,
       entryTime: log.entryTime,
     });
 
     // Emit live notification
     emitNotification({
-      message: `${activePeriod.facultyName} entered Room ${classroom.roomNumber} (${classroom.className})`,
+      message: `${facultyName} entered Room ${classroom.roomNumber} (${classroom.className})`,
       type: 'success', // success notification
       classroomName: classroom.className,
       roomNumber: classroom.roomNumber,

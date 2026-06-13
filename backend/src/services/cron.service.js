@@ -1,86 +1,92 @@
 const cron = require('node-cron');
 const prisma = require('../db');
 const { emitClassroomStatusUpdate, emitNotification } = require('./socket.service');
-const { getTodayDay, getCurrentTimeInHHMM, getLocalDayBounds } = require('../utils/date');
-
+const { getTodayDay, getCurrentTimeInHHMM, getLocalDayBounds, STANDARD_PERIODS } = require('../utils/date');
 const checkExpiredPeriods = async () => {
   try {
     const today = getTodayDay();
     const currentTime = getCurrentTimeInHHMM();
-
     const { start: startOfToday, end: endOfToday } = getLocalDayBounds();
 
-    // Find all timetable periods for today that have already ended
-    const expiredPeriods = await prisma.timetable.findMany({
+    // Find all expired standard periods
+    const expiredStdPeriods = STANDARD_PERIODS.filter(p => p.endTime <= currentTime);
+    if (expiredStdPeriods.length === 0) return;
+
+    const classrooms = await prisma.classroom.findMany();
+    const allTimetables = await prisma.timetable.findMany({
       where: {
         day: today,
-        endTime: {
-          lte: currentTime,
-        },
       },
-      include: {
-        classroom: true,
+    });
+    const allLogs = await prisma.facultyLog.findMany({
+      where: {
+        createdAt: {
+          gte: startOfToday,
+          lte: endOfToday,
+        },
       },
     });
 
-    for (const period of expiredPeriods) {
-      // Check if a log already exists for this period today
-      const existingLog = await prisma.facultyLog.findFirst({
-        where: {
-          classroomId: period.classroomId,
-          periodNo: period.periodNo,
-          createdAt: {
-            gte: startOfToday,
-            lte: endOfToday,
-          },
-        },
-      });
+    for (const classroom of classrooms) {
+      const classroomTimetables = allTimetables.filter(t => t.classroomId === classroom.id);
+      const classroomLogs = allLogs.filter(l => l.classroomId === classroom.id);
 
-      // If no log exists (CR didn't mark it before period end), mark as "Not Entered"
-      if (!existingLog) {
-        const newLog = await prisma.facultyLog.create({
-          data: {
-            classroomId: period.classroomId,
-            facultyName: period.facultyName,
+      for (const period of expiredStdPeriods) {
+        // Check if log already exists
+        const existingLog = classroomLogs.find(l => l.periodNo === period.periodNo);
+
+        if (!existingLog) {
+          const matchingTT = classroomTimetables.find(t => t.periodNo === period.periodNo);
+          const facultyName = matchingTT ? matchingTT.facultyName : 'Faculty';
+          const subjectName = matchingTT ? matchingTT.subjectName : 'Class';
+          const startTime = matchingTT ? matchingTT.startTime : period.startTime;
+          const endTime = matchingTT ? matchingTT.endTime : period.endTime;
+
+          const newLog = await prisma.facultyLog.create({
+            data: {
+              classroomId: classroom.id,
+              facultyName: facultyName,
+              periodNo: period.periodNo,
+              entryTime: null,
+              status: 'Not Entered',
+              createdAt: new Date(),
+            },
+            include: {
+              classroom: true,
+            },
+          });
+
+          console.log(`[Auto-Status] Marked ${facultyName} as Not Entered in ${classroom.roomNumber} - Period ${period.periodNo}`);
+
+          // Broadcast the update to HOD / Sub Admin
+          emitClassroomStatusUpdate({
+            classroomId: classroom.id,
+            roomNumber: classroom.roomNumber,
+            className: classroom.className,
             periodNo: period.periodNo,
-            entryTime: null,
+            facultyName: facultyName,
             status: 'Not Entered',
-            createdAt: new Date(), // Set to now (which is after period end)
-          },
-          include: {
-            classroom: true,
-          },
-        });
+            subjectName: subjectName,
+            startTime: startTime,
+            endTime: endTime,
+            entryTime: null,
+          });
 
-        console.log(`[Auto-Status] Marked ${period.facultyName} as Not Entered in ${period.classroom.roomNumber} - Period ${period.periodNo}`);
-
-        // Broadcast the update to HOD / Sub Admin
-        emitClassroomStatusUpdate({
-          classroomId: period.classroomId,
-          roomNumber: period.classroom.roomNumber,
-          className: period.classroom.className,
-          periodNo: period.periodNo,
-          facultyName: period.facultyName,
-          status: 'Not Entered',
-          subjectName: period.subjectName,
-          startTime: period.startTime,
-          endTime: period.endTime,
-          entryTime: null,
-        });
-
-        // Broadcast notifications
-        emitNotification({
-          message: `${period.facultyName} not entered into Room ${period.classroom.roomNumber} (${period.classroom.className})`,
-          type: 'danger', // maps to Danger style
-          classroomName: period.classroom.className,
-          roomNumber: period.classroom.roomNumber,
-        });
+          // Broadcast notifications
+          emitNotification({
+            message: `${facultyName} not entered into Room ${classroom.roomNumber} (${classroom.className})`,
+            type: 'danger',
+            classroomName: classroom.className,
+            roomNumber: classroom.roomNumber,
+          });
+        }
       }
     }
   } catch (error) {
     console.error('Error running checkExpiredPeriods cron:', error);
   }
 };
+
 
 const startCron = () => {
   // Run every 60 seconds

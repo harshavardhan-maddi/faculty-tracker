@@ -1,5 +1,5 @@
 const prisma = require('../db');
-const { getTodayDay, getCurrentTimeInHHMM, getLocalDayBounds } = require('../utils/date');
+const { getTodayDay, getCurrentTimeInHHMM, getLocalDayBounds, STANDARD_PERIODS } = require('../utils/date');
 
 const upsertTimetable = async (req, res) => {
   const { classroomId, day, periodNo, startTime, endTime, facultyName, subjectName } = req.body;
@@ -118,32 +118,38 @@ const getCRSchedule = async (req, res) => {
     const today = getTodayDay();
     const { start: startOfToday, end: endOfToday } = getLocalDayBounds();
 
-    const periods = await prisma.timetable.findMany({
+    // Fetch custom timetable entries for today in a single query
+    const timetablesToday = await prisma.timetable.findMany({
       where: {
         classroomId: classroom.id,
         day: today,
       },
-      orderBy: { periodNo: 'asc' },
+    });
+
+    // Fetch all logs for today in a single query
+    const logsToday = await prisma.facultyLog.findMany({
+      where: {
+        classroomId: classroom.id,
+        createdAt: {
+          gte: startOfToday,
+          lte: endOfToday,
+        },
+      },
     });
 
     const currentTime = getCurrentTimeInHHMM();
     const schedule = [];
 
-    for (const period of periods) {
-      const log = await prisma.facultyLog.findFirst({
-        where: {
-          classroomId: classroom.id,
-          periodNo: period.periodNo,
-          createdAt: {
-            gte: startOfToday,
-            lte: endOfToday,
-          },
-        },
-      });
+    for (const stdPeriod of STANDARD_PERIODS) {
+      // Find matching timetable entry if any
+      const matchingTT = timetablesToday.find(t => t.periodNo === stdPeriod.periodNo);
+
+      // Find matching log if any
+      const log = logsToday.find(l => l.periodNo === stdPeriod.periodNo);
 
       let status = 'Future';
-      const isActive = period.startTime <= currentTime && currentTime < period.endTime;
-      const isPast = period.endTime <= currentTime;
+      const isActive = stdPeriod.startTime <= currentTime && currentTime < stdPeriod.endTime;
+      const isPast = stdPeriod.endTime <= currentTime;
 
       if (log) {
         status = log.status; // 'Present' or 'Not Entered'
@@ -154,12 +160,12 @@ const getCRSchedule = async (req, res) => {
       }
 
       schedule.push({
-        id: period.id,
-        periodNo: period.periodNo,
-        startTime: period.startTime,
-        endTime: period.endTime,
-        facultyName: period.facultyName,
-        subjectName: period.subjectName,
+        id: matchingTT ? matchingTT.id : `std-${stdPeriod.periodNo}`,
+        periodNo: stdPeriod.periodNo,
+        startTime: stdPeriod.startTime,
+        endTime: stdPeriod.endTime,
+        facultyName: matchingTT ? matchingTT.facultyName : 'Faculty',
+        subjectName: matchingTT ? matchingTT.subjectName : 'Class',
         status,
         entryTime: log ? log.entryTime : null,
       });

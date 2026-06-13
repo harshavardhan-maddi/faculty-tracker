@@ -92,9 +92,20 @@ const getWeekdayForDate = (date) => {
   return formatter.format(new Date(date));
 };
 
+const STANDARD_PERIODS = [
+  { periodNo: 1, startTime: '09:10', endTime: '10:00' },
+  { periodNo: 2, startTime: '10:00', endTime: '10:50' },
+  { periodNo: 3, startTime: '11:00', endTime: '11:50' },
+  { periodNo: 4, startTime: '11:50', endTime: '12:40' },
+  { periodNo: 5, startTime: '13:30', endTime: '14:20' },
+  { periodNo: 6, startTime: '14:20', endTime: '15:10' },
+  { periodNo: 7, startTime: '15:10', endTime: '16:00' },
+];
+
 module.exports = {
   getTodayDay,
   getCurrentTimeInHHMM,
   getLocalDayBounds,
   getWeekdayForDate,
+  STANDARD_PERIODS,
 };
