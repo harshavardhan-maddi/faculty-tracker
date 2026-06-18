@@ -103,7 +103,7 @@ const Login = () => {
               Narasaraopeta Engineering College
             </h1>
             <h2 className="text-2xl font-extrabold tracking-tight text-customText dark:text-customText-dark mb-2">
-              Faculty Attendance Tracker
+              Lectra
             </h2>
             <p className="text-[10px] text-customText-muted dark:text-customText-mutedDark font-bold tracking-widest uppercase mb-8">
               Real-Time Portal
@@ -122,13 +122,16 @@ const Login = () => {
         </div>
       )}
       {loading && <Loading />}
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-4 relative overflow-hidden transition-colors duration-300">
+      <div className="min-h-screen flex flex-col items-center justify-between bg-slate-50 dark:bg-slate-950 p-4 relative overflow-hidden transition-colors duration-300">
         
         {/* Background glass decorative bubbles */}
         <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full bg-primary/10 dark:bg-primary-dark/5 blur-3xl" />
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 rounded-full bg-secondary/10 dark:bg-secondary-dark/5 blur-3xl" />
 
-        <div className="w-full max-w-md glass-card p-8 border border-white/60 dark:border-slate-800/65 relative z-10 animate-fade-in">
+        {/* Top spacer to balance the layout and keep the card centered */}
+        <div className="flex-1" />
+
+        <div className="w-full max-w-md glass-card p-8 border border-white/60 dark:border-slate-800/65 relative z-10 animate-fade-in my-auto">
           
           {/* Logo and Header */}
           <div className="flex flex-col items-center mb-8 text-center">
@@ -138,7 +141,7 @@ const Login = () => {
               <img src={logo} alt="NEC Logo" className="w-16 h-16 rounded-full object-contain relative z-10 shadow-md" />
             </div>
             <h2 className="text-2xl font-extrabold text-customText dark:text-customText-dark tracking-tight">
-              Welcome to Faculty Tracker
+              Welcome to Lectra
             </h2>
           <p className="text-sm text-customText-muted dark:text-customText-mutedDark mt-1">
             Sign in to access real-time attendance portal
@@ -220,8 +223,34 @@ const Login = () => {
           </button>
         </form>
 
+        </div>
+
+        {/* Bottom spacer / Footer area */}
+        <div className="flex-1 flex items-end justify-center w-full relative z-10">
+          <footer className="w-full text-center py-4 text-xs text-customText-muted dark:text-customText-mutedDark">
+            <p>
+              This project is developed in the collaboration of{' '}
+              <a 
+                href="https://nrtec.in" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="text-primary-dark dark:text-primary font-bold hover:underline"
+              >
+                NEC
+              </a>{' '}
+              and{' '}
+              <a 
+                href="https://technoelite-web-portal.vercel.app/" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="text-primary-dark dark:text-primary font-bold hover:underline"
+              >
+                Techno Elite
+              </a>
+            </p>
+          </footer>
+        </div>
       </div>
-    </div>
     </>
   );
 };

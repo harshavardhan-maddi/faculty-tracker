@@ -303,7 +303,7 @@ const Reports = () => {
       {/* PRINT-READY HEADER (Shown ONLY on print) */}
       <div className="hidden print:block mb-6 text-center">
         <h1 className="text-2xl font-extrabold text-slate-900">Classroom Presence Logs Report</h1>
-        <p className="text-xs text-slate-500 mt-1">Generated dynamically from Faculty Tracker</p>
+        <p className="text-xs text-slate-500 mt-1">Generated dynamically from Lectra</p>
         <div className="flex justify-center gap-6 text-[10px] text-slate-500 mt-2 font-medium">
           <span>Date Run: {new Date().toLocaleDateString()}</span>
           {reportMode === 'single' ? (

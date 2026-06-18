@@ -1,4 +1,4 @@
-# Faculty Tracker 🏫
+# Lectra 🏫
 
 A production-ready, real-time faculty attendance monitoring platform built using React (Vite), Node.js (Express), PostgreSQL, and Socket.IO.
 

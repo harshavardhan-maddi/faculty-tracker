@@ -131,7 +131,7 @@ const Layout = ({ children }) => {
           </div>
           <div>
             <h1 className="font-bold text-lg leading-tight bg-gradient-to-r from-primary-dark to-slate-700 dark:to-slate-300 bg-clip-text text-transparent">
-              Faculty Tracker
+              Lectra
             </h1>
             <span className="text-[10px] text-customText-muted dark:text-customText-mutedDark font-semibold tracking-wider uppercase">
               NEC
@@ -202,7 +202,7 @@ const Layout = ({ children }) => {
             <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-slate-800">
               <div className="flex items-center gap-2">
                 <img src={logo} alt="NEC Logo" className="w-7 h-7 rounded-lg object-contain bg-white" />
-                <span className="font-bold text-lg text-primary-dark">Faculty Tracker</span>
+                <span className="font-bold text-lg text-primary-dark">Lectra</span>
               </div>
               <button onClick={() => setMobileMenuOpen(false)} className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">
                 <X size={20} />
@@ -405,8 +405,32 @@ const Layout = ({ children }) => {
         </header>
 
         {/* CONTAINER FOR CHILDREN */}
-        <main className="flex-1 p-4 md:p-8 max-w-[1600px] w-full mx-auto animate-fade-in">
-          {children}
+        <main className="flex-1 p-4 md:p-8 max-w-[1600px] w-full mx-auto animate-fade-in flex flex-col justify-between">
+          <div className="flex-1">
+            {children}
+          </div>
+          <footer className="mt-8 pt-6 pb-4 border-t border-slate-200/50 dark:border-slate-800/30 text-center text-xs text-customText-muted dark:text-customText-mutedDark no-print">
+            <p>
+              This project is developed in the collaboration of{' '}
+              <a 
+                href="https://nrtec.in" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="text-primary-dark dark:text-primary font-bold hover:underline"
+              >
+                NEC
+              </a>{' '}
+              and{' '}
+              <a 
+                href="https://technoelite-web-portal.vercel.app/" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="text-primary-dark dark:text-primary font-bold hover:underline"
+              >
+                Techno Elite
+              </a>
+            </p>
+          </footer>
         </main>
       </div>
 
