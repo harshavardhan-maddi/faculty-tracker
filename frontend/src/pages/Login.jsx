@@ -227,9 +227,8 @@ const Login = () => {
 
         {/* Bottom spacer / Footer area */}
         <div className="flex-1 flex items-end justify-center w-full relative z-10">
-          <footer className="w-full text-center py-4 text-xs text-customText-muted dark:text-customText-mutedDark">
-            <p>
-              This project is developed in the collaboration of{' '}
+          <footer className="w-full text-center py-4">
+            <div className="inline-flex items-center justify-center gap-2.5 px-3.5 py-1.5 rounded-xl bg-slate-100/60 dark:bg-slate-900/40 border border-slate-200/40 dark:border-slate-800/40 text-xs font-semibold text-customText-muted dark:text-customText-mutedDark shadow-sm">
               <a 
                 href="https://nrtec.in" 
                 target="_blank" 
@@ -237,17 +236,17 @@ const Login = () => {
                 className="text-primary-dark dark:text-primary font-bold hover:underline"
               >
                 NEC
-              </a>{' '}
-              and{' '}
+              </a>
+              <span className="text-[10px] text-slate-400 dark:text-slate-500 font-extrabold select-none">✕</span>
               <a 
                 href="https://technoelite-web-portal.vercel.app/" 
                 target="_blank" 
                 rel="noopener noreferrer" 
                 className="text-primary-dark dark:text-primary font-bold hover:underline"
               >
-                Techno Elite
+                Technoelite
               </a>
-            </p>
+            </div>
           </footer>
         </div>
       </div>
