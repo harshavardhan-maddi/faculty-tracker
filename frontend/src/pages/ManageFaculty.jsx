@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Search, Edit, UploadCloud, Users, Phone, Loader, Plus, X } from 'lucide-react';
+import { Search, Edit, UploadCloud, Users, Phone, Loader, Plus, X, Trash2 } from 'lucide-react';
 
 const ManageFaculty = () => {
   const { token, user } = useAuth();
@@ -65,6 +65,31 @@ const ManageFaculty = () => {
       alert('Error saving phone number');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleDelete = async (id, name) => {
+    if (!window.confirm(`Are you sure you want to delete ${name}? This action cannot be undone.`)) {
+      return;
+    }
+    
+    try {
+      const res = await fetch(`/api/faculty/${id}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      
+      if (res.ok) {
+        fetchFaculty();
+      } else {
+        const data = await res.json();
+        alert(data.message || 'Failed to delete faculty');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error deleting faculty');
     }
   };
 
@@ -172,7 +197,7 @@ const ManageFaculty = () => {
                   <span>{f.phoneNumber || 'No phone number'}</span>
                 </div>
               </div>
-              <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-end">
+              <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-2">
                 <button
                   onClick={() => {
                     setEditingFaculty(f);
@@ -181,6 +206,12 @@ const ManageFaculty = () => {
                   className="flex items-center gap-1.5 text-xs font-semibold text-primary hover:bg-primary/10 px-3 py-1.5 rounded-lg border border-transparent hover:border-primary/20 transition-all"
                 >
                   <Edit size={14} /> Edit Phone
+                </button>
+                <button
+                  onClick={() => handleDelete(f.id, f.facultyName)}
+                  className="flex items-center gap-1.5 text-xs font-semibold text-red-500 hover:bg-red-500/10 px-3 py-1.5 rounded-lg border border-transparent hover:border-red-500/20 transition-all"
+                >
+                  <Trash2 size={14} /> Delete
                 </button>
               </div>
             </div>

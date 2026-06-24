@@ -67,8 +67,33 @@ const bulkUpsertFaculty = async (req, res) => {
   }
 };
 
+// Delete faculty
+const deleteFaculty = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const faculty = await prisma.faculty.findUnique({
+      where: { id: parseInt(id) },
+    });
+
+    if (!faculty) {
+      return res.status(404).json({ message: 'Faculty not found' });
+    }
+
+    await prisma.faculty.delete({
+      where: { id: parseInt(id) },
+    });
+
+    res.json({ message: 'Faculty deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting faculty:', error);
+    res.status(500).json({ message: error.message || 'Internal Server Error' });
+  }
+};
+
 module.exports = {
   getAllFaculty,
   upsertFaculty,
   bulkUpsertFaculty,
+  deleteFaculty,
 };
