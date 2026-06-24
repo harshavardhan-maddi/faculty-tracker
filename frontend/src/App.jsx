@@ -8,6 +8,7 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import ManageClassrooms from './pages/ManageClassrooms';
 import ManageUsers from './pages/ManageUsers';
+import ManageFaculty from './pages/ManageFaculty';
 import Reports from './pages/Reports';
 import CRDashboard from './pages/CRDashboard';
 
@@ -56,6 +57,17 @@ const AppRoutes = () => {
           <PrivateRoute allowedRoles={['HOD', 'SUB_ADMIN']}>
             <Layout>
               <ManageClassrooms />
+            </Layout>
+          </PrivateRoute>
+        }
+      />
+
+      <Route
+        path="/faculty"
+        element={
+          <PrivateRoute allowedRoles={['HOD', 'SUB_ADMIN']}>
+            <Layout>
+              <ManageFaculty />
             </Layout>
           </PrivateRoute>
         }

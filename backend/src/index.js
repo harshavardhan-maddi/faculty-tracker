@@ -12,6 +12,7 @@ const timetableRoutes = require('./routes/timetable.routes');
 const logRoutes = require('./routes/log.routes');
 const reportRoutes = require('./routes/report.routes');
 const settingRoutes = require('./routes/setting.routes');
+const facultyRoutes = require('./routes/faculty.routes');
 
 const app = express();
 const server = http.createServer(app);
@@ -30,6 +31,7 @@ app.use('/api/timetables', timetableRoutes);
 app.use('/api/logs', logRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/settings', settingRoutes);
+app.use('/api/faculty', facultyRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

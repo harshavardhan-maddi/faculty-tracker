@@ -39,8 +39,9 @@ model Classroom {
 }
 
 model Faculty {
-  id          Int    @id @default(autoincrement())
-  facultyName String @unique @map("faculty_name")
+  id          Int     @id @default(autoincrement())
+  facultyName String  @unique @map("faculty_name")
+  phoneNumber String? @map("phone_number")
 
   @@map("faculty")
 }

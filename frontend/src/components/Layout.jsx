@@ -103,6 +103,7 @@ const Layout = ({ children }) => {
     navLinks.push(
       { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
       { name: 'Classrooms', path: '/classrooms', icon: CalendarDays },
+      { name: 'Faculty Contacts', path: '/faculty', icon: UserCheck },
       { name: 'Reports', path: '/reports', icon: FileSpreadsheet }
     );
     if (user?.role === 'HOD') {

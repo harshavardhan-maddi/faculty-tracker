@@ -42,6 +42,18 @@ const getClassrooms = async (req, res) => {
       (p) => p.startTime <= currentTime && currentTime < p.endTime
     );
 
+    // Fetch faculty records to attach phone numbers
+    const faculties = await prisma.faculty.findMany();
+    const facultyPhoneMap = {};
+    for (const f of faculties) {
+      facultyPhoneMap[f.facultyName] = f.phoneNumber;
+    }
+
+    // Fetch timetables for today
+    const timetablesToday = await prisma.timetable.findMany({
+      where: { day: getTodayDay() },
+    });
+
     const result = [];
 
     for (const classroom of classrooms) {
@@ -51,9 +63,15 @@ const getClassrooms = async (req, res) => {
       // Filter logs for this classroom in-memory
       const classroomLogs = logsToday.filter(l => l.classroomId === classroom.id);
 
+      // Filter timetables for this classroom
+      const classroomTimetables = timetablesToday.filter(t => t.classroomId === classroom.id);
+
       if (activePeriodConfig) {
         // Find matching log for the active period
         const log = classroomLogs.find(l => l.periodNo === activePeriodConfig.periodNo);
+        const timetable = classroomTimetables.find(t => t.periodNo === activePeriodConfig.periodNo);
+        const actualFacultyName = log ? log.facultyName : (timetable ? timetable.facultyName : 'Faculty');
+        const actualSubjectName = timetable ? timetable.subjectName : 'Class';
 
         if (log) {
           status = log.status; // 'Present' or 'Not Entered'
@@ -65,9 +83,10 @@ const getClassrooms = async (req, res) => {
           periodNo: activePeriodConfig.periodNo,
           startTime: activePeriodConfig.startTime,
           endTime: activePeriodConfig.endTime,
-          facultyName: 'Faculty',
-          subjectName: 'Class',
+          facultyName: actualFacultyName,
+          subjectName: actualSubjectName,
           entryTime: log ? log.entryTime : null,
+          facultyPhoneNumber: facultyPhoneMap[actualFacultyName] || null,
         };
       } else {
         // Fallback: check the latest completed period today
@@ -75,15 +94,19 @@ const getClassrooms = async (req, res) => {
         if (pastPeriods.length > 0) {
           const latestPast = pastPeriods[pastPeriods.length - 1];
           const pastLog = classroomLogs.find(l => l.periodNo === latestPast.periodNo);
+          const pastTimetable = classroomTimetables.find(t => t.periodNo === latestPast.periodNo);
+          const actualPastFacultyName = pastLog ? pastLog.facultyName : (pastTimetable ? pastTimetable.facultyName : 'Faculty');
+          const actualPastSubjectName = pastTimetable ? pastTimetable.subjectName : 'Class';
 
           status = pastLog ? pastLog.status : 'Not Entered';
           currentPeriodInfo = {
             periodNo: latestPast.periodNo,
             startTime: latestPast.startTime,
             endTime: latestPast.endTime,
-            facultyName: 'Faculty',
-            subjectName: 'Class',
+            facultyName: actualPastFacultyName,
+            subjectName: actualPastSubjectName,
             entryTime: pastLog ? pastLog.entryTime : null,
+            facultyPhoneNumber: facultyPhoneMap[actualPastFacultyName] || null,
           };
         }
       }
