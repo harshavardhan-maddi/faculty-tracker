@@ -81,19 +81,40 @@
   background: rgba(124, 157, 255, 0.4);
 }
 
-/* Print optimizations */
-@media print {
-  body {
-    background: white !important;
-    color: black !important;
-  }
-  .no-print {
-    display: none !important;
-  }
-  .print-card {
-    border: 1px solid #e2e8f0 !important;
-    box-shadow: none !important;
-    background: transparent !important;
-    page-break-inside: avoid;
-  }
-}
+
+ /* Print optimizations */
+ @media print {
+   body {
+     background: white !important;
+     color: black !important;
+   }
+   .no-print {
+     display: none !important;
+   }
+   .print-card {
+     border: 1px solid #e2e8f0 !important;
+     box-shadow: none !important;
+     background: transparent !important;
+     page-break-inside: avoid;
+   }
+ }
+ 
+ /* Fingerprint Scanning Animations */
+ @keyframes scan-line {
+   0% { top: 0%; }
+   50% { top: 100%; }
+   100% { top: 0%; }
+ }
+ 
+ .animate-scan-line {
+   animation: scan-line 3s ease-in-out infinite;
+ }
+ 
+ @keyframes ripple-ring {
+   0% { transform: scale(0.85); opacity: 0.8; }
+   100% { transform: scale(1.5); opacity: 0; }
+ }
+ 
+ .animate-ripple-ring {
+   animation: ripple-ring 2s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+ }

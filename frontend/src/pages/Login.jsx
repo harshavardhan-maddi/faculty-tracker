@@ -1,49 +1,41 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import * as faceapi from '@vladmandic/face-api';
+import { startAuthentication } from '@simplewebauthn/browser';
 import { 
   Eye, 
   EyeOff, 
   User, 
   Lock, 
-  Camera, 
-  RefreshCw, 
-  KeyRound, 
+  Fingerprint, 
   AlertTriangle, 
-  Info 
+  Info,
+  X
 } from 'lucide-react';
 import logo from '../neclogo.png';
 import Loading from '../components/Loading';
 
 const Login = () => {
-  const { login, authenticateWithFace } = useAuth();
+  const { login, authenticateWithBiometrics } = useAuth();
   const navigate = useNavigate();
 
-  // Existing password login states
+  // Form states
   const [userId, setUserId] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // Biometrics states
+  const [biometricsLoading, setBiometricsLoading] = useState(false);
+  const [biometricsStatus, setBiometricsStatus] = useState('');
+  const [showBiometricsModal, setShowBiometricsModal] = useState(false);
+  const [modalError, setModalError] = useState('');
+
   // Intro loader states
   const [introVisible, setIntroVisible] = useState(true);
   const [introFadeOut, setIntroFadeOut] = useState(false);
   const [progressWidth, setProgressWidth] = useState('0%');
-
-  // Face auth states
-  const [hasRegisteredFaces, setHasRegisteredFaces] = useState(null);
-  const [useFaceAuth, setUseFaceAuth] = useState(false);
-  const [modelsLoaded, setModelsLoaded] = useState(false);
-  const [loadingModels, setLoadingModels] = useState(false);
-  const [faceScanStatus, setFaceScanStatus] = useState('');
-  const [faceScanError, setFaceScanError] = useState('');
-  const [detectedFace, setDetectedFace] = useState(null);
-
-  const videoRef = useRef(null);
-  const streamRef = useRef(null);
-  const detectIntervalRef = useRef(null);
 
   // 1. Intro Animation
   useEffect(() => {
@@ -66,174 +58,7 @@ const Login = () => {
     };
   }, []);
 
-  // 2. Check face authentication availability on mount
-  useEffect(() => {
-    const checkSystemFaceStatus = async () => {
-      try {
-        const res = await fetch('/api/auth/face/check');
-        const data = await res.json();
-        setHasRegisteredFaces(data.hasRegisteredFaces);
-        
-        // If there are enrolled faces in the system, face auth is the default
-        if (data.hasRegisteredFaces) {
-          setUseFaceAuth(true);
-        }
-      } catch (err) {
-        console.error('Failed to verify system face status:', err);
-        setHasRegisteredFaces(false);
-      }
-    };
-    checkSystemFaceStatus();
-  }, []);
 
-  // 3. Initialize camera when Face Auth is active and intro finishes
-  useEffect(() => {
-    if (!introVisible && useFaceAuth) {
-      startFaceScanner();
-    } else {
-      stopFaceScanner();
-    }
-    return () => {
-      stopFaceScanner();
-    };
-  }, [introVisible, useFaceAuth]);
-
-  // Lazy loading face models
-  const loadFaceModels = async () => {
-    if (modelsLoaded) return;
-    setLoadingModels(true);
-    setFaceScanStatus('Initializing face models...');
-    try {
-      await Promise.all([
-        faceapi.nets.tinyFaceDetector.loadFromUri('/models'),
-        faceapi.nets.faceLandmark68Net.loadFromUri('/models'),
-        faceapi.nets.faceRecognitionNet.loadFromUri('/models')
-      ]);
-      setModelsLoaded(true);
-    } catch (err) {
-      console.error('Failed to load Face Models:', err);
-      setFaceScanError(`Failed to load neural models: ${err.message || err.toString()}`);
-    } finally {
-      setLoadingModels(false);
-    }
-  };
-
-  const startFaceScanner = async () => {
-    setFaceScanError('');
-    setFaceScanStatus('Starting camera...');
-    setDetectedFace(null);
-
-    // Make sure models are loaded before turning on camera
-    await loadFaceModels();
-
-    try {
-      const constraints = {
-        video: {
-          width: { ideal: 640 },
-          height: { ideal: 480 },
-          facingMode: 'user'
-        },
-        audio: false
-      };
-
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      streamRef.current = stream;
-
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.onloadedmetadata = () => {
-          setFaceScanStatus('Position your face in the box');
-          startFaceDetection();
-        };
-      }
-    } catch (err) {
-      console.error('Camera stream access failed:', err);
-      setFaceScanError('Unable to access camera. Please check permissions.');
-      stopFaceScanner();
-    }
-  };
-
-  const stopFaceScanner = () => {
-    if (detectIntervalRef.current) {
-      clearInterval(detectIntervalRef.current);
-      detectIntervalRef.current = null;
-    }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
-    }
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
-    setDetectedFace(null);
-  };
-
-  const startFaceDetection = () => {
-    if (detectIntervalRef.current) clearInterval(detectIntervalRef.current);
-
-    let consecutiveFramesWithFace = 0;
-
-    detectIntervalRef.current = setInterval(async () => {
-      if (!videoRef.current || !streamRef.current) return;
-
-      try {
-        const detection = await faceapi.detectSingleFace(
-          videoRef.current,
-          new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.55 })
-        ).withFaceLandmarks().withFaceDescriptor();
-
-        if (detection) {
-          setDetectedFace(true);
-          consecutiveFramesWithFace += 1;
-          setFaceScanStatus('Scanning face... Hold still.');
-
-          // Match when face is stable for 3 consecutive frames
-          if (consecutiveFramesWithFace >= 3) {
-            clearInterval(detectIntervalRef.current);
-            detectIntervalRef.current = null;
-            submitFaceDescriptor(detection.descriptor);
-          }
-        } else {
-          setDetectedFace(false);
-          consecutiveFramesWithFace = 0;
-          setFaceScanStatus('Position your face in the box');
-        }
-      } catch (err) {
-        console.error('Face detection error:', err);
-      }
-    }, 300);
-  };
-
-  const submitFaceDescriptor = async (descriptor) => {
-    setFaceScanStatus('Verifying face signature...');
-    setLoading(true);
-    setFaceScanError('');
-
-    try {
-      const res = await fetch('/api/auth/face/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ descriptor: Array.from(descriptor) })
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Face authentication failed');
-
-      // Login success: update context and redirect
-      authenticateWithFace(data.token, data.user);
-      
-      if (data.user.role === 'CR') {
-        navigate('/cr-dashboard');
-      } else {
-        navigate('/dashboard');
-      }
-    } catch (err) {
-      setFaceScanError(err.message || 'Face not recognized.');
-      setFaceScanStatus('Scanning failed.');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -258,6 +83,84 @@ const Login = () => {
       setLoading(false);
     }
   };
+
+  const handleFingerprintLogin = () => {
+    setModalError('');
+    setShowBiometricsModal(true);
+  };
+
+  const handleBiometricAuth = async () => {
+    setBiometricsLoading(true);
+    setBiometricsStatus('Requesting biometric options...');
+    setModalError('');
+
+    try {
+      // Step 1: Request authentication challenge options from server (no userId needed)
+      const resOptions = await fetch('/api/auth/fingerprint/login-options', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      });
+      const optionsData = await resOptions.json();
+      if (!resOptions.ok) {
+        throw new Error(optionsData.message || 'Fingerprint biometrics not enabled');
+      }
+
+      setBiometricsStatus('Scan your fingerprint...');
+      
+      // Step 2: Invoke device's native fingerprint/biometric authentication prompt
+      let assertionResponse;
+      try {
+        assertionResponse = await startAuthentication(optionsData);
+      } catch (authError) {
+        console.error(authError);
+        throw new Error(`Biometric scan cancelled: ${authError.message}`);
+      }
+
+      setBiometricsStatus('Verifying security signature...');
+
+      // Step 3: Send signature response back to server for verification
+      const resVerify = await fetch('/api/auth/fingerprint/login-verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          response: assertionResponse, 
+          challenge: optionsData.challenge 
+        })
+      });
+      const verifyData = await resVerify.json();
+      if (!resVerify.ok) {
+        throw new Error(verifyData.message || 'Fingerprint authentication failed');
+      }
+
+      // Successful authentication
+      authenticateWithBiometrics(verifyData.token, verifyData.user);
+      
+      // Close modal on success
+      setShowBiometricsModal(false);
+      
+      if (verifyData.user.role === 'CR') {
+        navigate('/cr-dashboard');
+      } else {
+        navigate('/dashboard');
+      }
+    } catch (err) {
+      setModalError(err.message);
+    } finally {
+      setBiometricsLoading(false);
+      setBiometricsStatus('');
+    }
+  };
+
+  // Trigger biometric scan automatically if modal is opened
+  useEffect(() => {
+    if (showBiometricsModal) {
+      const timer = setTimeout(() => {
+        handleBiometricAuth();
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [showBiometricsModal]);
 
   return (
     <>
@@ -308,7 +211,7 @@ const Login = () => {
         </div>
       )}
 
-      {loading && !useFaceAuth && <Loading />}
+      {loading && <Loading />}
 
       <div className="min-h-screen flex flex-col items-center justify-between bg-slate-50 dark:bg-slate-950 p-4 relative overflow-hidden transition-colors duration-300">
         <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full bg-primary/10 dark:bg-primary-dark/5 blur-3xl" />
@@ -318,6 +221,24 @@ const Login = () => {
 
         <div className="w-full max-w-md glass-card p-8 border border-white/60 dark:border-slate-800/65 relative z-10 animate-fade-in my-auto">
           
+          {/* Fingerprint Login Option at Card Top Right */}
+          <div className="absolute top-6 right-6 z-20">
+            <button
+              type="button"
+              onClick={handleFingerprintLogin}
+              disabled={loading || biometricsLoading}
+              title="Sign in with Fingerprint"
+              className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900 text-slate-500 dark:text-slate-400 hover:bg-primary/10 hover:border-primary/30 hover:text-primary hover:scale-105 transition-all duration-300 flex items-center justify-center cursor-pointer shadow-sm"
+            >
+              <Fingerprint 
+                size={20} 
+                className={`${
+                  biometricsLoading ? 'animate-bounce' : ''
+                } transition-transform duration-300`} 
+              />
+            </button>
+          </div>
+
           <div className="flex flex-col items-center mb-8 text-center">
             <div className="relative w-20 h-20 flex items-center justify-center mb-4">
               <div className="absolute inset-0 rounded-full border-2 border-t-primary-dark border-r-transparent border-b-secondary border-l-transparent animate-spin" style={{ animationDuration: '3s' }}></div>
@@ -331,158 +252,88 @@ const Login = () => {
             </p>
           </div>
 
-          {/* Fallback Banner for No Registered Face */}
-          {hasRegisteredFaces === false && !useFaceAuth && (
-            <div className="mb-6 p-4 bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-xs font-semibold rounded-xl flex items-center gap-2">
-              <Info size={14} className="shrink-0" />
-              <span>No Face Authentication has been configured.</span>
-            </div>
-          )}
-
-          {/* Password Form Errors */}
-          {error && !useFaceAuth && (
-            <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-sm font-semibold rounded-xl flex items-center gap-2 animate-pulse">
-              <span>⚠️</span>
+          {/* Form Errors */}
+          {error && (
+            <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-sm font-semibold rounded-xl flex items-center gap-2">
+              <AlertTriangle size={16} className="shrink-0" />
               <span>{error}</span>
             </div>
           )}
 
-          {useFaceAuth ? (
-            /* Face Scanner Login UI */
-            <div className="space-y-6">
-              
-              {/* Scan Status Display */}
-              {faceScanError ? (
-                <div className="p-4 bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs font-semibold rounded-xl flex items-center gap-2">
-                  <AlertTriangle size={16} className="shrink-0" />
-                  <span>{faceScanError}</span>
-                </div>
-              ) : (
-                <div className="p-3 bg-slate-50 dark:bg-slate-950/20 border border-slate-200/40 text-customText-muted text-xs font-medium rounded-xl flex items-center justify-center gap-2.5">
-                  {(loadingModels || loading) ? (
-                    <span className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-primary border-t-transparent shrink-0"></span>
-                  ) : (
-                    <span className="w-2.5 h-2.5 rounded-full bg-green-500 shrink-0"></span>
-                  )}
-                  <span>{faceScanStatus}</span>
-                </div>
-              )}
-
-              {/* Video Camera Container */}
-              <div className="relative aspect-video w-full rounded-2xl overflow-hidden bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center">
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  muted
-                  playsInline
-                  className="w-full h-full object-cover scale-x-[-1]"
-                />
-                
-                {/* Visual Target frame */}
-                <div className="absolute inset-0 border-[3px] border-dashed border-white/20 rounded-2xl pointer-events-none flex items-center justify-center">
-                  <div className={`w-36 h-36 rounded-full border-2 transition-colors duration-300 ${detectedFace ? 'border-green-500 bg-green-500/5' : 'border-white/20 bg-white/5'}`} />
-                </div>
-              </div>
-
-              {/* Scanner Actions */}
-              <div className="flex flex-col gap-3">
-                {faceScanError && (
-                  <button
-                    onClick={startFaceScanner}
-                    className="w-full btn-primary py-3 flex items-center justify-center gap-2"
-                  >
-                    <RefreshCw size={16} />
-                    <span>Retry Face Login</span>
-                  </button>
-                )}
-                
-                <button
-                  onClick={() => setUseFaceAuth(false)}
-                  className="w-full btn-secondary py-3 flex items-center justify-center gap-2"
-                >
-                  <KeyRound size={16} />
-                  <span>Login with Password</span>
-                </button>
-              </div>
-
+          {/* Biometrics Loading Status */}
+          {biometricsLoading && (
+            <div className="mb-6 p-3 bg-slate-50 dark:bg-slate-950/20 border border-slate-200/40 text-customText-muted text-xs font-semibold rounded-xl flex items-center justify-center gap-2.5">
+              <span className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-primary border-t-transparent shrink-0"></span>
+              <span>{biometricsStatus}</span>
             </div>
-          ) : (
-            /* Classic Password login form */
-            <form onSubmit={handleSubmit} className="space-y-5">
-              <div>
-                <label className="block text-xs font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider mb-2">
-                  User ID
-                </label>
-                <div className="relative">
-                  <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-customText-muted dark:text-customText-mutedDark">
-                    <User size={18} />
-                  </span>
-                  <input
-                    type="text"
-                    value={userId}
-                    onChange={(e) => setUserId(e.target.value)}
-                    placeholder="Enter your User ID"
-                    className="glass-input pl-10"
-                    disabled={loading}
-                    required
-                  />
-                </div>
+          )}
+
+          {/* Password login form */}
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div>
+              <label className="block text-xs font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider mb-2">
+                User ID
+              </label>
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-customText-muted dark:text-customText-mutedDark">
+                  <User size={18} />
+                </span>
+                <input
+                  type="text"
+                  value={userId}
+                  onChange={(e) => setUserId(e.target.value)}
+                  placeholder="Enter your User ID"
+                  className="glass-input pl-10"
+                  disabled={loading || biometricsLoading}
+                  required
+                />
               </div>
+            </div>
 
-              <div>
-                <label className="block text-xs font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider mb-2">
-                  Password
-                </label>
-                <div className="relative">
-                  <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-customText-muted dark:text-customText-mutedDark">
-                    <Lock size={18} />
-                  </span>
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter password"
-                    className="glass-input pl-10 pr-10"
-                    disabled={loading}
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-customText-muted dark:text-customText-mutedDark hover:text-customText"
-                  >
-                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                  </button>
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                className="w-full btn-primary mt-2 py-3.5"
-                disabled={loading}
-              >
-                {loading ? (
-                  <div className="flex items-center justify-center gap-2">
-                    <span className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></span>
-                    <span>Signing in...</span>
-                  </div>
-                ) : (
-                  <span>Sign In</span>
-                )}
-              </button>
-
-              {hasRegisteredFaces && (
+            <div>
+              <label className="block text-xs font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider mb-2">
+                Password
+              </label>
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-customText-muted dark:text-customText-mutedDark">
+                  <Lock size={18} />
+                </span>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter password"
+                  className="glass-input pl-10 pr-10"
+                  disabled={loading || biometricsLoading}
+                  required
+                />
                 <button
                   type="button"
-                  onClick={() => setUseFaceAuth(true)}
-                  className="w-full btn-secondary py-3 flex items-center justify-center gap-2 border-t border-slate-100 dark:border-slate-800 pt-4"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-customText-muted dark:text-customText-mutedDark hover:text-customText"
                 >
-                  <Camera size={16} />
-                  <span>Scan My Face</span>
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              className="w-full btn-primary mt-2 py-3.5"
+              disabled={loading || biometricsLoading}
+            >
+              {loading ? (
+                <div className="flex items-center justify-center gap-2">
+                  <span className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></span>
+                  <span>Signing in...</span>
+                </div>
+              ) : (
+                <span>Sign In</span>
               )}
-            </form>
-          )}
+            </button>
+
+
+          </form>
 
         </div>
 
@@ -510,6 +361,122 @@ const Login = () => {
           </footer>
         </div>
       </div>
+
+      {/* Biometric Scan Modal */}
+      {showBiometricsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* Glass backdrop with high blur */}
+          <div 
+            className="fixed inset-0 bg-slate-950/80 backdrop-blur-md transition-opacity duration-300" 
+            onClick={() => !biometricsLoading && setShowBiometricsModal(false)} 
+          />
+          
+          <div className="relative w-full max-w-sm glass-card p-8 border border-white/20 dark:border-slate-800/40 shadow-2xl z-10 animate-fade-in space-y-6">
+            {/* Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200/50 dark:border-slate-800/50">
+              <h3 className="font-extrabold text-lg text-customText dark:text-customText-dark flex items-center gap-2">
+                <Fingerprint className="text-primary" size={22} />
+                <span>Biometric Login</span>
+              </h3>
+              <button 
+                type="button" 
+                onClick={() => !biometricsLoading && setShowBiometricsModal(false)}
+                className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-customText-muted dark:text-customText-mutedDark transition-colors cursor-pointer"
+                disabled={biometricsLoading}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Description */}
+            <p className="text-xs text-customText-muted dark:text-customText-mutedDark text-center leading-relaxed">
+              Scan your registered fingerprint to securely access your account.
+            </p>
+
+            {/* Fingerprint Scanner Animation Graphic */}
+            <div className="flex flex-col items-center justify-center py-6 relative">
+              <div className="relative w-32 h-32 flex items-center justify-center">
+                
+                {/* Ripple Rings */}
+                {biometricsLoading && (
+                  <>
+                    <div className="absolute inset-0 rounded-full border border-primary/30 animate-ripple-ring" style={{ animationDelay: '0s' }} />
+                    <div className="absolute inset-0 rounded-full border border-primary/20 animate-ripple-ring" style={{ animationDelay: '0.6s' }} />
+                    <div className="absolute inset-0 rounded-full border border-primary/10 animate-ripple-ring" style={{ animationDelay: '1.2s' }} />
+                  </>
+                )}
+
+                {/* Central Circle */}
+                <button
+                  type="button"
+                  onClick={() => !biometricsLoading && handleBiometricAuth()}
+                  disabled={biometricsLoading}
+                  className={`w-24 h-24 rounded-full border-2 flex items-center justify-center transition-all duration-500 overflow-hidden relative ${
+                    biometricsLoading 
+                      ? 'border-primary bg-primary/5 shadow-[0_0_15px_rgba(124,157,255,0.2)] cursor-default' 
+                      : modalError 
+                        ? 'border-danger bg-danger/5 cursor-pointer hover:bg-danger/10 shadow-[0_0_15px_rgba(239,154,154,0.15)]' 
+                        : 'border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/20 cursor-pointer hover:border-primary hover:bg-primary/5'
+                  }`}
+                >
+                  <Fingerprint 
+                    size={48} 
+                    className={`transition-all duration-500 ${
+                      biometricsLoading 
+                        ? 'text-primary scale-110' 
+                        : modalError 
+                          ? 'text-danger' 
+                          : 'text-slate-400 dark:text-slate-500 hover:text-primary'
+                    }`} 
+                  />
+
+                  {/* Laser scan line going up/down */}
+                  {biometricsLoading && (
+                    <div className="absolute left-0 right-0 h-0.5 bg-primary shadow-[0_0_8px_rgba(124,157,255,0.8)] animate-scan-line" />
+                  )}
+                </button>
+              </div>
+
+              {/* Scanning Status Text */}
+              <div className="mt-4 text-center">
+                <span className={`text-xs font-bold uppercase tracking-wider ${
+                  modalError ? 'text-danger' : 'text-primary'
+                }`}>
+                  {biometricsLoading ? biometricsStatus : modalError ? 'Authentication Failed' : 'Ready to Scan'}
+                </span>
+              </div>
+            </div>
+
+            {/* Modal Error alert */}
+            {modalError && (
+              <div className="p-3.5 bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs font-semibold rounded-xl flex items-center gap-2 animate-pulse">
+                <AlertTriangle size={15} className="shrink-0" />
+                <span>{modalError}</span>
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowBiometricsModal(false)}
+                className="flex-1 btn-secondary py-2.5 text-xs font-bold cursor-pointer"
+                disabled={biometricsLoading}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleBiometricAuth}
+                className="flex-1 btn-primary py-2.5 text-xs font-bold cursor-pointer"
+                disabled={biometricsLoading}
+              >
+                {biometricsLoading ? 'Scanning...' : 'Scan Fingerprint'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };

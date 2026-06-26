@@ -11,7 +11,7 @@ import ManageUsers from './pages/ManageUsers';
 import ManageFaculty from './pages/ManageFaculty';
 import Reports from './pages/Reports';
 import CRDashboard from './pages/CRDashboard';
-import FaceSettings from './pages/FaceSettings';
+import FingerprintSettings from './pages/FingerprintSettings';
 
 // Custom router resolver to send authenticated users to their correct home dashboard
 const HomeRedirect = () => {
@@ -90,7 +90,7 @@ const AppRoutes = () => {
         element={
           <PrivateRoute allowedRoles={['HOD', 'SUB_ADMIN']}>
             <Layout>
-              <FaceSettings />
+              <FingerprintSettings />
             </Layout>
           </PrivateRoute>
         }

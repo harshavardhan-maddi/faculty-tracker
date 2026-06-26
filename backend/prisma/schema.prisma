@@ -16,19 +16,14 @@ enum Role {
 }
 
 model User {
-  id               Int       @id @default(autoincrement())
-  name             String
-  userId           String    @unique @map("user_id")
-  password         String
-  role             Role
-  className        String?   @map("class_name")
-  createdAt        DateTime  @default(now()) @map("created_at")
-  faceDescriptor   String?   @map("face_descriptor")
-  faceAuthEnabled  Boolean   @default(false) @map("face_auth_enabled")
-  faceRegisteredAt DateTime? @map("face_registered_at")
-  faceUpdatedAt    DateTime? @map("face_updated_at")
-  faceUpdateCount  Int       @default(0) @map("face_update_count")
-  faceUpdateMonth  String?   @map("face_update_month")
+  id                 Int       @id @default(autoincrement())
+  name               String
+  userId             String    @unique @map("user_id")
+  password           String
+  role               Role
+  className          String?   @map("class_name")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  fingerprintEnabled Boolean   @default(false) @map("fingerprint_enabled")
 
   @@map("users")
 }
@@ -90,13 +85,25 @@ model SystemSetting {
   @@map("system_settings")
 }
 
-model FaceAuditLog {
+model Fingerprint {
+  id           Int      @id @default(autoincrement())
+  userId       String   @unique @map("user_id")
+  credentialId String   @map("credential_id")
+  publicKey    String   @map("public_key")
+  counter      Int      @default(0)
+  transports   String?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("fingerprints")
+}
+
+model FingerprintAuditLog {
   id        Int      @id @default(autoincrement())
   userId    String   @map("user_id")
-  action    String   // "REGISTRATION", "UPDATE", "REMOVAL", "LOGIN_SUCCESS", "LOGIN_FAILURE"
+  action    String   // "REGISTRATION", "REMOVAL", "LOGIN_SUCCESS", "LOGIN_FAILURE", "TOGGLE_ON", "TOGGLE_OFF"
   details   String?
   ipAddress String?  @map("ip_address")
   createdAt DateTime @default(now()) @map("created_at")
 
-  @@map("face_audit_logs")
+  @@map("fingerprint_audit_logs")
 }

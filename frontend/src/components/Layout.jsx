@@ -105,7 +105,7 @@ const Layout = ({ children }) => {
       { name: 'Classrooms', path: '/classrooms', icon: CalendarDays },
       { name: 'Faculty Contacts', path: '/faculty', icon: UserCheck },
       { name: 'Reports', path: '/reports', icon: FileSpreadsheet },
-      { name: 'Face Settings', path: '/settings', icon: Settings }
+      { name: 'Fingerprint Settings', path: '/settings', icon: Settings }
     );
     if (user?.role === 'HOD') {
       navLinks.push({ name: 'Manage Users', path: '/users', icon: Users });

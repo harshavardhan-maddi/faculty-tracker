@@ -138,7 +138,7 @@ export const AuthProvider = ({ children }) => {
     return data.user;
   };
 
-  const authenticateWithFace = (jwtToken, userProfile) => {
+  const authenticateWithBiometrics = (jwtToken, userProfile) => {
     localStorage.setItem('token', jwtToken);
     setToken(jwtToken);
     setUser(userProfile);
@@ -154,7 +154,7 @@ export const AuthProvider = ({ children }) => {
     deleteUser,
     getUsersList,
     updateProfile,
-    authenticateWithFace,
+    authenticateWithBiometrics,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
