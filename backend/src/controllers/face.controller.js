@@ -38,15 +38,6 @@ const loginWithFace = async (req, res) => {
   const { descriptor } = req.body;
   const ip = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
 
-  // Rate limit / Lockout check
-  const record = failedFaceAttempts[ip];
-  if (record && record.lockUntil && record.lockUntil > Date.now()) {
-    const remainingMinutes = Math.ceil((record.lockUntil - Date.now()) / 60000);
-    return res.status(429).json({
-      message: `Too many failed face login attempts. Face login is locked. Try again in ${remainingMinutes} minutes, or use Password fallback.`
-    });
-  }
-
   if (!descriptor || !Array.isArray(descriptor) || descriptor.length === 0) {
     return res.status(400).json({ message: 'Face descriptor is required' });
   }
@@ -119,7 +110,7 @@ const loginWithFace = async (req, res) => {
         }
       });
 
-      res.json({
+      return res.json({
         token,
         user: {
           id: bestMatch.id,
@@ -130,6 +121,16 @@ const loginWithFace = async (req, res) => {
         }
       });
     } else {
+      // If we got here, the face did not match any authenticated user descriptor.
+      // Now we check if this IP is currently locked out for unauthenticated attempts.
+      const record = failedFaceAttempts[ip];
+      if (record && record.lockUntil && record.lockUntil > Date.now()) {
+        const remainingMinutes = Math.ceil((record.lockUntil - Date.now()) / 60000);
+        return res.status(429).json({
+          message: `Too many failed face login attempts. Face login is locked. Try again in ${remainingMinutes} minutes, or use Password fallback.`
+        });
+      }
+
       // Increment failed count
       if (!failedFaceAttempts[ip]) {
         failedFaceAttempts[ip] = { count: 0, lockUntil: null };
@@ -153,13 +154,13 @@ const loginWithFace = async (req, res) => {
         }
       });
 
-      res.status(401).json({
+      return res.status(401).json({
         message: 'Face not recognized. Please adjust lighting or try again.'
       });
     }
   } catch (error) {
     console.error('[Face Auth loginWithFace Error]', error);
-    res.status(500).json({ message: 'Internal Server Error' });
+    return res.status(500).json({ message: 'Internal Server Error' });
   }
 };
 
