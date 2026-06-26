@@ -20,7 +20,6 @@ const checkExpiredPeriods = async () => {
       return;
     }
 
-    const today = getTodayDay();
     const currentTime = getCurrentTimeInHHMM();
     const { start: startOfToday, end: endOfToday } = getLocalDayBounds();
 
