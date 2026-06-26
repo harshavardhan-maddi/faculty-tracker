@@ -1,4 +1,9 @@
 require('dotenv').config();
+
+// Force Prisma to use binary engines dynamically for Windows ARM64 compatibility
+process.env.PRISMA_CLIENT_ENGINE_TYPE = 'binary';
+process.env.PRISMA_CLI_QUERY_ENGINE_TYPE = 'binary';
+
 const express = require('express');
 const cors = require('cors');
 const http = require('http');

@@ -18,9 +18,7 @@ try {
 
   // 2. Generate Prisma Client
   console.log('[Build Script] Step 2: Generating Prisma Client...');
-  const prismaPath = path.join(__dirname, '../node_modules/prisma/build/index.js');
-  const schemaPath = path.join(__dirname, '../backend/prisma/schema.prisma');
-  execSync(`node "${prismaPath}" generate --schema="${schemaPath}"`, { stdio: 'inherit' });
+  execSync('npx prisma generate', { cwd: backendDir, stdio: 'inherit' });
   console.log('[Build Script] Prisma Client generated successfully.');
 
   // 3. Install Frontend Dependencies

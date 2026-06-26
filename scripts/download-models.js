@@ -14,7 +14,8 @@ const filesToDownload = [
   'face_landmark_68_model-weights_manifest.json',
   'face_landmark_68_model-shard1',
   'face_recognition_model-weights_manifest.json',
-  'face_recognition_model-shard1'
+  'face_recognition_model-shard1',
+  'face_recognition_model-shard2' // Added second shard for Face Recognition
 ];
 
 const baseUrl = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights/';
@@ -63,13 +64,13 @@ async function downloadAll() {
       await downloadFile(url, destPath);
       console.log(`[Face API Models] Completed download: ${finalName}`);
       
-      // If it's a manifest JSON file, update its paths content to point to the .bin file
+      // If it's a manifest JSON file, dynamically replace all matching shards in the paths array to append .bin
       if (!isShard && file.endsWith('.json')) {
         let content = fs.readFileSync(destPath, 'utf8');
-        const shardName = file.replace('-weights_manifest.json', '-shard1');
-        content = content.replace(`"${shardName}"`, `"${shardName}.bin"`);
+        // Match model-shard1, model-shard2, etc., and append .bin
+        content = content.replace(/_model-shard(\d+)/g, '_model-shard$1.bin');
         fs.writeFileSync(destPath, content, 'utf8');
-        console.log(`[Face API Models] Updated manifest: ${file} to point to .bin shard`);
+        console.log(`[Face API Models] Updated manifest: ${file} to point to all .bin shards`);
       }
     } catch (err) {
       console.error(`[Face API Models] Error downloading ${file}:`, err.message);

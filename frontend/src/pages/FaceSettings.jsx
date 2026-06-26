@@ -157,7 +157,7 @@ const FaceSettings = () => {
       setModelsLoaded(true);
     } catch (err) {
       console.error('Failed to load Face Models:', err);
-      setScanError('Failed to load AI face detection models. Please check your network connection.');
+      setScanError(`Failed to load AI face detection models: ${err.message || err.toString()}`);
     } finally {
       setLoadingModels(false);
     }

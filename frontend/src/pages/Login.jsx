@@ -112,7 +112,7 @@ const Login = () => {
       setModelsLoaded(true);
     } catch (err) {
       console.error('Failed to load Face Models:', err);
-      setFaceScanError('Failed to load neural models.');
+      setFaceScanError(`Failed to load neural models: ${err.message || err.toString()}`);
     } finally {
       setLoadingModels(false);
     }
