@@ -84,12 +84,44 @@ const Login = () => {
     }
   };
 
-  const handleFingerprintLogin = () => {
+  const handleFingerprintLogin = async () => {
+    if (!window.PublicKeyCredential) {
+      setError('Biometric authentication is not supported by your browser. Please login using your User ID and Password.');
+      return;
+    }
+
+    try {
+      const isBiometricAvailable = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+      if (!isBiometricAvailable) {
+        setError('Your device does not have a fingerprint sensor. Please login using your User ID and Password.');
+        return;
+      }
+    } catch (e) {
+      setError('Failed to check biometric availability. Please login using your User ID and Password.');
+      return;
+    }
+
     setModalError('');
     setShowBiometricsModal(true);
   };
 
   const handleBiometricAuth = async () => {
+    if (!window.PublicKeyCredential) {
+      setModalError('Biometrics are not supported by your browser. Please login using your User ID and Password.');
+      return;
+    }
+
+    try {
+      const isBiometricAvailable = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+      if (!isBiometricAvailable) {
+        setModalError('Your device does not have a fingerprint sensor. Please login using your User ID and Password.');
+        return;
+      }
+    } catch (e) {
+      setModalError('Biometric sensor check failed. Please login using your User ID and Password.');
+      return;
+    }
+
     setBiometricsLoading(true);
     setBiometricsStatus('Requesting biometric options...');
     setModalError('');

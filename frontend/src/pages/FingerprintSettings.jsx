@@ -70,7 +70,27 @@ const FingerprintSettings = () => {
     }
   };
 
-  const triggerVerify = (action) => {
+  const triggerVerify = async (action) => {
+    if (action === 'register') {
+      if (!window.PublicKeyCredential) {
+        setError('Biometric authentication is not supported by your browser.');
+        setTimeout(() => setError(''), 4000);
+        return;
+      }
+      try {
+        const isBiometricAvailable = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+        if (!isBiometricAvailable) {
+          setError('Your device does not have a fingerprint sensor or platform biometric hardware. Registration cannot be performed on this device.');
+          setTimeout(() => setError(''), 5000);
+          return;
+        }
+      } catch (e) {
+        setError('Failed to verify biometric hardware configuration.');
+        setTimeout(() => setError(''), 4000);
+        return;
+      }
+    }
+
     setVerifyPassword('');
     setVerifyError('');
     setPendingAction(action);
