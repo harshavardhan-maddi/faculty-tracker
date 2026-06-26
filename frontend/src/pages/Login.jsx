@@ -146,7 +146,10 @@ const Login = () => {
         assertionResponse = await startAuthentication(optionsData);
       } catch (authError) {
         console.error(authError);
-        throw new Error(`Biometric scan cancelled: ${authError.message}`);
+        if (authError.name === 'NotAllowedError') {
+          throw new Error('No registered fingerprint was found on this device for this site, or the scan was cancelled. Please log in with your User ID and Password first, then enroll your fingerprint in Settings.');
+        }
+        throw new Error(`Biometric scan failed: ${authError.message}. Please log in with User ID and Password.`);
       }
 
       setBiometricsStatus('Verifying security signature...');

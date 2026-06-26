@@ -138,7 +138,10 @@ const FingerprintSettings = () => {
           attestationResponse = await startRegistration(optionsData);
         } catch (webauthnError) {
           console.error(webauthnError);
-          throw new Error(`Device biometrics registration cancelled: ${webauthnError.message}`);
+          if (webauthnError.name === 'NotAllowedError') {
+            throw new Error('Biometric registration was cancelled or timed out. Please try again.');
+          }
+          throw new Error(`Device biometrics registration failed: ${webauthnError.message}`);
         }
 
         // Step 3: Verify registration response on backend
