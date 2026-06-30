@@ -102,22 +102,22 @@ const ManageClassrooms = () => {
     reader.onload = (event) => {
       const text = event.target.result;
       try {
-        let parsed = [];
+        let rawList = [];
         if (file.name.endsWith('.json')) {
-          parsed = JSON.parse(text);
-          if (!Array.isArray(parsed)) throw new Error('JSON file must be an array of objects');
+          rawList = JSON.parse(text);
+          if (!Array.isArray(rawList)) throw new Error('JSON file must be an array of objects');
         } else if (file.name.endsWith('.csv')) {
-          parsed = parseCSV(text);
+          rawList = parseCSV(text);
         } else {
           throw new Error('Unsupported file format. Please upload a .csv or .json file.');
         }
 
-        if (parsed.length === 0) {
+        if (rawList.length === 0) {
           throw new Error('The file is empty.');
         }
 
         // Loose validation of sample columns
-        const sample = parsed[0];
+        const sample = rawList[0];
         const missingFields = [];
         const required = ['day', 'period', 'subject', 'faculty'];
         const sampleKeys = Object.keys(sample).map(k => k.toLowerCase());
@@ -132,6 +132,7 @@ const ManageClassrooms = () => {
           throw new Error(`Invalid headers format. Missing columns: ${missingFields.join(', ')}`);
         }
 
+        const parsed = rawList.map(normalizeCsvRow);
         setImportData(parsed);
         setImportPreviewCount(parsed.length);
       } catch (err) {
@@ -152,11 +153,11 @@ const ManageClassrooms = () => {
     if (!text.trim()) return;
 
     try {
-      const parsed = parseCSV(text);
-      if (parsed.length === 0) return;
+      const rawList = parseCSV(text);
+      if (rawList.length === 0) return;
 
       // Loose validation of columns
-      const sample = parsed[0];
+      const sample = rawList[0];
       const missingFields = [];
       const required = ['day', 'period', 'subject', 'faculty'];
       const sampleKeys = Object.keys(sample).map(k => k.toLowerCase());
@@ -171,6 +172,7 @@ const ManageClassrooms = () => {
         throw new Error(`Missing columns: ${missingFields.join(', ')}`);
       }
 
+      const parsed = rawList.map(normalizeCsvRow);
       setImportData(parsed);
       setImportPreviewCount(parsed.length);
     } catch (err) {
@@ -230,6 +232,52 @@ const ManageClassrooms = () => {
     } finally {
       setAiLoading(false);
     }
+  };
+
+  const normalizeCsvRow = (row) => {
+    if (!row) return {};
+    const keys = Object.keys(row);
+    const getVal = (possibleKeys) => {
+      const key = keys.find(k => possibleKeys.includes(k.toLowerCase()));
+      return key ? String(row[key]).trim() : '';
+    };
+
+    const day = getVal(['day']);
+    const periodVal = getVal(['period', 'periodno', 'period_no', 'periodnumber']);
+    const periodNo = parseInt(periodVal) || 1;
+    const startTime = getVal(['starttime', 'start_time', 'start']);
+    const endTime = getVal(['endtime', 'end_time', 'end']);
+    const subjectName = getVal(['subjectname', 'subject_name', 'subject', 'course', 'class']);
+    const facultyName = getVal(['facultyname', 'faculty_name', 'faculty', 'teacher', 'staff', 'prof']);
+
+    const STANDARD_PERIOD_TIMES = [
+      { periodNo: 1, start: '09:10', end: '10:00' },
+      { periodNo: 2, start: '10:00', end: '10:50' },
+      { periodNo: 3, start: '11:00', end: '11:50' },
+      { periodNo: 4, start: '11:50', end: '12:40' },
+      { periodNo: 5, start: '13:30', end: '14:20' },
+      { periodNo: 6, start: '14:20', end: '15:10' },
+      { periodNo: 7, start: '15:10', end: '16:00' },
+    ];
+
+    let finalStart = startTime;
+    let finalEnd = endTime;
+    if (!finalStart || !finalEnd) {
+      const std = STANDARD_PERIOD_TIMES.find(sp => sp.periodNo === periodNo);
+      if (std) {
+        finalStart = std.start;
+        finalEnd = std.end;
+      }
+    }
+
+    return {
+      day: day || 'Monday',
+      periodNo,
+      startTime: finalStart || '09:10',
+      endTime: finalEnd || '10:00',
+      subjectName: subjectName || 'Class',
+      facultyName: facultyName || 'Faculty',
+    };
   };
 
   const parseCSV = (text) => {
