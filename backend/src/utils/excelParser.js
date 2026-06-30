@@ -309,32 +309,79 @@ function tryParseGrid(rows, worksheet) {
 }
 
 function splitPeriods(periods) {
+  // Build a lookup map of subjectName -> facultyName using robust case-insensitive / alternative key lookups
+  const subjectToFaculty = {};
+  for (const p of periods) {
+    if (!p) continue;
+    const subjectName = String(
+      p.subjectName || p.subjectname || p.subject || p.SubjectName || p.Subject || ''
+    ).trim();
+    const facultyName = String(
+      p.facultyName || p.facultyname || p.faculty || p.FacultyName || p.Faculty || ''
+    ).trim();
+    
+    if (subjectName && facultyName && facultyName.toLowerCase() !== 'faculty') {
+      if (!subjectToFaculty[subjectName.toLowerCase()]) {
+        subjectToFaculty[subjectName.toLowerCase()] = facultyName;
+      }
+    }
+  }
+
   const result = [];
   for (const p of periods) {
-    const periodNo = parseInt(p.periodNo || p.periodno || p.period);
-    const day = p.day;
-    const startTime = p.startTime || p.starttime || p.start;
-    const endTime = p.endTime || p.endtime || p.end;
-    const facultyName = p.facultyName || p.facultyname || p.faculty;
-    const subjectName = p.subjectName || p.subjectname || p.subject;
+    if (!p) continue;
 
-    if (!day || !startTime || !endTime || !facultyName || !subjectName) {
-      result.push(p);
-      continue;
+    // Support flexible header keys (e.g. p.Period, p.Day, etc.)
+    const periodNoVal = p.periodNo || p.periodno || p.period || p.Period || p.PeriodNo || p.Periodno;
+    const periodNo = parseInt(periodNoVal);
+    const day = p.day || p.Day || '';
+    const startTime = p.startTime || p.starttime || p.start || p.StartTime || p.Start || '';
+    const endTime = p.endTime || p.endtime || p.end || p.EndTime || p.End || '';
+    let subjectName = String(p.subjectName || p.subjectname || p.subject || p.SubjectName || p.Subject || '').trim();
+    let facultyName = String(p.facultyName || p.facultyname || p.faculty || p.FacultyName || p.Faculty || '').trim();
+
+    // Auto-fill fallback values if empty to avoid DB insertion crash
+    if (!subjectName) {
+      subjectName = 'Class';
     }
 
-    const start = formatTimeStr(startTime);
-    const end = formatTimeStr(endTime);
+    if (subjectName) {
+      const lowerSubj = subjectName.toLowerCase();
+      if (!facultyName || facultyName.toLowerCase() === 'faculty') {
+        if (subjectToFaculty[lowerSubj]) {
+          facultyName = subjectToFaculty[lowerSubj];
+        } else {
+          facultyName = 'Faculty';
+        }
+      }
+    }
 
+    if (!facultyName) {
+      facultyName = 'Faculty';
+    }
+
+    let start = formatTimeStr(startTime);
+    let end = formatTimeStr(endTime);
+
+    // CRITICAL BUG FIX: If times are missing, resolve them based on periodNo
+    const finalPeriodNo = isNaN(periodNo) ? 1 : periodNo;
     if (!start || !end) {
-      result.push(p);
-      continue;
+      const std = STANDARD_PERIODS.find(sp => sp.periodNo === finalPeriodNo);
+      if (std) {
+        start = std.startTime;
+        end = std.endTime;
+      }
     }
+
+    // Fallbacks if still missing
+    const finalDay = day || 'Monday';
+    const finalStart = start || '09:10';
+    const finalEnd = end || '10:00';
 
     // Find all overlapping standard periods
     const overlaps = [];
     for (const std of STANDARD_PERIODS) {
-      if (std.startTime < end && std.endTime > start) {
+      if (std.startTime < finalEnd && std.endTime > finalStart) {
         overlaps.push(std);
       }
     }
@@ -342,7 +389,7 @@ function splitPeriods(periods) {
     if (overlaps.length > 1) {
       for (const std of overlaps) {
         result.push({
-          day,
+          day: finalDay,
           periodNo: std.periodNo,
           startTime: std.startTime,
           endTime: std.endTime,
@@ -352,7 +399,7 @@ function splitPeriods(periods) {
       }
     } else if (overlaps.length === 1) {
       result.push({
-        day,
+        day: finalDay,
         periodNo: overlaps[0].periodNo,
         startTime: overlaps[0].startTime,
         endTime: overlaps[0].endTime,
@@ -361,10 +408,10 @@ function splitPeriods(periods) {
       });
     } else {
       result.push({
-        day,
-        periodNo,
-        startTime: start,
-        endTime: end,
+        day: finalDay,
+        periodNo: finalPeriodNo,
+        startTime: finalStart,
+        endTime: finalEnd,
         subjectName,
         facultyName
       });

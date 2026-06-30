@@ -58,13 +58,25 @@ const ManageClassrooms = () => {
   const [editClassName, setEditClassName] = useState('');
 
   // Bulk import states
-  const [importTab, setImportTab] = useState('standard'); // 'standard' or 'ai'
+  const [importTab, setImportTab] = useState('standard'); // 'standard', 'paste', or 'ai'
   const [aiLoading, setAiLoading] = useState(false);
   const [importFile, setImportFile] = useState(null);
   const [importData, setImportData] = useState([]);
   const [importPreviewCount, setImportPreviewCount] = useState(0);
   const [importError, setImportError] = useState('');
   const [importSubmitting, setImportSubmitting] = useState(false);
+  const [csvText, setCsvText] = useState('');
+
+  useEffect(() => {
+    if (!showImportModal) {
+      setImportFile(null);
+      setImportData([]);
+      setImportPreviewCount(0);
+      setImportError('');
+      setCsvText('');
+      setImportTab('standard');
+    }
+  }, [showImportModal]);
 
   const handleCellClick = (day, pNo) => {
     setPeriodDay(day);
@@ -128,6 +140,42 @@ const ManageClassrooms = () => {
       }
     };
     reader.readAsText(file);
+  };
+
+  const handleCsvTextChange = (e) => {
+    const text = e.target.value;
+    setCsvText(text);
+    setImportError('');
+    setImportData([]);
+    setImportPreviewCount(0);
+
+    if (!text.trim()) return;
+
+    try {
+      const parsed = parseCSV(text);
+      if (parsed.length === 0) return;
+
+      // Loose validation of columns
+      const sample = parsed[0];
+      const missingFields = [];
+      const required = ['day', 'period', 'subject', 'faculty'];
+      const sampleKeys = Object.keys(sample).map(k => k.toLowerCase());
+      
+      required.forEach(reqKey => {
+        if (!sampleKeys.some(sk => sk.includes(reqKey))) {
+          missingFields.push(reqKey);
+        }
+      });
+
+      if (missingFields.length > 0) {
+        throw new Error(`Missing columns: ${missingFields.join(', ')}`);
+      }
+
+      setImportData(parsed);
+      setImportPreviewCount(parsed.length);
+    } catch (err) {
+      setImportError(err.message || 'Failed to parse CSV text.');
+    }
   };
 
   const handleAiFileChange = async (e) => {
@@ -1161,7 +1209,26 @@ const ManageClassrooms = () => {
                 }`}
                 disabled={importSubmitting || aiLoading}
               >
-                Standard File (CSV/JSON)
+                Standard File
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (importSubmitting || aiLoading) return;
+                  setImportTab('paste');
+                  setImportFile(null);
+                  setImportError('');
+                  setImportData([]);
+                  setImportPreviewCount(0);
+                }}
+                className={`flex-1 py-2 text-center text-xs font-bold border-b-2 transition-all ${
+                  importTab === 'paste'
+                    ? 'border-primary text-primary-dark dark:text-primary'
+                    : 'border-transparent text-customText-muted dark:text-customText-mutedDark hover:text-customText'
+                }`}
+                disabled={importSubmitting || aiLoading}
+              >
+                Paste CSV Text
               </button>
               <button
                 type="button"
@@ -1219,6 +1286,39 @@ const ManageClassrooms = () => {
                       onChange={handleFileChange}
                       className="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-primary/10 file:text-primary-dark hover:file:bg-primary/20 cursor-pointer"
                       required={importTab === 'standard'}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Paste CSV text instructions and textarea */}
+              {importTab === 'paste' && (
+                <div className="space-y-4">
+                  <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-xl border text-xs space-y-2 text-customText-muted dark:text-customText-mutedDark">
+                    <p className="font-bold text-customText dark:text-customText-dark">CSV Format Instructions:</p>
+                    <p>Paste CSV rows with headers. Headers must include: <code className="bg-white dark:bg-slate-900 px-1 py-0.5 rounded border font-mono">day,period,subject,faculty</code></p>
+                    <p className="pt-2 font-bold text-customText dark:text-customText-dark">Example:</p>
+                    <code className="block bg-white dark:bg-slate-900 p-2 rounded border font-mono text-[9px] leading-relaxed whitespace-pre overflow-x-auto">
+Day,Period,Subject,Faculty{"\n"}
+Monday,1,Computer Networks,Dr. Srinivas Rao{"\n"}
+Monday,2,Artificial Intelligence,Dr. Sarah Thomas
+                    </code>
+                    <p className="text-[10px] text-yellow-600 dark:text-yellow-400 font-semibold italic">
+                      ⚠️ Note: Importing will replace all existing scheduled periods for this classroom.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider mb-2">
+                      CSV Text Input
+                    </label>
+                    <textarea
+                      value={csvText}
+                      onChange={handleCsvTextChange}
+                      rows={6}
+                      placeholder="Day,Period,Subject,Faculty&#10;Monday,1,Computer Networks,Dr. Srinivas Rao&#10;Monday,2,Artificial Intelligence,Dr. Sarah Thomas"
+                      className="w-full glass-input text-xs font-mono p-3 rounded-xl border focus:outline-none focus:ring-1 focus:ring-primary dark:bg-slate-950 dark:border-slate-800"
+                      required={importTab === 'paste'}
                     />
                   </div>
                 </div>
