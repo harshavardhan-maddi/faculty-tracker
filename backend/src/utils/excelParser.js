@@ -308,6 +308,71 @@ function tryParseGrid(rows, worksheet) {
   return periods;
 }
 
+function splitPeriods(periods) {
+  const result = [];
+  for (const p of periods) {
+    const periodNo = parseInt(p.periodNo || p.periodno || p.period);
+    const day = p.day;
+    const startTime = p.startTime || p.starttime || p.start;
+    const endTime = p.endTime || p.endtime || p.end;
+    const facultyName = p.facultyName || p.facultyname || p.faculty;
+    const subjectName = p.subjectName || p.subjectname || p.subject;
+
+    if (!day || !startTime || !endTime || !facultyName || !subjectName) {
+      result.push(p);
+      continue;
+    }
+
+    const start = formatTimeStr(startTime);
+    const end = formatTimeStr(endTime);
+
+    if (!start || !end) {
+      result.push(p);
+      continue;
+    }
+
+    // Find all overlapping standard periods
+    const overlaps = [];
+    for (const std of STANDARD_PERIODS) {
+      if (std.startTime < end && std.endTime > start) {
+        overlaps.push(std);
+      }
+    }
+
+    if (overlaps.length > 1) {
+      for (const std of overlaps) {
+        result.push({
+          day,
+          periodNo: std.periodNo,
+          startTime: std.startTime,
+          endTime: std.endTime,
+          subjectName,
+          facultyName
+        });
+      }
+    } else if (overlaps.length === 1) {
+      result.push({
+        day,
+        periodNo: overlaps[0].periodNo,
+        startTime: overlaps[0].startTime,
+        endTime: overlaps[0].endTime,
+        subjectName,
+        facultyName
+      });
+    } else {
+      result.push({
+        day,
+        periodNo,
+        startTime: start,
+        endTime: end,
+        subjectName,
+        facultyName
+      });
+    }
+  }
+  return result;
+}
+
 function parseExcelTimetable(fileBuffer) {
   const workbook = xlsx.read(fileBuffer, { type: 'buffer' });
   const allPeriods = [];
@@ -329,9 +394,10 @@ function parseExcelTimetable(fileBuffer) {
     }
   }
 
-  return allPeriods;
+  return splitPeriods(allPeriods);
 }
 
 module.exports = {
   parseExcelTimetable,
+  splitPeriods,
 };

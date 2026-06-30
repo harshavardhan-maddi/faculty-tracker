@@ -1,5 +1,6 @@
 const prisma = require('../db');
 const { getTodayDay, getCurrentTimeInHHMM, getLocalDayBounds, STANDARD_PERIODS } = require('../utils/date');
+const { parseExcelTimetable, splitPeriods } = require('../utils/excelParser');
 
 const upsertTimetable = async (req, res) => {
   const { classroomId, day, periodNo, startTime, endTime, facultyName, subjectName } = req.body;
@@ -217,8 +218,9 @@ const importBulkTimetable = async (req, res) => {
     });
 
     const createdPeriods = [];
+    const processedPeriods = splitPeriods(periods);
 
-    for (const p of periods) {
+    for (const p of processedPeriods) {
       const periodNo = parseInt(p.periodNo || p.periodno || p.period);
       const day = p.day;
       const startTime = p.startTime || p.starttime || p.start;
@@ -279,7 +281,6 @@ if (typeof globalThis.DOMMatrix === 'undefined') {
   };
 }
 
-const { parseExcelTimetable } = require('../utils/excelParser');
 const pdfParse = require('pdf-parse');
 const xlsx = require('xlsx');
 
