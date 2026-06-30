@@ -279,6 +279,7 @@ if (typeof globalThis.DOMMatrix === 'undefined') {
   };
 }
 
+const { parseExcelTimetable } = require('../utils/excelParser');
 const pdfParse = require('pdf-parse');
 const xlsx = require('xlsx');
 
@@ -287,6 +288,29 @@ const analyzeTimetableFile = async (req, res) => {
     return res.status(400).json({ message: 'No file uploaded' });
   }
 
+  const fileBuffer = req.file.buffer;
+  const mimeType = req.file.mimetype;
+  const isExcel = mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+                  mimeType === 'application/vnd.ms-excel' ||
+                  req.file.originalname.endsWith('.xlsx') ||
+                  req.file.originalname.endsWith('.xls');
+
+  // Try local Excel parsing first to bypass Groq API key completely
+  if (isExcel) {
+    try {
+      console.log('[Local Parser] Attempting to parse Excel file locally...');
+      const localPeriods = parseExcelTimetable(fileBuffer);
+      if (localPeriods && localPeriods.length > 0) {
+        console.log(`[Local Parser] Successfully parsed ${localPeriods.length} periods locally! Bypassing Groq AI.`);
+        return res.json(localPeriods);
+      }
+      console.log('[Local Parser] Local parsing returned no periods, falling back to AI.');
+    } catch (localError) {
+      console.error('[Local Parser] Failed to parse Excel file locally:', localError);
+    }
+  }
+
+  // Fallback to Groq AI parsing. Groq API Key must be configured.
   const groqApiKey = process.env.GROQ_API_KEY;
   if (!groqApiKey) {
     return res.status(500).json({ message: 'Groq API Key is not configured on the server.' });
@@ -294,8 +318,6 @@ const analyzeTimetableFile = async (req, res) => {
 
   try {
     let extractedText = '';
-    const fileBuffer = req.file.buffer;
-    const mimeType = req.file.mimetype;
 
     if (mimeType === 'application/pdf') {
       const uint8Data = new Uint8Array(fileBuffer);
@@ -303,12 +325,7 @@ const analyzeTimetableFile = async (req, res) => {
       await pdfInstance.load();
       const parsedPdf = await pdfInstance.getText();
       extractedText = parsedPdf.text;
-    } else if (
-      mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
-      mimeType === 'application/vnd.ms-excel' ||
-      req.file.originalname.endsWith('.xlsx') ||
-      req.file.originalname.endsWith('.xls')
-    ) {
+    } else if (isExcel) {
       const workbook = xlsx.read(fileBuffer, { type: 'buffer' });
       workbook.SheetNames.forEach(sheetName => {
         const worksheet = workbook.Sheets[sheetName];
