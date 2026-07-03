@@ -334,7 +334,8 @@ function splitPeriods(periods) {
     // Support flexible header keys (e.g. p.Period, p.Day, etc.)
     const periodNoVal = p.periodNo || p.periodno || p.period || p.Period || p.PeriodNo || p.Periodno;
     const periodNo = parseInt(periodNoVal);
-    const day = p.day || p.Day || '';
+    const dayVal = p.day || p.Day || '';
+    const day = getNormalizedWeekday(dayVal) || dayVal || 'Monday';
     const startTime = p.startTime || p.starttime || p.start || p.StartTime || p.Start || '';
     const endTime = p.endTime || p.endtime || p.end || p.EndTime || p.End || '';
     let subjectName = String(p.subjectName || p.subjectname || p.subject || p.SubjectName || p.Subject || '').trim();
@@ -447,4 +448,5 @@ function parseExcelTimetable(fileBuffer) {
 module.exports = {
   parseExcelTimetable,
   splitPeriods,
+  getNormalizedWeekday,
 };

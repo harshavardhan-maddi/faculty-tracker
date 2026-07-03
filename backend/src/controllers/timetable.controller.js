@@ -1,6 +1,6 @@
 const prisma = require('../db');
 const { getTodayDay, getCurrentTimeInHHMM, getLocalDayBounds, STANDARD_PERIODS } = require('../utils/date');
-const { parseExcelTimetable, splitPeriods } = require('../utils/excelParser');
+const { parseExcelTimetable, splitPeriods, getNormalizedWeekday } = require('../utils/excelParser');
 
 const upsertTimetable = async (req, res) => {
   const { classroomId, day, periodNo, startTime, endTime, facultyName, subjectName } = req.body;
@@ -8,6 +8,8 @@ const upsertTimetable = async (req, res) => {
   if (!classroomId || !day || !periodNo || !startTime || !endTime || !facultyName || !subjectName) {
     return res.status(400).json({ message: 'All fields are required' });
   }
+
+  const normalizedDay = getNormalizedWeekday(day) || day || 'Monday';
 
   try {
     const classroom = await prisma.classroom.findUnique({
@@ -22,7 +24,7 @@ const upsertTimetable = async (req, res) => {
     const existing = await prisma.timetable.findFirst({
       where: {
         classroomId: parseInt(classroomId),
-        day,
+        day: normalizedDay,
         periodNo: parseInt(periodNo),
       },
     });
@@ -42,7 +44,7 @@ const upsertTimetable = async (req, res) => {
       timetable = await prisma.timetable.create({
         data: {
           classroomId: parseInt(classroomId),
-          day,
+          day: normalizedDay,
           periodNo: parseInt(periodNo),
           startTime,
           endTime,
