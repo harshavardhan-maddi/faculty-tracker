@@ -7,6 +7,7 @@ const ManageFaculty = () => {
   const [faculty, setFaculty] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState('all'); // 'all' or 'missing'
   
   // Single edit state
   const [editingFaculty, setEditingFaculty] = useState(null);
@@ -137,10 +138,20 @@ const ManageFaculty = () => {
     }
   };
 
-  const filteredFaculty = faculty.filter(f => 
-    f.facultyName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (f.phoneNumber && f.phoneNumber.includes(searchQuery))
-  );
+  const filteredFaculty = faculty.filter(f => {
+    // Filter by tab
+    if (activeTab === 'missing' && f.phoneNumber && f.phoneNumber.trim() !== '') {
+      return false;
+    }
+    
+    // Filter by search query
+    const matchesSearch = f.facultyName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (f.phoneNumber && f.phoneNumber.includes(searchQuery));
+      
+    return matchesSearch;
+  });
+
+  const missingCount = faculty.filter(f => !f.phoneNumber || f.phoneNumber.trim() === '').length;
 
   return (
     <div className="space-y-6">
@@ -177,6 +188,33 @@ const ManageFaculty = () => {
             <span className="hidden sm:inline">Bulk Add/Update</span>
           </button>
         </div>
+      </div>
+
+      {/* Tabs Switcher */}
+      <div className="flex gap-2 border-b border-slate-200/60 dark:border-slate-800/60 pb-3">
+        <button
+          onClick={() => setActiveTab('all')}
+          className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${
+            activeTab === 'all'
+              ? 'bg-primary-dark text-white shadow-md shadow-primary-dark/20'
+              : 'bg-white/40 dark:bg-slate-900/40 text-customText-muted hover:text-customText hover:bg-white/80 dark:hover:bg-slate-900/80 border border-slate-200/40 dark:border-slate-800/40'
+          }`}
+        >
+          All Faculty ({faculty.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('missing')}
+          className={`px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-2 ${
+            activeTab === 'missing'
+              ? 'bg-red-500 text-white shadow-md shadow-red-500/20'
+              : 'bg-white/40 dark:bg-slate-900/40 text-red-500 hover:bg-red-500/10 border border-slate-200/40 dark:border-slate-800/40'
+          }`}
+        >
+          <span>Missing Mobile Numbers</span>
+          <span className={`text-[10px] px-2 py-0.5 rounded-full font-black ${activeTab === 'missing' ? 'bg-white text-red-500' : 'bg-red-500/10 text-red-500'}`}>
+            {missingCount}
+          </span>
+        </button>
       </div>
 
       {/* Grid of Faculty */}
@@ -218,7 +256,9 @@ const ManageFaculty = () => {
           ))}
           {filteredFaculty.length === 0 && (
             <div className="col-span-full text-center py-12 text-customText-muted border border-dashed rounded-xl">
-              No faculty found. Timetable syncing might be required or adjust your search.
+              {activeTab === 'missing' 
+                ? '🎉 Excellent! All faculty contacts have phone numbers assigned.'
+                : 'No faculty found. Timetable syncing might be required or adjust your search.'}
             </div>
           )}
         </div>
