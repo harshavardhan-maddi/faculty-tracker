@@ -248,16 +248,8 @@ const Dashboard = () => {
       if (!statsRes.ok) {
         throw new Error(statsData.message || 'Failed to fetch stats');
       }
-      setStats(statsData);
-
-      const activityRes = await fetch('/api/reports/activity-feed', {
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
-      const activityData = await activityRes.json();
-      if (!activityRes.ok) {
-        throw new Error(activityData.message || 'Failed to fetch activity feed');
-      }
-      setActivity(activityData);
+      setStats(statsData.stats);
+      setActivity(statsData.recentActivity);
     } catch (err) {
       setError(err.message || 'Failed to load HOD metrics');
     } finally {
