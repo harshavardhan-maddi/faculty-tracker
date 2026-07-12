@@ -322,4 +322,44 @@ router.delete('/students/:id', authMiddleware, roleMiddleware(['HOD', 'SUB_ADMIN
   }
 });
 
+// 9. POST /students/bulk - HOD/Sub-Admin bulk registers students from CSV/JSON parsed array
+router.post('/students/bulk', authMiddleware, roleMiddleware(['HOD', 'SUB_ADMIN']), async (req, res) => {
+  const { section, students } = req.body;
+  if (!section || !Array.isArray(students)) {
+    return res.status(400).json({ message: 'Missing section or students array' });
+  }
+
+  try {
+    const results = [];
+    for (const s of students) {
+      if (!s.rollNumber || !s.name || !s.studentMobile || !s.parentMobile) {
+        continue; // skip incomplete records
+      }
+
+      const student = await prisma.student.upsert({
+        where: { rollNumber: s.rollNumber },
+        update: {
+          name: s.name,
+          section: section,
+          studentMobile: s.studentMobile,
+          parentMobile: s.parentMobile
+        },
+        create: {
+          rollNumber: s.rollNumber,
+          name: s.name,
+          section: section,
+          studentMobile: s.studentMobile,
+          parentMobile: s.parentMobile
+        }
+      });
+      results.push(student);
+    }
+
+    res.json({ message: `Successfully loaded/updated ${results.length} students in section ${section}` });
+  } catch (error) {
+    console.error('Bulk student import error:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
+
 module.exports = router;

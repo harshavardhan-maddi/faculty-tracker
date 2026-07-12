@@ -84,6 +84,14 @@ const Dashboard = () => {
   const [studentSubmitSuccess, setStudentSubmitSuccess] = useState('');
   const [studentSubmitting, setStudentSubmitting] = useState(false);
 
+  // HOD Student Registry - Bulk Upload States
+  const [showBulkModal, setShowBulkModal] = useState(false);
+  const [bulkText, setBulkText] = useState('');
+  const [bulkSection, setBulkSection] = useState('');
+  const [bulkError, setBulkError] = useState('');
+  const [bulkSuccess, setBulkSuccess] = useState('');
+  const [bulkSubmitting, setBulkSubmitting] = useState(false);
+
   // HOD Absentees States
   const [absentees, setAbsentees] = useState([]);
   const [absenteesSection, setAbsenteesSection] = useState('');
@@ -437,6 +445,75 @@ const Dashboard = () => {
     }
   };
 
+  const parseCSVText = (text) => {
+    const lines = text.split('\n');
+    const parsed = [];
+    for (let line of lines) {
+      line = line.trim();
+      if (!line) continue;
+      
+      const parts = line.split(/[,\t]/).map(p => p.trim());
+      if (parts.length >= 4) {
+        parsed.push({
+          rollNumber: parts[0],
+          name: parts[1],
+          studentMobile: parts[2],
+          parentMobile: parts[3]
+        });
+      }
+    }
+    return parsed;
+  };
+
+  const handleBulkSubmit = async (e) => {
+    e.preventDefault();
+    if (!bulkText || !bulkSection) {
+      setBulkError('Both CSV text and target section are required');
+      return;
+    }
+
+    const studentsToUpload = parseCSVText(bulkText);
+    if (studentsToUpload.length === 0) {
+      setBulkError('Could not parse any valid student records. Check your format.');
+      return;
+    }
+
+    setBulkSubmitting(true);
+    setBulkError('');
+    setBulkSuccess('');
+
+    try {
+      const res = await fetch('/api/student-attendance/students/bulk', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          section: bulkSection,
+          students: studentsToUpload
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setBulkSuccess(data.message || 'Students imported successfully');
+        setBulkText('');
+        fetchStudents();
+        setTimeout(() => {
+          setShowBulkModal(false);
+          setBulkSuccess('');
+        }, 1500);
+      } else {
+        setBulkError(data.message || 'Failed to import students');
+      }
+    } catch (err) {
+      setBulkError('Network connection issue');
+    } finally {
+      setBulkSubmitting(false);
+    }
+  };
+
   // Filter classrooms by search query
   const filteredClassrooms = classrooms.filter((c) =>
     c.className.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -727,17 +804,33 @@ const Dashboard = () => {
               </p>
             </div>
             
-            <button
-              onClick={() => {
-                setShowAddStudentModal(true);
-                setStudentSubmitError('');
-                setStudentSubmitSuccess('');
-              }}
-              className="btn-primary"
-            >
-              <UserPlus size={16} />
-              <span>Register Student</span>
-            </button>
+            <div className="flex gap-2 w-full sm:w-auto">
+              <button
+                onClick={() => {
+                  setShowBulkModal(true);
+                  setBulkText('');
+                  setBulkSection(classrooms.length > 0 ? classrooms[0].className : '');
+                  setBulkError('');
+                  setBulkSuccess('');
+                }}
+                className="btn-secondary flex items-center gap-1.5 text-xs py-2"
+              >
+                <Plus size={14} />
+                <span>Bulk Upload</span>
+              </button>
+              
+              <button
+                onClick={() => {
+                  setShowAddStudentModal(true);
+                  setStudentSubmitError('');
+                  setStudentSubmitSuccess('');
+                }}
+                className="btn-primary flex items-center gap-1.5 text-xs py-2"
+              >
+                <UserPlus size={14} />
+                <span>Register Student</span>
+              </button>
+            </div>
           </div>
 
           <div className="glass-card p-6 border border-slate-200/50 dark:border-slate-800/45 space-y-4">
@@ -1077,6 +1170,90 @@ const Dashboard = () => {
                   className="btn-primary py-2 text-xs bg-primary-dark"
                 >
                   {studentSubmitting ? 'Registering...' : 'Register Student'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* BULK UPLOAD MODAL FOR STUDENTS (HOD ONLY) */}
+      {showBulkModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => setShowBulkModal(false)} />
+          
+          <div className="relative glass-card border border-white/60 w-full max-w-lg p-6 bg-white dark:bg-slate-900 shadow-2xl animate-fade-in z-10 text-left">
+            <div className="flex justify-between items-center pb-3 border-b mb-4">
+              <h3 className="font-extrabold text-base text-customText dark:text-customText-dark">
+                Bulk Student Import (CSV/Text)
+              </h3>
+              <button onClick={() => setShowBulkModal(false)} className="text-slate-400 hover:text-slate-600">
+                <X size={18} />
+              </button>
+            </div>
+
+            {bulkError && (
+              <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-655 text-xs font-semibold rounded-lg mb-3">
+                ⚠️ {bulkError}
+              </div>
+            )}
+
+            {bulkSuccess && (
+              <div className="p-3 bg-green-500/10 border border-green-500/20 text-green-655 text-xs font-semibold rounded-lg mb-3">
+                ✓ {bulkSuccess}
+              </div>
+            )}
+
+            <form onSubmit={handleBulkSubmit} className="space-y-4">
+              <div>
+                <label className="block text-[10px] font-bold text-customText-muted uppercase tracking-wider mb-1">
+                  Target Section / Class
+                </label>
+                <select
+                  value={bulkSection}
+                  onChange={(e) => setBulkSection(e.target.value)}
+                  className="glass-input text-xs"
+                  required
+                >
+                  {classrooms.map((c) => (
+                    <option key={c.id} value={c.className}>
+                      {c.className} ({c.roomNumber})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-customText-muted uppercase tracking-wider mb-1">
+                  Paste Student CSV Data
+                </label>
+                <textarea
+                  rows="8"
+                  required
+                  placeholder="Format: RollNumber,Name,StudentMobile,ParentMobile&#10;e.g.&#10;22B81A0501,Aarav Mehta,9876543201,9123456701&#10;22B81A0502,Bhavya Sen,9876543202,9123456702"
+                  value={bulkText}
+                  onChange={(e) => setBulkText(e.target.value)}
+                  className="w-full glass-input text-xs font-mono p-3 leading-relaxed focus:outline-none focus:ring-1 focus:ring-primary border border-slate-200 dark:border-slate-800 rounded-xl"
+                />
+                <p className="text-[10px] text-customText-muted mt-1 leading-snug">
+                  * Note: Each line must contain four values separated by a comma (,) or a tab (\t). Upserts are supported, so re-importing existing roll numbers updates their details.
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-3 border-t">
+                <button
+                  type="button"
+                  onClick={() => setShowBulkModal(false)}
+                  className="btn-secondary py-2 text-xs"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={bulkSubmitting || classrooms.length === 0}
+                  className="btn-primary py-2 text-xs bg-primary-dark"
+                >
+                  {bulkSubmitting ? 'Importing...' : 'Import Students'}
                 </button>
               </div>
             </form>
