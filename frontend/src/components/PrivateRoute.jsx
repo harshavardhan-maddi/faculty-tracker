@@ -21,8 +21,12 @@ const PrivateRoute = ({ children, allowedRoles }) => {
   }
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
-    // If CR, send to CR dashboard, else send to admin dashboard
-    const defaultRoute = user.role === 'CR' ? '/cr-dashboard' : '/dashboard';
+    let defaultRoute = '/dashboard';
+    if (user.role === 'CR') {
+      defaultRoute = '/cr-dashboard';
+    } else if (user.role === 'ABSENT_CONTROLLER') {
+      defaultRoute = '/absent-controller';
+    }
     return <Navigate to={defaultRoute} replace />;
   }
 

@@ -74,6 +74,8 @@ const Login = () => {
       const loggedUser = await login(userId, password);
       if (loggedUser.role === 'CR') {
         navigate('/cr-dashboard');
+      } else if (loggedUser.role === 'ABSENT_CONTROLLER') {
+        navigate('/absent-controller');
       } else {
         navigate('/dashboard');
       }
