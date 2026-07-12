@@ -425,6 +425,26 @@ const Dashboard = () => {
     window.location.href = `tel:${phone}`;
   };
 
+  const handleDeleteStudent = async (student) => {
+    if (!window.confirm(`Are you sure you want to delete student ${student.name} (${student.rollNumber})?`)) return;
+    
+    setError('');
+    try {
+      const res = await fetch(`/api/student-attendance/students/${student.id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        fetchStudents();
+      } else {
+        setError(data.message || 'Failed to delete student');
+      }
+    } catch (err) {
+      setError('Error deleting student');
+    }
+  };
+
   // Filter classrooms by search query
   const filteredClassrooms = classrooms.filter((c) =>
     c.className.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -771,6 +791,7 @@ const Dashboard = () => {
                     <th className="pb-3">Section/Class</th>
                     <th className="pb-3">Student Mobile</th>
                     <th className="pb-3">Parent's Mobile</th>
+                    <th className="pb-3 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50 text-xs text-customText dark:text-customText-dark">
@@ -789,11 +810,20 @@ const Dashboard = () => {
                           <span>{s.parentMobile}</span>
                         </button>
                       </td>
+                      <td className="py-3 text-right">
+                        <button
+                          onClick={() => handleDeleteStudent(s)}
+                          className="p-1 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg transition-colors cursor-pointer"
+                          title="Delete Student Profile"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </td>
                     </tr>
                   ))}
                   {filteredStudentsList.length === 0 && (
                     <tr>
-                      <td colSpan="5" className="text-center py-10 text-customText-muted">
+                      <td colSpan="6" className="text-center py-10 text-customText-muted">
                         No students found registered under this category.
                       </td>
                     </tr>

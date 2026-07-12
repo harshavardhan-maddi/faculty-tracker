@@ -298,4 +298,28 @@ router.get('/student/:studentId/absent-days', authMiddleware, async (req, res) =
   }
 });
 
+// 8. DELETE /students/:id - HOD/Sub-Admin deletes a student profile
+router.delete('/students/:id', authMiddleware, roleMiddleware(['HOD', 'SUB_ADMIN']), async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const student = await prisma.student.findUnique({
+      where: { id: Number(id) }
+    });
+
+    if (!student) {
+      return res.status(404).json({ message: 'Student not found' });
+    }
+
+    await prisma.student.delete({
+      where: { id: Number(id) }
+    });
+
+    res.json({ message: `Student ${student.name} deleted successfully` });
+  } catch (error) {
+    console.error('Delete student error:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
+
 module.exports = router;
