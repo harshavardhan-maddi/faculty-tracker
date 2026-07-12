@@ -47,12 +47,13 @@ async function main() {
   console.log('[Seeder] Seeding users (HOD, Sub Admin, CRs)...');
   const salt = await bcrypt.genSalt(10);
   const defaultPassword = await bcrypt.hash('password123', salt);
+  const hodPassword = await bcrypt.hash('HOD_TE', salt);
 
   const users = [
     {
       name: 'Dr. Rajesh Sharma',
-      userId: 'hod123',
-      password: defaultPassword,
+      userId: 'TE_HOD',
+      password: hodPassword,
       role: 'HOD',
       className: null,
     },
