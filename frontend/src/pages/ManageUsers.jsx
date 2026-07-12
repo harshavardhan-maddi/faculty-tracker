@@ -312,6 +312,7 @@ const ManageUsers = () => {
                   <option value="CR">Class Representative (CR)</option>
                   <option value="SUB_ADMIN">Sub Admin</option>
                   <option value="HOD">HOD (Head of Department)</option>
+                  <option value="ABSENT_CONTROLLER">Absent Controller</option>
                 </select>
               </div>
 

@@ -12,6 +12,7 @@ import ManageFaculty from './pages/ManageFaculty';
 import Reports from './pages/Reports';
 import CRDashboard from './pages/CRDashboard';
 import FingerprintSettings from './pages/FingerprintSettings';
+import AbsentControllerDashboard from './pages/AbsentControllerDashboard';
 
 // Custom router resolver to send authenticated users to their correct home dashboard
 const HomeRedirect = () => {
@@ -19,7 +20,13 @@ const HomeRedirect = () => {
   if (!user) {
     return <Navigate to="/login" replace />;
   }
-  return user.role === 'CR' ? <Navigate to="/cr-dashboard" replace /> : <Navigate to="/dashboard" replace />;
+  if (user.role === 'CR') {
+    return <Navigate to="/cr-dashboard" replace />;
+  }
+  if (user.role === 'ABSENT_CONTROLLER') {
+    return <Navigate to="/absent-controller" replace />;
+  }
+  return <Navigate to="/dashboard" replace />;
 };
 
 const AppRoutes = () => {
@@ -35,6 +42,18 @@ const AppRoutes = () => {
           <PrivateRoute allowedRoles={['CR']}>
             <Layout>
               <CRDashboard />
+            </Layout>
+          </PrivateRoute>
+        }
+      />
+
+      {/* Protected Absent Controller Routes */}
+      <Route
+        path="/absent-controller"
+        element={
+          <PrivateRoute allowedRoles={['ABSENT_CONTROLLER']}>
+            <Layout>
+              <AbsentControllerDashboard />
             </Layout>
           </PrivateRoute>
         }

@@ -15,13 +15,27 @@ import {
   X,
   History,
   Info,
-  Edit
+  Edit,
+  UserPlus,
+  Users,
+  AlertCircle,
+  Phone,
+  PhoneCall,
+  CalendarDays,
+  Plus,
+  Save,
+  CheckCircle2,
+  Trash2
 } from 'lucide-react';
 
 const Dashboard = () => {
   const { token, user } = useAuth();
   const { socket } = useSocket();
 
+  // Active Tab: 'faculty', 'students', 'absentees' (Only HOD sees student/absent tabs)
+  const [activeTab, setActiveTab] = useState('faculty');
+
+  // Existing Faculty Tracker States
   const [classrooms, setClassrooms] = useState([]);
   const [stats, setStats] = useState(null);
   const [activity, setActivity] = useState([]);
@@ -35,7 +49,7 @@ const Dashboard = () => {
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [modalDateFilter, setModalDateFilter] = useState('');
 
-  // Edit Classroom States (for admin/sub-admin quick edit from modal)
+  // Edit Classroom States
   const [isEditing, setIsEditing] = useState(false);
   const [editRoomNumber, setEditRoomNumber] = useState('');
   const [editClassName, setEditClassName] = useState('');
@@ -53,6 +67,39 @@ const Dashboard = () => {
   const [clearSubmitting, setClearSubmitting] = useState(false);
   const [clearSuccess, setClearSuccess] = useState('');
   const [clearError, setClearError] = useState('');
+
+  // HOD Student Registry States
+  const [students, setStudents] = useState([]);
+  const [searchStudentQuery, setSearchStudentQuery] = useState('');
+  const [filterStudentSection, setFilterStudentSection] = useState('');
+  const [showAddStudentModal, setShowAddStudentModal] = useState(false);
+  
+  // Student form fields
+  const [studentName, setStudentName] = useState('');
+  const [studentRoll, setStudentRoll] = useState('');
+  const [studentSection, setStudentSection] = useState('');
+  const [studentMobile, setStudentMobile] = useState('');
+  const [parentMobile, setParentMobile] = useState('');
+  const [studentSubmitError, setStudentSubmitError] = useState('');
+  const [studentSubmitSuccess, setStudentSubmitSuccess] = useState('');
+  const [studentSubmitting, setStudentSubmitting] = useState(false);
+
+  // HOD Absentees States
+  const [absentees, setAbsentees] = useState([]);
+  const [absenteesSection, setAbsenteesSection] = useState('');
+  const [absenteesDate, setAbsenteesDate] = useState('');
+  const [loadingAbsentees, setLoadingAbsentees] = useState(false);
+  const [absenteesError, setAbsenteesError] = useState('');
+
+  const getTodayDateString = () => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const todayDate = getTodayDateString();
 
   const fetchTrackingStatus = async () => {
     try {
@@ -157,7 +204,6 @@ const Dashboard = () => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Failed to update classroom');
 
-      // Update local classroom details view
       setSelectedClassroom(data);
       if (classroomDetails) {
         setClassroomDetails(prev => ({
@@ -167,10 +213,7 @@ const Dashboard = () => {
         }));
       }
 
-      // Turn off editing
       setIsEditing(false);
-
-      // Silently refresh dashboard classrooms grid
       fetchDashboardData(true);
     } catch (err) {
       setEditError(err.message);
@@ -182,7 +225,7 @@ const Dashboard = () => {
   const fetchDashboardData = async (isSilent = false) => {
     try {
       if (!isSilent) setLoading(true);
-      // 1. Fetch classrooms
+      
       const classRes = await fetch('/api/classrooms', {
         headers: { 'Authorization': `Bearer ${token}` },
       });
@@ -191,8 +234,13 @@ const Dashboard = () => {
         throw new Error(classData.message || 'Failed to fetch classrooms');
       }
       setClassrooms(classData);
+      
+      if (classData.length > 0 && !studentSection) {
+        setStudentSection(classData[0].className);
+        setFilterStudentSection('');
+        setAbsenteesSection(classData[0].className);
+      }
 
-      // 2. Fetch stats
       const statsRes = await fetch('/api/reports/dashboard-stats', {
         headers: { 'Authorization': `Bearer ${token}` },
       });
@@ -200,107 +248,99 @@ const Dashboard = () => {
       if (!statsRes.ok) {
         throw new Error(statsData.message || 'Failed to fetch stats');
       }
-      setStats(statsData.stats);
-      setActivity(statsData.recentActivity || []);
-      if (error) setError('');
-    } catch (err) {
-      console.error('Failed to load dashboard:', err);
-      if (!isSilent) {
-        setError(err.message);
+      setStats(statsData);
+
+      const activityRes = await fetch('/api/reports/activity-feed', {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      const activityData = await activityRes.json();
+      if (!activityRes.ok) {
+        throw new Error(activityData.message || 'Failed to fetch activity feed');
       }
+      setActivity(activityData);
+    } catch (err) {
+      setError(err.message || 'Failed to load HOD metrics');
     } finally {
-      if (!isSilent) setLoading(false);
+      setLoading(false);
+    }
+  };
+
+  // Fetch student directories
+  const fetchStudents = async () => {
+    try {
+      setError('');
+      const url = filterStudentSection 
+        ? `/api/student-attendance/students?section=${encodeURIComponent(filterStudentSection)}`
+        : '/api/student-attendance/students';
+      
+      const res = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setStudents(data);
+      } else {
+        setError(data.message || 'Failed to fetch students list');
+      }
+    } catch (err) {
+      setError('Network error fetching students directory');
+    }
+  };
+
+  // Fetch absentees today
+  const fetchAbsentees = async () => {
+    if (!absenteesSection) return;
+    const targetDate = absenteesDate || todayDate;
+    setLoadingAbsentees(true);
+    setAbsenteesError('');
+    try {
+      const res = await fetch(
+        `/api/student-attendance/absentees?section=${encodeURIComponent(absenteesSection)}&date=${targetDate}`,
+        { headers: { 'Authorization': `Bearer ${token}` } }
+      );
+      const data = await res.json();
+      if (res.ok) {
+        setAbsentees(data);
+      } else {
+        setAbsenteesError(data.message || 'Failed to fetch absentees');
+      }
+    } catch (err) {
+      setAbsenteesError('Error connecting to attendance server');
+    } finally {
+      setLoadingAbsentees(false);
     }
   };
 
   useEffect(() => {
-    fetchDashboardData();
     fetchTrackingStatus();
-
-    // Set up polling interval to fetch updates periodically (every 5 seconds)
-    const interval = setInterval(() => {
-      fetchDashboardData(true);
-    }, 5000);
-
-    return () => clearInterval(interval);
+    fetchDashboardData();
   }, [token]);
 
-  // Real-time synchronization via Socket.IO
+  useEffect(() => {
+    if (activeTab === 'students') {
+      fetchStudents();
+    } else if (activeTab === 'absentees') {
+      fetchAbsentees();
+    }
+  }, [activeTab, filterStudentSection, absenteesSection, absenteesDate]);
+
+  // Handle live WebSockets updates
   useEffect(() => {
     if (!socket) return;
-
-    socket.on('tracking_status_update', (data) => {
-      console.log('[Socket Event] Tracking status update:', data);
-      setTrackingEnabled(data.trackingEnabled);
+    
+    socket.on('log_added', (data) => {
       fetchDashboardData(true);
     });
 
-    socket.on('classroom_status_update', (data) => {
-      console.log('[Socket Event] Classroom update received:', data);
-
-      if (data.cleared) {
-        fetchDashboardData();
-        return;
-      }
-
-      // Update Classroom Card state locally
-      setClassrooms((prev) =>
-        prev.map((c) => {
-          if (c.id === data.classroomId) {
-            return {
-              ...c,
-              status: data.status,
-              currentPeriod: data.periodNo
-                ? {
-                    periodNo: data.periodNo,
-                    startTime: data.startTime,
-                    endTime: data.endTime,
-                    facultyName: data.facultyName,
-                    subjectName: data.subjectName,
-                    entryTime: data.entryTime,
-                  }
-                : null,
-            };
-          }
-          return c;
-        })
-      );
-
-      // Add to local activity feed list
-      const newAct = {
-        id: Date.now().toString(),
-        createdAt: new Date(),
-        roomNumber: data.roomNumber,
-        className: data.className,
-        facultyName: data.facultyName,
-        subjectName: data.subjectName,
-        periodNo: data.periodNo,
-        entryTime: data.entryTime,
-        status: data.status,
-      };
-
-      setActivity((prev) => [newAct, ...prev].slice(0, 15));
-
-      // Trigger stats refresh in background
-      fetchStatsBackground();
+    socket.on('logs_cleared', () => {
+      fetchDashboardData(true);
     });
 
     return () => {
-      socket.off('classroom_status_update');
+      socket.off('log_added');
+      socket.off('logs_cleared');
     };
   }, [socket]);
-
-  const fetchStatsBackground = async () => {
-    try {
-      const statsRes = await fetch('/api/reports/dashboard-stats', {
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
-      const statsData = await statsRes.json();
-      setStats(statsData.stats);
-    } catch (error) {
-      console.error('Stats reload failed:', error);
-    }
-  };
 
   const fetchClassroomDetails = async (classroomId, dateStr = '') => {
     setLoadingDetails(true);
@@ -331,10 +371,70 @@ const Dashboard = () => {
     }
   };
 
+  // Add Student Handler
+  const handleAddStudentSubmit = async (e) => {
+    e.preventDefault();
+    if (!studentName || !studentRoll || !studentSection || !studentMobile || !parentMobile) {
+      setStudentSubmitError('All fields are required');
+      return;
+    }
+
+    setStudentSubmitting(true);
+    setStudentSubmitError('');
+    setStudentSubmitSuccess('');
+
+    try {
+      const res = await fetch('/api/student-attendance/students', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          rollNumber: studentRoll,
+          name: studentName,
+          section: studentSection,
+          studentMobile,
+          parentMobile
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setStudentSubmitSuccess(`Student "${studentName}" added successfully.`);
+        setStudentName('');
+        setStudentRoll('');
+        setStudentMobile('');
+        setParentMobile('');
+        fetchStudents();
+        setTimeout(() => {
+          setShowAddStudentModal(false);
+          setStudentSubmitSuccess('');
+        }, 1500);
+      } else {
+        setStudentSubmitError(data.message || 'Failed to add student');
+      }
+    } catch (err) {
+      setStudentSubmitError('Network connection issue');
+    } finally {
+      setStudentSubmitting(false);
+    }
+  };
+
+  const handleMakeCall = (phone) => {
+    window.location.href = `tel:${phone}`;
+  };
+
   // Filter classrooms by search query
   const filteredClassrooms = classrooms.filter((c) =>
     c.className.toLowerCase().includes(searchQuery.toLowerCase()) ||
     c.roomNumber.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  // Filter registered students list
+  const filteredStudentsList = students.filter((s) =>
+    s.name.toLowerCase().includes(searchStudentQuery.toLowerCase()) ||
+    s.rollNumber.toLowerCase().includes(searchStudentQuery.toLowerCase())
   );
 
   if (loading) {
@@ -343,231 +443,624 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-6">
+      
+      {/* Tab Navigation header (Only for HOD roles) */}
+      {user?.role === 'HOD' && (
+        <div className="flex border-b border-slate-200 dark:border-slate-800">
+          <button
+            onClick={() => setActiveTab('faculty')}
+            className={`flex items-center gap-2 py-3 px-6 text-sm font-semibold border-b-2 transition-all ${
+              activeTab === 'faculty' 
+                ? 'border-primary text-primary-dark dark:text-primary font-bold' 
+                : 'border-transparent text-customText-muted dark:text-customText-mutedDark hover:text-customText'
+            }`}
+          >
+            <CalendarDays size={16} />
+            <span>Faculty Monitor</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('students')}
+            className={`flex items-center gap-2 py-3 px-6 text-sm font-semibold border-b-2 transition-all ${
+              activeTab === 'students' 
+                ? 'border-primary text-primary-dark dark:text-primary font-bold' 
+                : 'border-transparent text-customText-muted dark:text-customText-mutedDark hover:text-customText'
+            }`}
+          >
+            <Users size={16} />
+            <span>Student Registry</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('absentees')}
+            className={`flex items-center gap-2 py-3 px-6 text-sm font-semibold border-b-2 transition-all ${
+              activeTab === 'absentees' 
+                ? 'border-primary text-primary-dark dark:text-primary font-bold' 
+                : 'border-transparent text-customText-muted dark:text-customText-mutedDark hover:text-customText'
+            }`}
+          >
+            <AlertCircle size={16} />
+            <span>Absentees Tracking</span>
+          </button>
+        </div>
+      )}
+
       {error && (
         <div className="p-4 bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-sm font-semibold rounded-xl">
           ⚠️ {error}
         </div>
       )}
-      
-      {/* Overview stats cards Row & System Control Panel */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
-        {stats && (
-          <div className="lg:col-span-1 flex">
-            <StatCard
-              title="Total Classrooms"
-              value={stats.classrooms}
-              icon={Building}
-              description={trackingEnabled ? "Monitoring live" : "Tracking is disabled"}
-            />
-          </div>
-        )}
 
-        {(user?.role === 'HOD' || user?.role === 'SUB_ADMIN') && (
-          <div className="lg:col-span-2 glass-card p-5 border border-slate-200/50 dark:border-slate-800/40 flex flex-col justify-between space-y-4">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-              <div>
-                <h3 className="font-extrabold text-sm text-customText dark:text-customText-dark uppercase tracking-wider">
-                  System Settings & Controls
-                </h3>
-                <p className="text-[11px] text-customText-muted dark:text-customText-mutedDark mt-0.5">
-                  Configure tracking status and manage database records
-                </p>
+      {/* VIEW 1: FACULTY MONITOR (Original Dashboard content) */}
+      {activeTab === 'faculty' && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
+            {stats && (
+              <div className="lg:col-span-1 flex">
+                <StatCard
+                  title="Total Classrooms"
+                  value={stats.classrooms}
+                  icon={Building}
+                  description={trackingEnabled ? "Monitoring live" : "Tracking is disabled"}
+                />
               </div>
+            )}
 
-              {/* Electric Switch Toggle */}
-              <div className="flex items-center gap-3 shrink-0">
-                <span className="text-xs font-bold text-customText">
-                  {trackingEnabled ? (
-                    <span className="text-green-600 dark:text-green-400 font-extrabold uppercase bg-green-500/10 px-2 py-0.5 rounded border border-green-500/10">Classes Running</span>
-                  ) : (
-                    <span className="text-purple-600 dark:text-purple-400 font-extrabold uppercase bg-purple-500/10 px-2 py-0.5 rounded border border-purple-500/10">College on Holiday</span>
-                  )}
-                </span>
-                
-                <button
-                  type="button"
-                  onClick={handleToggleTracking}
-                  disabled={toggleSubmitting}
-                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                    trackingEnabled ? 'bg-primary' : 'bg-slate-300 dark:bg-slate-700'
-                  }`}
-                >
-                  <span
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                      trackingEnabled ? 'translate-x-5' : 'translate-x-0'
-                    }`}
-                  />
-                </button>
-              </div>
-            </div>
-
-            {/* Clear History Action */}
-            <div className="border-t border-slate-100 dark:border-slate-850 pt-3">
-              <form onSubmit={handleClearHistory} className="space-y-3">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                  <div className="w-full sm:w-auto">
-                    <label className="block text-[10px] font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider mb-1">
-                      Clear Log History Action
-                    </label>
-                    <select
-                      value={clearAction}
-                      onChange={(e) => {
-                        setClearAction(e.target.value);
-                        setClearClassroomId('');
-                        setClearStartDate('');
-                        setClearEndDate('');
-                        setClearSuccess('');
-                        setClearError('');
-                      }}
-                      className="glass-input text-xs py-1.5 min-w-[200px]"
-                    >
-                      <option value="">Select action...</option>
-                      <option value="all">Clear All Log History</option>
-                      <option value="classroom">Clear Logs by Classroom</option>
-                      <option value="date_range">Clear Logs by Date Range</option>
-                    </select>
+            {(user?.role === 'HOD' || user?.role === 'SUB_ADMIN') && (
+              <div className="lg:col-span-2 glass-card p-5 border border-slate-200/50 dark:border-slate-800/40 flex flex-col justify-between space-y-4">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                  <div>
+                    <h3 className="font-extrabold text-sm text-customText dark:text-customText-dark uppercase tracking-wider">
+                      System Settings & Controls
+                    </h3>
+                    <p className="text-[11px] text-customText-muted dark:text-customText-mutedDark mt-0.5">
+                      Configure tracking status and manage database records
+                    </p>
                   </div>
 
-                  {clearAction && (
+                  <div className="flex items-center gap-3 shrink-0">
+                    <span className="text-xs font-bold text-customText">
+                      {trackingEnabled ? (
+                        <span className="text-green-600 dark:text-green-400 font-extrabold uppercase bg-green-500/10 px-2 py-0.5 rounded border border-green-500/10">Classes Running</span>
+                      ) : (
+                        <span className="text-purple-600 dark:text-purple-400 font-extrabold uppercase bg-purple-500/10 px-2 py-0.5 rounded border border-purple-500/10">College on Holiday</span>
+                      )}
+                    </span>
+                    
                     <button
-                      type="submit"
-                      disabled={clearSubmitting}
-                      className="w-full sm:w-auto px-4 py-2 bg-red-600 hover:bg-red-750 text-white text-xs font-bold rounded-xl shadow transition-all active:scale-[0.98] shrink-0"
+                      type="button"
+                      onClick={handleToggleTracking}
+                      disabled={toggleSubmitting}
+                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        trackingEnabled ? 'bg-primary' : 'bg-slate-300 dark:bg-slate-700'
+                      }`}
                     >
-                      {clearSubmitting ? 'Clearing...' : 'Execute Clear'}
+                      <span
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                          trackingEnabled ? 'translate-x-5' : 'translate-x-0'
+                        }`}
+                      />
                     </button>
-                  )}
+                  </div>
                 </div>
 
-                {clearAction === 'classroom' && (
-                  <div className="bg-slate-50 dark:bg-slate-950/20 p-3 rounded-xl border border-slate-200/40 dark:border-slate-800/40 grid grid-cols-1 sm:grid-cols-2 gap-3 animate-fade-in">
-                    <div>
-                      <label className="block text-[9px] font-bold text-customText-muted uppercase mb-1">
-                        Target Classroom
-                      </label>
-                      <select
-                        required
-                        value={clearClassroomId}
-                        onChange={(e) => setClearClassroomId(e.target.value)}
-                        className="glass-input text-xs py-1.5"
-                      >
-                        <option value="">Choose classroom...</option>
-                        {classrooms.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.className} ({c.roomNumber})
-                          </option>
-                        ))}
-                      </select>
+                <div className="border-t border-slate-100 dark:border-slate-850 pt-3">
+                  <form onSubmit={handleClearHistory} className="space-y-3">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                      <div className="w-full sm:w-auto">
+                        <label className="block text-[10px] font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider mb-1">
+                          Clear Log History Action
+                        </label>
+                        <select
+                          value={clearAction}
+                          onChange={(e) => {
+                            setClearAction(e.target.value);
+                            setClearClassroomId('');
+                            setClearStartDate('');
+                            setClearEndDate('');
+                            setClearSuccess('');
+                            setClearError('');
+                          }}
+                          className="glass-input text-xs py-1.5 min-w-[200px]"
+                        >
+                          <option value="">Select action...</option>
+                          <option value="all">Clear All Log History</option>
+                          <option value="classroom">Clear Logs by Classroom</option>
+                          <option value="date_range">Clear Logs by Date Range</option>
+                        </select>
+                      </div>
+
+                      {clearAction && (
+                        <button
+                          type="submit"
+                          disabled={clearSubmitting}
+                          className="w-full sm:w-auto px-4 py-2 bg-red-600 hover:bg-red-750 text-white text-xs font-bold rounded-xl shadow transition-all active:scale-[0.98] shrink-0"
+                        >
+                          {clearSubmitting ? 'Clearing...' : 'Execute Clear'}
+                        </button>
+                      )}
                     </div>
-                    <div className="flex items-end text-[10px] text-customText-muted dark:text-customText-mutedDark italic pb-1">
-                      All logs recorded for this classroom will be deleted.
-                    </div>
-                  </div>
-                )}
 
-                {clearAction === 'date_range' && (
-                  <div className="bg-slate-50 dark:bg-slate-950/20 p-3 rounded-xl border border-slate-200/40 dark:border-slate-800/40 grid grid-cols-1 sm:grid-cols-2 gap-3 animate-fade-in">
-                    <div>
-                      <label className="block text-[9px] font-bold text-customText-muted uppercase mb-1">
-                        Start Date
-                      </label>
-                      <input
-                        type="date"
-                        required
-                        value={clearStartDate}
-                        onChange={(e) => setClearStartDate(e.target.value)}
-                        className="glass-input text-xs py-1.5"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[9px] font-bold text-customText-muted uppercase mb-1">
-                        End Date
-                      </label>
-                      <input
-                        type="date"
-                        required
-                        value={clearEndDate}
-                        onChange={(e) => setClearEndDate(e.target.value)}
-                        className="glass-input text-xs py-1.5"
-                      />
-                    </div>
-                  </div>
-                )}
+                    {clearAction === 'classroom' && (
+                      <div className="bg-slate-50 dark:bg-slate-950/20 p-3 rounded-xl border border-slate-200/40 dark:border-slate-800/40 grid grid-cols-1 sm:grid-cols-2 gap-3 animate-fade-in">
+                        <div>
+                          <label className="block text-[9px] font-bold text-customText-muted uppercase mb-1">
+                            Target Classroom
+                          </label>
+                          <select
+                            required
+                            value={clearClassroomId}
+                            onChange={(e) => setClearClassroomId(e.target.value)}
+                            className="glass-input text-xs py-1.5"
+                          >
+                            <option value="">Choose classroom...</option>
+                            {classrooms.map((c) => (
+                              <option key={c.id} value={c.id}>
+                                {c.className} ({c.roomNumber})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    )}
 
-                {clearSuccess && (
-                  <p className="text-[11px] text-green-600 dark:text-green-400 font-bold bg-green-500/10 px-2.5 py-1.5 rounded-lg border border-green-500/15">
-                    ✅ {clearSuccess}
-                  </p>
-                )}
+                    {clearAction === 'date_range' && (
+                      <div className="bg-slate-50 dark:bg-slate-950/20 p-3 rounded-xl border border-slate-200/40 dark:border-slate-800/40 grid grid-cols-1 sm:grid-cols-2 gap-3 animate-fade-in">
+                        <div>
+                          <label className="block text-[9px] font-bold text-customText-muted uppercase mb-1">
+                            Start Date
+                          </label>
+                          <input
+                            type="date"
+                            required
+                            value={clearStartDate}
+                            onChange={(e) => setClearStartDate(e.target.value)}
+                            className="glass-input text-xs py-1.5"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[9px] font-bold text-customText-muted uppercase mb-1">
+                            End Date
+                          </label>
+                          <input
+                            type="date"
+                            required
+                            value={clearEndDate}
+                            onChange={(e) => setClearEndDate(e.target.value)}
+                            className="glass-input text-xs py-1.5"
+                          />
+                        </div>
+                      </div>
+                    )}
 
-                {clearError && (
-                  <p className="text-[11px] text-red-600 dark:text-red-400 font-bold bg-red-500/10 px-2.5 py-1.5 rounded-lg border border-red-500/15">
-                    ⚠️ {clearError}
-                  </p>
-                )}
-              </form>
-            </div>
-          </div>
-        )}
-      </div>
+                    {clearSuccess && (
+                      <p className="text-[11px] text-green-600 dark:text-green-400 font-bold bg-green-500/10 px-2.5 py-1.5 rounded-lg border border-green-500/15">
+                        ✅ {clearSuccess}
+                      </p>
+                    )}
 
-      {/* Main Grid: Card Grid + Activity Feed */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-        
-        {/* Left Side: Classrooms search & Grid */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white/40 dark:bg-slate-900/40 p-4 rounded-2xl border border-slate-200/40 dark:border-slate-800/40 backdrop-blur-md">
-            <div>
-              <h3 className="font-extrabold text-lg text-customText dark:text-customText-dark">
-                Live Classroom Monitor
-              </h3>
-              <p className="text-xs text-customText-muted dark:text-customText-mutedDark">
-                Classrooms color code dynamically based on current timetabled period status
-              </p>
-            </div>
-            
-            {/* Search inputs */}
-            <div className="relative w-full sm:w-64">
-              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-customText-muted dark:text-customText-mutedDark">
-                <Search size={16} />
-              </span>
-              <input
-                type="text"
-                placeholder="Search room or class..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 bg-white/70 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-1 focus:ring-primary text-xs"
-              />
-            </div>
-          </div>
-
-          {/* Cards Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {filteredClassrooms.map((c) => (
-              <ClassroomCard
-                key={c.id}
-                roomNumber={c.roomNumber}
-                className={c.className}
-                status={c.status}
-                currentPeriod={c.currentPeriod}
-                onClick={() => handleCardClick(c)}
-              />
-            ))}
-
-            {filteredClassrooms.length === 0 && (
-              <div className="col-span-2 text-center py-20 bg-slate-50/50 dark:bg-slate-900/30 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl text-customText-muted dark:text-customText-mutedDark text-sm">
-                No classrooms found matching selection.
+                    {clearError && (
+                      <p className="text-[11px] text-red-600 dark:text-red-400 font-bold bg-red-500/10 px-2.5 py-1.5 rounded-lg border border-red-500/15">
+                        ⚠️ {clearError}
+                      </p>
+                    )}
+                  </form>
+                </div>
               </div>
             )}
           </div>
-        </div>
 
-        {/* Right Side: Timeline Activity Feed */}
-        <div className="lg:col-span-1 h-full">
-          <ActivityFeed activities={activity} />
-        </div>
+          {/* Classroom Live grid row */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+            <div className="lg:col-span-2 space-y-6">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white/40 dark:bg-slate-900/40 p-4 rounded-2xl border border-slate-200/40 dark:border-slate-800/40 backdrop-blur-md">
+                <div>
+                  <h3 className="font-extrabold text-lg text-customText dark:text-customText-dark">
+                    Live Classroom Monitor
+                  </h3>
+                  <p className="text-xs text-customText-muted dark:text-customText-mutedDark">
+                    Classrooms color code dynamically based on current timetabled period status
+                  </p>
+                </div>
+                
+                <div className="relative w-full sm:w-64">
+                  <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-customText-muted dark:text-customText-mutedDark">
+                    <Search size={16} />
+                  </span>
+                  <input
+                    type="text"
+                    placeholder="Search room or class..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2 bg-white/70 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-1 focus:ring-primary text-xs"
+                  />
+                </div>
+              </div>
 
-      </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {filteredClassrooms.map((c) => (
+                  <ClassroomCard
+                    key={c.id}
+                    roomNumber={c.roomNumber}
+                    className={c.className}
+                    status={c.status}
+                    currentPeriod={c.currentPeriod}
+                    onClick={() => handleCardClick(c)}
+                  />
+                ))}
+
+                {filteredClassrooms.length === 0 && (
+                  <div className="col-span-2 text-center py-20 bg-slate-50/50 dark:bg-slate-900/30 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl text-customText-muted dark:text-customText-mutedDark text-sm">
+                    No classrooms found matching selection.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="lg:col-span-1 h-full">
+              <ActivityFeed activities={activity} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* VIEW 2: STUDENT REGISTRY */}
+      {activeTab === 'students' && (
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div>
+              <h3 className="font-extrabold text-lg text-customText dark:text-customText-dark">
+                Registered Students Registry
+              </h3>
+              <p className="text-xs text-customText-muted dark:text-customText-mutedDark">
+                Create new student profiles and assign them to specific section/classrooms
+              </p>
+            </div>
+            
+            <button
+              onClick={() => {
+                setShowAddStudentModal(true);
+                setStudentSubmitError('');
+                setStudentSubmitSuccess('');
+              }}
+              className="btn-primary"
+            >
+              <UserPlus size={16} />
+              <span>Register Student</span>
+            </button>
+          </div>
+
+          <div className="glass-card p-6 border border-slate-200/50 dark:border-slate-800/45 space-y-4">
+            {/* Filters */}
+            <div className="flex flex-col sm:flex-row gap-4 justify-between items-center bg-slate-50 dark:bg-slate-950/20 p-4 rounded-xl border border-slate-200/40 dark:border-slate-800/40">
+              <div className="relative w-full sm:w-72">
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
+                  <Search size={14} />
+                </span>
+                <input
+                  type="text"
+                  placeholder="Search name or roll number..."
+                  value={searchStudentQuery}
+                  onChange={(e) => setSearchStudentQuery(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 glass-input text-xs"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <span className="text-xs font-bold text-customText-muted uppercase shrink-0">Class Section:</span>
+                <select
+                  value={filterStudentSection}
+                  onChange={(e) => setFilterStudentSection(e.target.value)}
+                  className="glass-input text-xs py-2 w-full sm:w-48"
+                >
+                  <option value="">-- All Sections --</option>
+                  {classrooms.map((c) => (
+                    <option key={c.id} value={c.className}>
+                      {c.className}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Students Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-200 dark:border-slate-800 text-xs font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider">
+                    <th className="pb-3">Roll Number</th>
+                    <th className="pb-3">Name</th>
+                    <th className="pb-3">Section/Class</th>
+                    <th className="pb-3">Student Mobile</th>
+                    <th className="pb-3">Parent's Mobile</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50 text-xs text-customText dark:text-customText-dark">
+                  {filteredStudentsList.map((s) => (
+                    <tr key={s.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/25 transition-colors">
+                      <td className="py-3 font-semibold text-primary">{s.rollNumber}</td>
+                      <td className="py-3 font-bold">{s.name}</td>
+                      <td className="py-3 font-semibold">{s.section}</td>
+                      <td className="py-3">{s.studentMobile}</td>
+                      <td className="py-3">
+                        <button
+                          onClick={() => handleMakeCall(s.parentMobile)}
+                          className="flex items-center gap-1 text-primary-dark hover:underline font-semibold"
+                        >
+                          <PhoneCall size={12} />
+                          <span>{s.parentMobile}</span>
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {filteredStudentsList.length === 0 && (
+                    <tr>
+                      <td colSpan="5" className="text-center py-10 text-customText-muted">
+                        No students found registered under this category.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* VIEW 3: ABSENTEES TRACKING */}
+      {activeTab === 'absentees' && (
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div>
+              <h3 className="font-extrabold text-lg text-customText dark:text-customText-dark">
+                CR Attendance hitting Monitor
+              </h3>
+              <p className="text-xs text-customText-muted dark:text-customText-mutedDark">
+                View student absentees and late comers marked by Class Representatives today
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+              <div>
+                <select
+                  value={absenteesSection}
+                  onChange={(e) => setAbsenteesSection(e.target.value)}
+                  className="glass-input text-xs py-2"
+                >
+                  {classrooms.map((c) => (
+                    <option key={c.id} value={c.className}>
+                      {c.className}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <input
+                  type="date"
+                  value={absenteesDate || todayDate}
+                  onChange={(e) => setAbsenteesDate(e.target.value)}
+                  className="glass-input text-xs py-2"
+                />
+              </div>
+            </div>
+          </div>
+
+          {absenteesError && (
+            <div className="p-4 bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-sm font-semibold rounded-xl">
+              ⚠️ {absenteesError}
+            </div>
+          )}
+
+          {loadingAbsentees ? (
+            <div className="text-center py-12 text-xs text-customText-muted">Loading attendance data...</div>
+          ) : (
+            <div className="glass-card p-6 border border-slate-200/50 dark:border-slate-800/45">
+              <h4 className="font-bold text-sm text-customText-muted uppercase tracking-wider mb-6">
+                Absentees List ({absentees.length})
+              </h4>
+
+              {absentees.length === 0 ? (
+                <div className="text-center py-12 bg-slate-50/50 dark:bg-slate-900/30 rounded-2xl border border-dashed text-customText-muted">
+                  No absentees or late entries marked for this section on selected date.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                  {absentees.map((item) => {
+                    const isLate = item.status === 'Late';
+                    
+                    return (
+                      <div
+                        key={item.id}
+                        className={`p-5 rounded-2xl border flex flex-col justify-between transition-all duration-200 relative ${
+                          isLate 
+                            ? 'bg-amber-500/5 border-amber-500/30 hover:border-amber-500/50' 
+                            : 'bg-red-500/5 border-red-500/20 hover:border-red-500/35'
+                        }`}
+                      >
+                        <span className={`absolute top-4 right-4 text-[9px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider border ${
+                          isLate 
+                            ? 'bg-amber-100 text-amber-700 border-amber-250 dark:bg-amber-950/40 dark:text-amber-450 dark:border-amber-800' 
+                            : 'bg-red-100 text-red-700 border-red-250 dark:bg-red-950/40 dark:text-red-450 dark:border-red-800'
+                        }`}>
+                          {item.status}
+                        </span>
+
+                        <div className="space-y-0.5">
+                          <span className="text-[10px] text-customText-muted font-bold tracking-wider uppercase">
+                            {item.rollNumber}
+                          </span>
+                          <h4 className="text-sm font-bold text-customText dark:text-customText-dark">
+                            {item.name}
+                          </h4>
+                          <span className="text-[10px] text-slate-400 block font-medium">
+                            {item.section}
+                          </span>
+                        </div>
+
+                        {/* Call Triggers */}
+                        <div className="mt-4 pt-3 border-t border-slate-200/50 dark:border-slate-800/10 space-y-2 text-xs">
+                          <div className="flex justify-between items-center text-customText-muted">
+                            <span>Student:</span>
+                            <span className="font-bold text-customText dark:text-customText-dark">{item.studentMobile}</span>
+                          </div>
+                          
+                          <div className="flex justify-between items-center text-customText-muted">
+                            <span>Parent Mobile:</span>
+                            <button
+                              onClick={() => handleMakeCall(item.parentMobile)}
+                              className="flex items-center gap-1.5 py-1 px-2.5 rounded-lg bg-primary-dark/10 hover:bg-primary-dark/20 text-primary-dark font-extrabold transition-all"
+                              title="Click to Call Parent"
+                            >
+                              <PhoneCall size={12} />
+                              <span>{item.parentMobile}</span>
+                            </button>
+                          </div>
+
+                          {/* Call Log details if answered by absent controller */}
+                          {item.callLog && (
+                            <div className={`mt-2 p-2 rounded-lg text-[11px] ${
+                              item.callLog.answered ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-450' : 'bg-red-500/10 text-red-700 dark:text-red-450'
+                            }`}>
+                              <p className="font-bold">
+                                Call {item.callLog.answered ? 'Answered' : 'Not Answered'}
+                              </p>
+                              {item.callLog.reason && (
+                                <p className="italic font-medium">Reason: "{item.callLog.reason}"</p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* REGISTRATION MODAL FOR STUDENTS (HOD ONLY) */}
+      {showAddStudentModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => setShowAddStudentModal(false)} />
+          
+          <div className="relative glass-card border border-white/60 w-full max-w-md p-6 bg-white dark:bg-slate-900 shadow-2xl animate-fade-in z-10 text-left">
+            <div className="flex justify-between items-center pb-3 border-b mb-4">
+              <h3 className="font-extrabold text-base text-customText dark:text-customText-dark">
+                Add Student Profile
+              </h3>
+              <button onClick={() => setShowAddStudentModal(false)} className="text-slate-400 hover:text-slate-600">
+                <X size={18} />
+              </button>
+            </div>
+
+            {studentSubmitError && (
+              <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-650 text-xs font-semibold rounded-lg mb-3">
+                ⚠️ {studentSubmitError}
+              </div>
+            )}
+
+            {studentSubmitSuccess && (
+              <div className="p-3 bg-green-500/10 border border-green-500/20 text-green-650 text-xs font-semibold rounded-lg mb-3">
+                ✓ {studentSubmitSuccess}
+              </div>
+            )}
+
+            <form onSubmit={handleAddStudentSubmit} className="space-y-3">
+              <div>
+                <label className="block text-[10px] font-bold text-customText-muted uppercase tracking-wider mb-1">
+                  Full Name
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. John Doe"
+                  value={studentName}
+                  onChange={(e) => setStudentName(e.target.value)}
+                  className="glass-input text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-customText-muted uppercase tracking-wider mb-1">
+                  Roll / Register Number
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. 22B81A0501"
+                  value={studentRoll}
+                  onChange={(e) => setStudentRoll(e.target.value)}
+                  className="glass-input text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-customText-muted uppercase tracking-wider mb-1">
+                  Assigned Section / Class
+                </label>
+                <select
+                  value={studentSection}
+                  onChange={(e) => setStudentSection(e.target.value)}
+                  className="glass-input text-xs"
+                  required
+                >
+                  {classrooms.map((c) => (
+                    <option key={c.id} value={c.className}>
+                      {c.className} ({c.roomNumber})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-customText-muted uppercase tracking-wider mb-1">
+                  Student Mobile Number
+                </label>
+                <input
+                  type="tel"
+                  required
+                  placeholder="e.g. 9876543201"
+                  value={studentMobile}
+                  onChange={(e) => setStudentMobile(e.target.value)}
+                  className="glass-input text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-customText-muted uppercase tracking-wider mb-1">
+                  Parent Mobile Number
+                </label>
+                <input
+                  type="tel"
+                  required
+                  placeholder="e.g. 9123456701"
+                  value={parentMobile}
+                  onChange={(e) => setParentMobile(e.target.value)}
+                  className="glass-input text-xs"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-3 border-t">
+                <button
+                  type="button"
+                  onClick={() => setShowAddStudentModal(false)}
+                  className="btn-secondary py-2 text-xs"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={studentSubmitting}
+                  className="btn-primary py-2 text-xs bg-primary-dark"
+                >
+                  {studentSubmitting ? 'Registering...' : 'Register Student'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* CLASSROOM DETAILS MODAL (TIMETABLE & HISTORY LOGS) */}
       {selectedClassroom && (
@@ -651,8 +1144,7 @@ const Dashboard = () => {
                       setEditClassName(selectedClassroom.className);
                       setEditError('');
                     }}
-                    className="flex items-center gap-1 text-xs font-bold text-primary hover:bg-primary/10 px-2.5 py-1.5 rounded-lg border border-primary/20 transition-all shrink-0"
-                    title="Edit Classroom Info"
+                    className="flex items-center gap-1 text-xs font-semibold text-primary-dark hover:underline"
                   >
                     <Edit size={14} />
                     <span>Edit Info</span>
@@ -661,116 +1153,68 @@ const Dashboard = () => {
               </div>
             )}
 
+            {/* Modal Body: Timetable schedule list */}
             {loadingDetails ? (
-              <div className="flex flex-col items-center justify-center py-20 gap-3">
-                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-primary"></div>
-                <p className="text-xs text-customText-muted">Loading timetable logs...</p>
-              </div>
+              <div className="text-center py-20 text-slate-500">Loading schedule...</div>
             ) : classroomDetails ? (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                
-                {/* 1. Timetable View (Left Column) */}
-                <div className="md:col-span-2 space-y-4">
-                  <div className="flex items-center gap-1.5 font-bold text-sm text-customText border-b pb-2">
-                    <Calendar size={16} />
-                    <span>Class Schedule Calendar</span>
-                  </div>
-
-                  <div className="max-h-96 overflow-y-auto space-y-3 pr-1">
-                    {classroomDetails.timetables.length === 0 ? (
-                      <p className="text-xs text-customText-muted">No timetable configured yet.</p>
-                    ) : (
-                      <div className="grid grid-cols-1 gap-2">
-                        {classroomDetails.timetables.map((item) => (
-                          <div
-                            key={item.id}
-                            className="p-3 bg-slate-50/70 dark:bg-slate-950/20 border border-slate-200/50 dark:border-slate-800/40 rounded-xl flex items-center justify-between text-xs"
-                          >
-                            <div>
-                              <span className="font-bold text-primary-dark uppercase mr-2">{item.day}</span>
-                              <span className="text-slate-500 font-semibold bg-white dark:bg-slate-800 px-1.5 py-0.5 rounded border border-slate-100 dark:border-slate-800">
-                                Period {item.periodNo}
-                              </span>
-                              <h4 className="font-bold text-customText dark:text-customText-dark mt-1">
-                                {item.subjectName}
-                              </h4>
-                              <p className="text-customText-muted dark:text-customText-mutedDark mt-0.5">
-                                Faculty: <span className="font-semibold text-customText dark:text-customText-dark">{item.facultyName}</span>
-                              </p>
-                            </div>
-                            <div className="text-right text-slate-500 font-semibold">
-                              {item.startTime} - {item.endTime}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* 2. Historic Logs View (Right Column) */}
-                <div className="md:col-span-1 space-y-4">
-                  <div className="flex flex-col gap-2 border-b pb-2">
-                    <div className="flex items-center gap-1.5 font-bold text-sm text-customText">
-                      <History size={16} />
-                      <span>Recent Logs History</span>
-                    </div>
-                    <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-950/20 p-2 rounded-xl border border-slate-200/50 dark:border-slate-800/40 text-xs">
-                      <Calendar size={14} className="text-slate-400 shrink-0" />
+              <div className="space-y-6">
+                <div>
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+                    <h3 className="font-bold text-sm text-customText dark:text-customText-dark uppercase tracking-wider flex items-center gap-2">
+                      <History size={16} className="text-slate-500" />
+                      <span>Class Schedule Period Log History</span>
+                    </h3>
+                    <div className="flex items-center gap-2 text-xs">
+                      <span>Filter Date:</span>
                       <input
                         type="date"
                         value={modalDateFilter}
                         onChange={(e) => handleModalDateChange(e.target.value)}
-                        className="bg-transparent border-0 outline-none p-0 text-xs text-customText w-full focus:ring-0"
-                        title="Filter logs by date"
+                        className="glass-input text-xs py-1 px-2.5 max-w-[150px]"
                       />
-                      {modalDateFilter && (
-                        <button
-                          onClick={() => handleModalDateChange('')}
-                          className="text-xs font-bold text-primary hover:underline shrink-0"
-                        >
-                          Clear
-                        </button>
-                      )}
                     </div>
                   </div>
 
-                  <div className="max-h-96 overflow-y-auto space-y-2 pr-1">
-                    {classroomDetails.logs.length === 0 ? (
-                      <div className="text-center py-12 text-xs text-customText-muted dark:text-customText-mutedDark border border-dashed rounded-xl">
-                        No history logs recorded
-                      </div>
-                    ) : (
-                      classroomDetails.logs.map((log) => {
-                        const isPresent = log.status === 'Present';
-                        return (
-                          <div
-                            key={log.id}
-                            className={`p-2.5 rounded-xl border text-[11px] leading-snug ${
-                              isPresent 
-                                ? 'bg-green-500/5 border-green-500/10' 
-                                : 'bg-red-500/5 border-red-500/10'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between font-bold">
-                              <span>Period {log.periodNo}</span>
-                              <span className={isPresent ? 'text-green-600' : 'text-red-600'}>
-                                {log.status}
+                  <div className="overflow-x-auto border rounded-2xl border-slate-200 dark:border-slate-800">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-slate-50 dark:bg-slate-850/40 border-b border-slate-200 dark:border-slate-850 text-xs font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider">
+                          <th className="py-3 px-4">Period</th>
+                          <th className="py-3 px-4">Subject</th>
+                          <th className="py-3 px-4">Faculty Assigned</th>
+                          <th className="py-3 px-4">Timings</th>
+                          <th className="py-3 px-4 text-right">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs text-customText dark:text-customText-dark">
+                        {classroomDetails.schedule?.map((period) => (
+                          <tr key={period.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/10 transition-colors">
+                            <td className="py-3 px-4 font-semibold">{period.periodNo}</td>
+                            <td className="py-3 px-4 font-bold">{period.subjectName}</td>
+                            <td className="py-3 px-4">{period.facultyName}</td>
+                            <td className="py-3 px-4 text-customText-muted dark:text-customText-mutedDark">{period.startTime} - {period.endTime}</td>
+                            <td className="py-3 px-4 text-right">
+                              <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-semibold border ${
+                                period.status === 'Present' 
+                                  ? 'bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/10' 
+                                  : 'bg-red-500/10 text-red-650 border-red-500/10'
+                              }`}>
+                                {period.status}
                               </span>
-                            </div>
-                            <p className="text-customText-muted dark:text-customText-mutedDark mt-1">
-                              Faculty: <span className="font-semibold text-customText dark:text-customText-dark">{log.facultyName}</span>
-                            </p>
-                            <span className="text-[9px] text-customText-muted dark:text-customText-mutedDark block mt-1">
-                              {new Date(log.createdAt).toLocaleDateString()} {log.entryTime ? `at ${new Date(log.entryTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}
-                            </span>
-                          </div>
-                        );
-                      })
-                    )}
+                            </td>
+                          </tr>
+                        ))}
+                        {classroomDetails.schedule?.length === 0 && (
+                          <tr>
+                            <td colSpan="5" className="text-center py-10 text-customText-muted">
+                              No logs recorded or scheduled for this date.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
-
               </div>
             ) : null}
           </div>

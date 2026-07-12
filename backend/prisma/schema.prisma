@@ -13,6 +13,7 @@ enum Role {
   HOD
   SUB_ADMIN
   CR
+  ABSENT_CONTROLLER
 }
 
 model User {
@@ -106,4 +107,45 @@ model FingerprintAuditLog {
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("fingerprint_audit_logs")
+}
+
+model Student {
+  id            Int               @id @default(autoincrement())
+  rollNumber    String            @unique @map("roll_number")
+  name          String
+  section       String            // Represents the classroom/section name, e.g. "CSE 3rd Year"
+  studentMobile String            @map("student_mobile")
+  parentMobile  String            @map("parent_mobile")
+  createdAt     DateTime          @default(now()) @map("created_at")
+  attendance    Attendance[]
+  callLogs      AbsenteeCallLog[]
+
+  @@map("students")
+}
+
+model Attendance {
+  id          Int      @id @default(autoincrement())
+  studentId   Int      @map("student_id")
+  student     Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  date        String   // Format: "YYYY-MM-DD"
+  status      String   // "Present", "Absent", "Late"
+  markedBy    Int      @map("marked_by") // User ID of user who marked it
+  isLateComer Boolean  @default(false) @map("is_late_comer")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@unique([studentId, date])
+  @@map("attendance")
+}
+
+model AbsenteeCallLog {
+  id          Int      @id @default(autoincrement())
+  studentId   Int      @map("student_id")
+  student     Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  date        String   // Format: "YYYY-MM-DD"
+  answered    Boolean  // true if answered, false if not
+  reason      String?  // Reason for absent if answered
+  calledById  Int      @map("called_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("absentee_call_logs")
 }

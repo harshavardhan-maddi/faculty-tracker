@@ -7,6 +7,9 @@ async function main() {
   console.log('[Seeder] Cleaning existing database content...');
   
   // Clean in order of foreign key dependencies
+  await prisma.absenteeCallLog.deleteMany({});
+  await prisma.attendance.deleteMany({});
+  await prisma.student.deleteMany({});
   await prisma.facultyLog.deleteMany({});
   await prisma.timetable.deleteMany({});
   await prisma.user.deleteMany({});
@@ -81,6 +84,13 @@ async function main() {
       role: 'CR',
       className: 'ECE 2nd Year',
     },
+    {
+      name: 'Absent Controller',
+      userId: 'ac123',
+      password: defaultPassword,
+      role: 'ABSENT_CONTROLLER',
+      className: null,
+    },
   ];
 
   for (const u of users) {
@@ -143,6 +153,21 @@ async function main() {
         });
       }
     }
+  }
+
+  console.log('[Seeder] Seeding default students...');
+  const students = [
+    { rollNumber: '22B81A0501', name: 'Aarav Mehta', section: 'CSE 3rd Year', studentMobile: '9876543201', parentMobile: '9123456701' },
+    { rollNumber: '22B81A0502', name: 'Bhavya Sen', section: 'CSE 3rd Year', studentMobile: '9876543202', parentMobile: '9123456702' },
+    { rollNumber: '22B81A0503', name: 'Chaitanya Rao', section: 'CSE 3rd Year', studentMobile: '9876543203', parentMobile: '9123456703' },
+    { rollNumber: '22B81A0504', name: 'Divya Reddy', section: 'CSE 3rd Year', studentMobile: '9876543204', parentMobile: '9123456704' },
+    { rollNumber: '22B81A0505', name: 'Eshwar Prasad', section: 'CSE 3rd Year', studentMobile: '9876543205', parentMobile: '9123456705' },
+    { rollNumber: '22B81A0506', name: 'Farhan Khan', section: 'CSE 3rd Year', studentMobile: '9876543206', parentMobile: '9123456706' },
+    { rollNumber: '22B81A0507', name: 'Geetha Lakshmi', section: 'CSE 4th Year', studentMobile: '9876543207', parentMobile: '9123456707' },
+    { rollNumber: '22B81A0508', name: 'Harish Kumar', section: 'CSE 4th Year', studentMobile: '9876543208', parentMobile: '9123456708' },
+  ];
+  for (const s of students) {
+    await prisma.student.create({ data: s });
   }
 
   console.log('[Seeder] Completed database seed execution successfully!');

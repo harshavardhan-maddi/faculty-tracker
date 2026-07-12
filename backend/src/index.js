@@ -18,6 +18,7 @@ const logRoutes = require('./routes/log.routes');
 const reportRoutes = require('./routes/report.routes');
 const settingRoutes = require('./routes/setting.routes');
 const facultyRoutes = require('./routes/faculty.routes');
+const studentAttendanceRoutes = require('./routes/studentAttendance.routes');
 
 const app = express();
 const server = http.createServer(app);
@@ -37,6 +38,7 @@ app.use('/api/logs', logRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/settings', settingRoutes);
 app.use('/api/faculty', facultyRoutes);
+app.use('/api/student-attendance', studentAttendanceRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
