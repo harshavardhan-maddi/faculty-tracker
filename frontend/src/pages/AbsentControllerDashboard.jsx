@@ -19,7 +19,8 @@ const AbsentControllerDashboard = () => {
   const { token, user } = useAuth();
   
   const [classrooms, setClassrooms] = useState([]);
-  const [selectedSection, setSelectedSection] = useState('All');
+  const [selectedSection, setSelectedSection] = useState('');
+  const [activeBoardTab, setActiveBoardTab] = useState('sectionWise'); // 'sectionWise' or 'allSections'
   const [students, setStudents] = useState([]);
   const [absentees, setAbsentees] = useState([]);
   
@@ -57,6 +58,9 @@ const AbsentControllerDashboard = () => {
         const data = await res.json();
         if (res.ok) {
           setClassrooms(data);
+          if (data.length > 0) {
+            setSelectedSection(data[0].className);
+          }
         } else {
           setError(data.message || 'Failed to fetch classrooms');
         }
@@ -71,34 +75,48 @@ const AbsentControllerDashboard = () => {
   }, [token]);
 
   const loadSectionData = async () => {
-    if (!selectedSection) return;
     try {
       setError('');
-      // 1. Fetch all students in section
-      const studRes = await fetch(`/api/student-attendance/students?section=${encodeURIComponent(selectedSection)}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const studData = await studRes.json();
-      if (studRes.ok) {
-        setStudents(studData);
-      }
+      if (activeBoardTab === 'sectionWise') {
+        if (!selectedSection) return;
 
-      // 2. Fetch absentees for section today
-      const absRes = await fetch(`/api/student-attendance/absentees?section=${encodeURIComponent(selectedSection)}&date=${todayDate}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const absData = await absRes.json();
-      if (absRes.ok) {
-        setAbsentees(absData);
+        // 1. Fetch all students in section
+        const studRes = await fetch(`/api/student-attendance/students?section=${encodeURIComponent(selectedSection)}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const studData = await studRes.json();
+        if (studRes.ok) {
+          setStudents(studData);
+        }
+
+        // 2. Fetch absentees for section today
+        const absRes = await fetch(`/api/student-attendance/absentees?section=${encodeURIComponent(selectedSection)}&date=${todayDate}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const absData = await absRes.json();
+        if (absRes.ok) {
+          setAbsentees(absData);
+        }
+      } else {
+        // activeBoardTab === 'allSections'
+        // Fetch absentees for all sections today
+        const absRes = await fetch(`/api/student-attendance/absentees?section=All&date=${todayDate}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const absData = await absRes.json();
+        if (absRes.ok) {
+          setAbsentees(absData);
+        }
+        setStudents([]);
       }
     } catch (err) {
-      setError('Error reloading section data');
+      setError('Error reloading dashboard data');
     }
   };
 
   useEffect(() => {
     loadSectionData();
-  }, [selectedSection, token]);
+  }, [activeBoardTab, selectedSection, token]);
 
   const handleMakeCall = (student) => {
     setActiveCallStudent(student);
@@ -190,23 +208,50 @@ const AbsentControllerDashboard = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <label className="text-xs font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider">
-            Select Class
-          </label>
-          <select
-            value={selectedSection}
-            onChange={(e) => setSelectedSection(e.target.value)}
-            className="glass-input text-sm py-2"
-          >
-            <option value="All">All Sections</option>
-            {classrooms.map((c) => (
-              <option key={c.id} value={c.className}>
-                {c.className}
-              </option>
-            ))}
-          </select>
-        </div>
+        {activeBoardTab === 'sectionWise' && (
+          <div className="flex items-center gap-3">
+            <label className="text-xs font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider">
+              Select Class
+            </label>
+            <select
+              value={selectedSection}
+              onChange={(e) => setSelectedSection(e.target.value)}
+              className="glass-input text-sm py-2"
+            >
+              {classrooms.map((c) => (
+                <option key={c.id} value={c.className}>
+                  {c.className}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+
+      {/* Tabs Layout */}
+      <div className="flex border-b border-slate-200 dark:border-slate-800 no-print">
+        <button
+          onClick={() => setActiveBoardTab('sectionWise')}
+          className={`flex items-center gap-2 py-3 px-6 text-sm font-semibold border-b-2 transition-all ${
+            activeBoardTab === 'sectionWise' 
+              ? 'border-primary text-primary-dark dark:text-primary font-bold' 
+              : 'border-transparent text-customText-muted dark:text-customText-mutedDark hover:text-customText'
+          }`}
+        >
+          <Users size={16} />
+          <span>Section Wise Absentees</span>
+        </button>
+        <button
+          onClick={() => setActiveBoardTab('allSections')}
+          className={`flex items-center gap-2 py-3 px-6 text-sm font-semibold border-b-2 transition-all ${
+            activeBoardTab === 'allSections' 
+              ? 'border-primary text-primary-dark dark:text-primary font-bold' 
+              : 'border-transparent text-customText-muted dark:text-customText-mutedDark hover:text-customText'
+          }`}
+        >
+          <AlertCircle size={16} className="text-red-500" />
+          <span>All Section Absentees</span>
+        </button>
       </div>
 
       {error && (
@@ -221,16 +266,269 @@ const AbsentControllerDashboard = () => {
         </div>
       )}
 
-      {/* Main Grid: Absentees and All Students lists */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* Left Column: Absentees List (Takes 2/3 space) */}
-        <div className="lg:col-span-2 space-y-6">
+      {/* SECTION 1: SECTION-WISE LAYOUT */}
+      {activeBoardTab === 'sectionWise' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          
+          {/* Today's Absentees list (2/3 width) */}
+          <div className="lg:col-span-2 space-y-6">
+            <div className="glass-card p-6 border border-slate-200/50 dark:border-slate-800/45">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="font-bold text-base text-customText dark:text-customText-dark flex items-center gap-2">
+                  <AlertCircle className="text-red-500" size={20} />
+                  <span>Today's Absentees ({absentees.length})</span>
+                </h3>
+                <span className="text-xs bg-slate-100 dark:bg-slate-800 text-customText-muted dark:text-customText-mutedDark px-2.5 py-1 rounded-md font-semibold">
+                  Date: {todayDate}
+                </span>
+              </div>
+
+              {absentees.length === 0 ? (
+                <div className="text-center py-12 bg-slate-50/50 dark:bg-slate-900/30 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 text-customText-muted dark:text-customText-mutedDark">
+                  🎉 No absentees logged for {selectedSection} today!
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {absentees.map((student) => {
+                    const isLate = student.status === 'Late';
+                    const hasCallLog = !!student.callLog;
+                    
+                    return (
+                      <div 
+                        key={student.id} 
+                        className={`relative flex flex-col justify-between p-5 rounded-2xl border transition-all duration-300 ${
+                          isLate 
+                            ? 'bg-amber-500/5 border-amber-500/30 hover:border-amber-500/60 shadow-amber-500/5' 
+                            : 'bg-red-500/5 border-red-500/20 hover:border-red-500/40 shadow-red-500/5'
+                        } hover:shadow-md`}
+                      >
+                        <span className={`absolute top-4 right-4 text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                          isLate 
+                            ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-450 border border-amber-250 dark:border-amber-800' 
+                            : 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-450 border border-red-250 dark:border-red-800'
+                        }`}>
+                          {student.status}
+                        </span>
+
+                        <div className="space-y-1 pr-14">
+                          <span className="text-[10px] text-customText-muted dark:text-customText-mutedDark font-bold tracking-wider uppercase">
+                            {student.rollNumber} • {student.section}
+                          </span>
+                          <h4 className="text-sm font-bold text-customText dark:text-customText-dark">
+                            {student.name}
+                          </h4>
+                        </div>
+
+                        {/* Parent Phone Section */}
+                        <div className="mt-4 pt-3 border-t border-slate-200/50 dark:border-slate-800/20 flex flex-col gap-2">
+                          <div className="flex justify-between items-center text-xs text-customText-muted dark:text-customText-mutedDark">
+                            <span>Parent's Mobile:</span>
+                            <span className="font-semibold text-customText dark:text-customText-dark">
+                              {student.parentMobile}
+                            </span>
+                          </div>
+
+                          {/* Call Logs Detail if any */}
+                          {hasCallLog && (
+                            <div className={`p-2.5 rounded-xl text-xs ${
+                              student.callLog.answered 
+                                ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-450' 
+                                : 'bg-red-500/10 text-red-700 dark:text-red-450'
+                            }`}>
+                              <p className="font-bold flex items-center gap-1.5">
+                                {student.callLog.answered ? <CheckCircle size={12} /> : <XCircle size={12} />}
+                                <span>{student.callLog.answered ? 'Answered' : 'Not Answered'}</span>
+                              </p>
+                              {student.callLog.answered && student.callLog.reason && (
+                                <p className="mt-1 font-medium italic text-[11px] opacity-90">
+                                  Reason: "{student.callLog.reason}"
+                                </p>
+                              )}
+                            </div>
+                          )}
+
+                          <button
+                            onClick={() => handleMakeCall(student)}
+                            className={`mt-2 flex items-center justify-center gap-2 py-2 px-4 rounded-xl text-xs font-bold text-white transition-all active:scale-[0.98] ${
+                              hasCallLog 
+                                ? 'bg-slate-600 hover:bg-slate-700' 
+                                : 'bg-primary-dark hover:bg-primary text-white shadow-md shadow-primary-dark/10'
+                            }`}
+                          >
+                            <PhoneCall size={14} />
+                            <span>{hasCallLog ? 'Call Again' : 'Call Parent'}</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Active Call Response Dialog */}
+            {activeCallStudent && (
+              <div className="glass-card p-6 border-2 border-primary-dark/30 animate-fade-in bg-primary-dark/5">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="font-bold text-sm text-primary-dark dark:text-primary uppercase tracking-wider">
+                    Call Feedback Log: {activeCallStudent.name}
+                  </h3>
+                  <button 
+                    onClick={() => setActiveCallStudent(null)}
+                    className="text-slate-400 hover:text-slate-600"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+
+                <form onSubmit={handleSaveCallLog} className="space-y-4 text-left">
+                  <div>
+                    <p className="text-xs font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider mb-2">
+                      Did the parent answer the call?
+                    </p>
+                    <div className="flex items-center gap-6">
+                      <label className="flex items-center gap-2 text-sm font-semibold text-customText dark:text-customText-dark cursor-pointer">
+                        <input
+                          type="radio"
+                          name="answered"
+                          checked={answeredCall === true}
+                          onChange={() => setAnsweredCall(true)}
+                          className="h-4 w-4 text-primary"
+                          required
+                        />
+                        <span>Yes</span>
+                      </label>
+                      <label className="flex items-center gap-2 text-sm font-semibold text-customText dark:text-customText-dark cursor-pointer">
+                        <input
+                          type="radio"
+                          name="answered"
+                          checked={answeredCall === false}
+                          onChange={() => setAnsweredCall(false)}
+                          className="h-4 w-4 text-primary"
+                          required
+                        />
+                        <span>No</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  {answeredCall === true && (
+                    <div className="space-y-1 animate-fade-in">
+                      <label className="block text-xs font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider">
+                        Reason for absence
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={absentReason}
+                        onChange={(e) => setAbsentReason(e.target.value)}
+                        placeholder="e.g. Family Emergency, Sick Leave, Traffic"
+                        className="glass-input text-xs"
+                      />
+                    </div>
+                  )}
+
+                  <div className="flex justify-end gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setActiveCallStudent(null)}
+                      className="btn-secondary py-2 text-xs"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={savingCall || answeredCall === null}
+                      className="btn-primary py-2 text-xs bg-primary-dark"
+                    >
+                      {savingCall ? 'Saving feedback...' : 'Save Feedback'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+          </div>
+
+          {/* Right Column: All Students Cards List (1/3 width) */}
+          <div className="space-y-6">
+            <div className="glass-card p-6 border border-slate-200/50 dark:border-slate-800/45">
+              <h3 className="font-bold text-base text-customText dark:text-customText-dark flex items-center gap-2 mb-6">
+                <Users className="text-slate-500" size={20} />
+                <span>All Students ({students.length})</span>
+              </h3>
+
+              <div className="space-y-4 max-h-[600px] overflow-y-auto pr-1">
+                {students.map((student) => (
+                  <div
+                    key={student.id}
+                    className="p-4 bg-slate-50/50 dark:bg-slate-800/20 border border-slate-200/45 dark:border-slate-800/40 rounded-2xl flex flex-col gap-3 transition-all duration-200 shadow-sm hover:shadow-md"
+                  >
+                    <div>
+                      <h4 className="text-sm font-bold text-customText dark:text-customText-dark">
+                        {student.name}
+                      </h4>
+                      <span className="text-[10px] text-customText-muted dark:text-customText-mutedDark font-bold tracking-wider uppercase">
+                        {student.rollNumber}
+                      </span>
+                    </div>
+
+                    <div className="text-xs space-y-1.5 pt-2.5 border-t border-slate-200/40 dark:border-slate-800/20 text-customText-muted dark:text-customText-mutedDark">
+                      <div className="flex justify-between items-center">
+                        <span>Student Mobile:</span>
+                        {student.studentMobile ? (
+                          <a href={`tel:${student.studentMobile}`} className="font-bold text-primary dark:text-primary-dark hover:underline flex items-center gap-1">
+                            <Phone size={10} />
+                            <span>{student.studentMobile}</span>
+                          </a>
+                        ) : (
+                          <span className="text-slate-400 italic">N/A</span>
+                        )}
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span>Parent Mobile:</span>
+                        {student.parentMobile ? (
+                          <a href={`tel:${student.parentMobile}`} className="font-bold text-primary dark:text-primary-dark hover:underline flex items-center gap-1">
+                            <Phone size={10} />
+                            <span>{student.parentMobile}</span>
+                          </a>
+                        ) : (
+                          <span className="text-slate-400 italic">N/A</span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2 pt-1 border-t border-slate-200/20 dark:border-slate-800/10">
+                      <button
+                        onClick={() => handleViewHistory(student)}
+                        className="flex-1 py-1.5 px-3 rounded-xl text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-750 transition-colors flex items-center justify-center gap-1"
+                      >
+                        <History size={12} className="text-slate-400" />
+                        <span>View History</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                
+                {students.length === 0 && (
+                  <div className="text-center py-6 text-xs text-customText-muted dark:text-customText-mutedDark">
+                    No students in this section.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+        </div>
+      )}
+
+      {/* SECTION 2: ALL SECTIONS TAB LAYOUT */}
+      {activeBoardTab === 'allSections' && (
+        <div className="space-y-6">
           <div className="glass-card p-6 border border-slate-200/50 dark:border-slate-800/45">
             <div className="flex justify-between items-center mb-6">
               <h3 className="font-bold text-base text-customText dark:text-customText-dark flex items-center gap-2">
                 <AlertCircle className="text-red-500" size={20} />
-                <span>Today's Absentees ({absentees.length})</span>
+                <span>Today's Absentees across All Sections ({absentees.length})</span>
               </h3>
               <span className="text-xs bg-slate-100 dark:bg-slate-800 text-customText-muted dark:text-customText-mutedDark px-2.5 py-1 rounded-md font-semibold">
                 Date: {todayDate}
@@ -239,10 +537,10 @@ const AbsentControllerDashboard = () => {
 
             {absentees.length === 0 ? (
               <div className="text-center py-12 bg-slate-50/50 dark:bg-slate-900/30 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 text-customText-muted dark:text-customText-mutedDark">
-                🎉 No absentees logged {selectedSection === 'All' ? 'today' : `for ${selectedSection} today`}!
+                🎉 No absentees logged across any sections today!
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                 {absentees.map((student) => {
                   const isLate = student.status === 'Late';
                   const hasCallLog = !!student.callLog;
@@ -256,7 +554,6 @@ const AbsentControllerDashboard = () => {
                           : 'bg-red-500/5 border-red-500/20 hover:border-red-500/40 shadow-red-500/5'
                       } hover:shadow-md`}
                     >
-                      {/* Orange (Late) / Red (Absent) indicator badge */}
                       <span className={`absolute top-4 right-4 text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${
                         isLate 
                           ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-450 border border-amber-250 dark:border-amber-800' 
@@ -274,7 +571,7 @@ const AbsentControllerDashboard = () => {
                         </h4>
                       </div>
 
-                      {/* Parent Phone Section */}
+                      {/* Parent Phone / Calling actions */}
                       <div className="mt-4 pt-3 border-t border-slate-200/50 dark:border-slate-800/20 flex flex-col gap-2">
                         <div className="flex justify-between items-center text-xs text-customText-muted dark:text-customText-mutedDark">
                           <span>Parent's Mobile:</span>
@@ -321,12 +618,12 @@ const AbsentControllerDashboard = () => {
             )}
           </div>
 
-          {/* Active Call Response Dialog */}
+          {/* Active Call Response Dialog in All Sections View */}
           {activeCallStudent && (
             <div className="glass-card p-6 border-2 border-primary-dark/30 animate-fade-in bg-primary-dark/5">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="font-bold text-sm text-primary-dark dark:text-primary uppercase tracking-wider">
-                  Call Feedback Log: {activeCallStudent.name}
+                  Call Feedback Log: {activeCallStudent.name} ({activeCallStudent.section})
                 </h3>
                 <button 
                   onClick={() => setActiveCallStudent(null)}
@@ -403,46 +700,7 @@ const AbsentControllerDashboard = () => {
             </div>
           )}
         </div>
-
-        {/* Right Column: All Students List (Takes 1/3 space) */}
-        <div className="space-y-6">
-          <div className="glass-card p-6 border border-slate-200/50 dark:border-slate-800/45">
-            <h3 className="font-bold text-base text-customText dark:text-customText-dark flex items-center gap-2 mb-6">
-              <Users className="text-slate-500" size={20} />
-              <span>All Students ({students.length})</span>
-            </h3>
-
-            <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
-              {students.map((student) => (
-                <div
-                  key={student.id}
-                  onClick={() => handleViewHistory(student)}
-                  className="flex items-center justify-between p-3 bg-slate-50/50 dark:bg-slate-800/20 hover:bg-slate-100/50 dark:hover:bg-slate-800/40 border border-slate-200/40 dark:border-slate-800/40 rounded-xl cursor-pointer transition-all hover:translate-x-1"
-                >
-                  <div className="flex-1">
-                    <h4 className="text-xs font-bold text-customText dark:text-customText-dark">
-                      {student.name}
-                    </h4>
-                    <div className="flex flex-col gap-0.5 mt-0.5 text-[10px] text-customText-muted dark:text-customText-mutedDark font-medium">
-                      <span>Roll: {student.rollNumber}</span>
-                      {student.studentMobile && <span>Student Mobile: {student.studentMobile}</span>}
-                      {student.parentMobile && <span>Parent Mobile: {student.parentMobile}</span>}
-                    </div>
-                  </div>
-                  <History size={14} className="text-slate-400 shrink-0 ml-2" />
-                </div>
-              ))}
-              
-              {students.length === 0 && (
-                <div className="text-center py-6 text-xs text-customText-muted dark:text-customText-mutedDark">
-                  No students in this section.
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-      </div>
+      )}
 
       {/* STUDENT ABSENT HISTORY MODAL */}
       {selectedHistoryStudent && (

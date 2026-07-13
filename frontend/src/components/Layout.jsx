@@ -113,7 +113,10 @@ const Layout = ({ children }) => {
   } else if (user?.role === 'CR') {
     navLinks.push({ name: 'My Timetable', path: '/cr-dashboard', icon: CalendarDays });
   } else if (user?.role === 'ABSENT_CONTROLLER') {
-    navLinks.push({ name: 'Absent Control', path: '/absent-controller', icon: Users });
+    navLinks.push(
+      { name: 'Absent Control', path: '/absent-controller', icon: Users },
+      { name: 'Reports', path: '/reports', icon: FileSpreadsheet }
+    );
   }
 
   const formatClockTime = (date) => {

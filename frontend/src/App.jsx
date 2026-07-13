@@ -96,7 +96,7 @@ const AppRoutes = () => {
       <Route
         path="/reports"
         element={
-          <PrivateRoute allowedRoles={['HOD', 'SUB_ADMIN']}>
+          <PrivateRoute allowedRoles={['HOD', 'SUB_ADMIN', 'ABSENT_CONTROLLER']}>
             <Layout>
               <Reports />
             </Layout>

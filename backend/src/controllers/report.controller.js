@@ -186,7 +186,103 @@ const getDashboardStats = async (req, res) => {
   }
 };
 
+const getAbsenteesReport = async (req, res) => {
+  const { section, date, startDate, endDate } = req.query;
+
+  const whereClause = {
+    status: { in: ['Absent', 'Late'] }
+  };
+
+  // String-based Date filter (date and date range are YYYY-MM-DD formatted strings in the DB)
+  if (date) {
+    whereClause.date = date;
+  } else if (startDate && endDate) {
+    whereClause.date = {
+      gte: startDate,
+      lte: endDate
+    };
+  }
+
+  // Section filter
+  if (section && section !== 'All') {
+    whereClause.student = {
+      section: section
+    };
+  }
+
+  try {
+    const attendances = await prisma.attendance.findMany({
+      where: whereClause,
+      include: {
+        student: true
+      },
+      orderBy: [
+        { date: 'desc' },
+        { student: { rollNumber: 'asc' } }
+      ]
+    });
+
+    // Build call logs where condition
+    const callLogWhere = {};
+    if (date) {
+      callLogWhere.date = date;
+    } else if (startDate && endDate) {
+      callLogWhere.date = {
+        gte: startDate,
+        lte: endDate
+      };
+    }
+
+    const callLogs = await prisma.absenteeCallLog.findMany({
+      where: callLogWhere
+    });
+
+    // Map call logs for fast O(1) lookup
+    const callLogMap = {};
+    callLogs.forEach(cl => {
+      callLogMap[`${cl.studentId}_${cl.date}`] = cl;
+    });
+
+    // Map user names for fast O(1) lookup of calledById
+    const users = await prisma.user.findMany({
+      select: { id: true, name: true }
+    });
+    const userMap = {};
+    users.forEach(u => {
+      userMap[u.id] = u.name;
+    });
+
+    const reportData = attendances.map(att => {
+      const s = att.student;
+      const callLog = callLogMap[`${att.studentId}_${att.date}`];
+
+      return {
+        id: att.id,
+        date: att.date,
+        rollNumber: s.rollNumber,
+        name: s.name,
+        section: s.section,
+        status: att.status,
+        studentMobile: s.studentMobile,
+        parentMobile: s.parentMobile,
+        called: !!callLog,
+        answered: callLog ? callLog.answered : null,
+        reason: callLog ? (callLog.reason || '') : null,
+        calledBy: callLog ? (userMap[callLog.calledById] || 'Unknown') : null,
+        calledAt: callLog ? callLog.createdAt : null
+      };
+    });
+
+    res.json(reportData);
+  } catch (error) {
+    console.error('Error fetching absentees report:', error);
+    res.status(500).json({ message: error.message || 'Internal Server Error' });
+  }
+};
+
 module.exports = {
   getLogsReport,
   getDashboardStats,
+  getAbsenteesReport,
 };
+
