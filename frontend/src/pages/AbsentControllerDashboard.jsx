@@ -291,6 +291,7 @@ const AbsentControllerDashboard = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {absentees.map((student) => {
                     const isLate = student.status === 'Late';
+                    const isAfternoon = student.attendanceSession === 'afternoon';
                     const hasCallLog = !!student.callLog;
                     
                     return (
@@ -356,6 +357,10 @@ const AbsentControllerDashboard = () => {
                           {isLate ? (
                             <span className="mt-2 text-center text-xs font-bold text-amber-600 bg-amber-500/10 py-2 px-4 rounded-xl border border-amber-500/20">
                               Late Entry - No Call Required
+                            </span>
+                          ) : isAfternoon ? (
+                            <span className="mt-2 text-center text-xs font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 py-2 px-4 rounded-xl border border-slate-200 dark:border-slate-700">
+                              Afternoon Entry - No Call Required
                             </span>
                           ) : (
                             <button
@@ -555,6 +560,7 @@ const AbsentControllerDashboard = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                 {absentees.map((student) => {
                   const isLate = student.status === 'Late';
+                  const isAfternoon = student.attendanceSession === 'afternoon';
                   const hasCallLog = !!student.callLog;
                   
                   return (
@@ -620,6 +626,10 @@ const AbsentControllerDashboard = () => {
                         {isLate ? (
                           <span className="mt-2 text-center text-xs font-bold text-amber-600 bg-amber-500/10 py-2 px-4 rounded-xl border border-amber-500/20">
                             Late Entry - No Call Required
+                          </span>
+                        ) : isAfternoon ? (
+                          <span className="mt-2 text-center text-xs font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 py-2 px-4 rounded-xl border border-slate-200 dark:border-slate-700">
+                            Afternoon Entry - No Call Required
                           </span>
                         ) : (
                           <button

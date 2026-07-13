@@ -117,7 +117,7 @@ const AppRoutes = () => {
       <Route
         path="/settings"
         element={
-          <PrivateRoute allowedRoles={['HOD', 'SUB_ADMIN']}>
+          <PrivateRoute allowedRoles={['HOD', 'SUB_ADMIN', 'ABSENT_CONTROLLER']}>
             <Layout>
               <FingerprintSettings />
             </Layout>

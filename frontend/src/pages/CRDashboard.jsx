@@ -42,6 +42,8 @@ const CRDashboard = () => {
   const [studentSuccess, setStudentSuccess] = useState('');
   const [savingAttendance, setSavingAttendance] = useState(false);
   const [lateComerStudentId, setLateComerStudentId] = useState('');
+  const [canSubmit, setCanSubmit] = useState(true);
+  const [submitReason, setSubmitReason] = useState('');
 
   const getTodayDateString = () => {
     const d = new Date();
@@ -84,6 +86,16 @@ const CRDashboard = () => {
     try {
       setLoadingStudents(true);
       setStudentError('');
+
+      // Check if submission is allowed today
+      const accessRes = await fetch('/api/student-attendance/can-submit', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const accessData = await accessRes.json();
+      if (accessRes.ok) {
+        setCanSubmit(accessData.canSubmit);
+        setSubmitReason(accessData.reason || '');
+      }
 
       // Fetch all students in CR's class
       const studRes = await fetch('/api/student-attendance/students', {
@@ -243,6 +255,7 @@ const CRDashboard = () => {
 
   // Student Attendance handlers
   const handleAllPresent = () => {
+    if (!canSubmit) return;
     const newMap = { ...attendanceMap };
     students.forEach(s => {
       newMap[s.id] = 'Present';
@@ -252,6 +265,7 @@ const CRDashboard = () => {
   };
 
   const handleAllAbsent = () => {
+    if (!canSubmit) return;
     const newMap = { ...attendanceMap };
     students.forEach(s => {
       newMap[s.id] = 'Absent';
@@ -261,6 +275,7 @@ const CRDashboard = () => {
   };
 
   const toggleStudentStatus = (studentId) => {
+    if (!canSubmit) return;
     const current = attendanceMap[studentId] || 'Present';
     const next = (current === 'Present') ? 'Absent' : 'Present';
     
@@ -273,6 +288,7 @@ const CRDashboard = () => {
 
   const handleMarkLateComer = async (e) => {
     e.preventDefault();
+    if (!canSubmit) return;
     if (!lateComerStudentId) return;
 
     try {
@@ -307,6 +323,7 @@ const CRDashboard = () => {
   };
 
   const handleSaveAttendance = async () => {
+    if (!canSubmit) return;
     setSavingAttendance(true);
     setStudentError('');
     setStudentSuccess('');
@@ -572,6 +589,16 @@ const CRDashboard = () => {
       {activeTab === 'students' && (
         <div className="space-y-6">
           
+          {!canSubmit && (
+            <div className="p-4 bg-amber-500/10 border border-amber-500/25 text-amber-700 dark:text-amber-450 rounded-2xl flex items-start gap-3 text-xs leading-relaxed font-semibold shadow-sm">
+              <AlertCircle size={18} className="shrink-0 mt-0.5" />
+              <div>
+                <p className="font-extrabold uppercase tracking-wider mb-0.5">Attendance Submission Blocked</p>
+                <p className="opacity-90">{submitReason || 'Attendance submission is closed outside authorized morning and afternoon slots.'}</p>
+              </div>
+            </div>
+          )}
+
           {studentError && (
             <div className="p-4 bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-sm font-semibold rounded-xl">
               ⚠️ {studentError}
@@ -593,14 +620,24 @@ const CRDashboard = () => {
               </span>
               <button
                 onClick={handleAllPresent}
-                className="flex items-center gap-1.5 px-4 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/10 hover:border-emerald-500/35 rounded-xl text-xs font-bold transition-all"
+                disabled={!canSubmit}
+                className={`flex items-center gap-1.5 px-4 py-2 border rounded-xl text-xs font-bold transition-all ${
+                  canSubmit
+                    ? 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-440 border-emerald-500/10 hover:border-emerald-500/35'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-750 cursor-not-allowed'
+                }`}
               >
                 <UserCheck size={14} />
                 <span>All Present</span>
               </button>
               <button
                 onClick={handleAllAbsent}
-                className="flex items-center gap-1.5 px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/10 hover:border-red-500/35 rounded-xl text-xs font-bold transition-all"
+                disabled={!canSubmit}
+                className={`flex items-center gap-1.5 px-4 py-2 border rounded-xl text-xs font-bold transition-all ${
+                  canSubmit
+                    ? 'bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-440 border-red-500/10 hover:border-red-500/35'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-750 cursor-not-allowed'
+                }`}
               >
                 <UserX size={14} />
                 <span>All Absent</span>
@@ -614,6 +651,7 @@ const CRDashboard = () => {
                 onChange={(e) => setLateComerStudentId(e.target.value)}
                 className="glass-input text-xs py-2 pr-8"
                 required
+                disabled={!canSubmit}
               >
                 <option value="">-- Select Late Comer --</option>
                 {students.map((s) => (
@@ -624,7 +662,12 @@ const CRDashboard = () => {
               </select>
               <button
                 type="submit"
-                className="flex items-center gap-1 py-2 px-3 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold shadow-md shadow-amber-500/10 active:scale-[0.98] transition-all"
+                disabled={!canSubmit}
+                className={`flex items-center gap-1 py-2 px-3 rounded-xl text-xs font-bold shadow-md active:scale-[0.98] transition-all ${
+                  canSubmit
+                    ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-amber-500/10'
+                    : 'bg-slate-300 dark:bg-slate-750 text-slate-500 cursor-not-allowed shadow-none'
+                }`}
               >
                 <PlusCircle size={14} />
                 <span>Mark Late</span>
@@ -663,7 +706,9 @@ const CRDashboard = () => {
                   <div
                     key={s.id}
                     onClick={() => toggleStudentStatus(s.id)}
-                    className={`flex flex-col justify-between p-4 rounded-2xl border-2 cursor-pointer transition-all duration-200 active:scale-[0.97] h-28 shadow-sm ${statusClasses}`}
+                    className={`flex flex-col justify-between p-4 rounded-2xl border-2 cursor-pointer transition-all duration-200 active:scale-[0.97] h-28 shadow-sm ${
+                      !canSubmit ? 'opacity-65 cursor-not-allowed border-dashed hover:border-slate-200 dark:hover:border-slate-800' : ''
+                    } ${statusClasses}`}
                   >
                     <div className="space-y-0.5">
                       <span className="text-[9px] text-customText-muted dark:text-customText-mutedDark font-bold uppercase tracking-wider">
@@ -694,8 +739,12 @@ const CRDashboard = () => {
             <div className="flex justify-end pt-4 border-t border-slate-200 dark:border-slate-800">
               <button
                 onClick={handleSaveAttendance}
-                disabled={savingAttendance}
-                className="flex items-center justify-center gap-2 btn-primary px-8 py-3.5 bg-gradient-to-r from-primary-dark to-primary text-white font-extrabold shadow-md hover:shadow-lg transition-all active:scale-[0.98]"
+                disabled={savingAttendance || !canSubmit}
+                className={`flex items-center justify-center gap-2 btn-primary px-8 py-3.5 font-extrabold shadow-md hover:shadow-lg transition-all active:scale-[0.98] ${
+                  canSubmit
+                    ? 'bg-gradient-to-r from-primary-dark to-primary text-white shadow-primary-dark/10'
+                    : 'bg-slate-300 dark:bg-slate-750 text-slate-400 cursor-not-allowed shadow-none'
+                }`}
               >
                 <Save size={18} />
                 <span>{savingAttendance ? 'Submitting Attendance...' : 'Submit Attendance Registry'}</span>

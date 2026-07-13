@@ -4,6 +4,69 @@ const prisma = require('../db');
 const authMiddleware = require('../middleware/auth.middleware');
 const roleMiddleware = require('../middleware/role.middleware');
 
+const checkCRAttendanceAccess = async (user, className) => {
+  if (user.role !== 'CR') return true;
+
+  const now = new Date();
+  const kolkataTimeString = now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" });
+  const kolkataDate = new Date(kolkataTimeString);
+  
+  const hours = kolkataDate.getHours();
+  const minutes = kolkataDate.getMinutes();
+  const currentMinutes = hours * 60 + minutes;
+  
+  const morningStart = 9 * 60 + 10;
+  const morningEnd = 9 * 60 + 50;
+  const afternoonStart = 13 * 60 + 30;
+  const afternoonEnd = 14 * 60 + 10;
+  
+  const inWindow = (currentMinutes >= morningStart && currentMinutes < morningEnd) ||
+                   (currentMinutes >= afternoonStart && currentMinutes < afternoonEnd);
+  
+  if (inWindow) return true;
+
+  const todayKolkata = new Date().toLocaleDateString("en-US", { timeZone: "Asia/Kolkata" });
+  const [m, d, y] = todayKolkata.split('/');
+  const todayDateStr = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+
+  const overrideKey = `override_attendance_date_${className}`;
+  const overrideSetting = await prisma.systemSetting.findUnique({
+    where: { key: overrideKey }
+  });
+
+  if (overrideSetting && overrideSetting.value === todayDateStr) {
+    return true;
+  }
+
+  return false;
+};
+
+router.get('/can-submit', authMiddleware, async (req, res) => {
+  try {
+    if (req.user.role !== 'CR') {
+      return res.json({ canSubmit: true });
+    }
+    
+    const className = req.user.className;
+    if (!className) {
+      return res.json({ canSubmit: false, reason: 'No class assigned' });
+    }
+
+    const hasAccess = await checkCRAttendanceAccess(req.user, className);
+    if (hasAccess) {
+      return res.json({ canSubmit: true });
+    }
+
+    res.json({ 
+      canSubmit: false, 
+      reason: 'Attendance window closed. Morning window: 9:10 AM - 9:50 AM, Afternoon window: 1:30 PM - 2:10 PM. Contact HOD/Absent Controller to request access.' 
+    });
+  } catch (error) {
+    console.error('Error in can-submit check:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
+
 // 1. POST /students - HOD/Sub-Admin registers a student
 router.post('/students', authMiddleware, roleMiddleware(['HOD', 'SUB_ADMIN']), async (req, res) => {
   const { rollNumber, name, section, studentMobile, parentMobile } = req.body;
@@ -96,6 +159,11 @@ router.post('/bulk', authMiddleware, roleMiddleware(['CR', 'HOD', 'SUB_ADMIN']),
       return res.status(403).json({ message: 'Forbidden: CR can only hit attendance for their own section' });
     }
 
+    const hasAccess = await checkCRAttendanceAccess(req.user, section);
+    if (!hasAccess) {
+      return res.status(403).json({ message: 'Attendance window is closed. Contact HOD/Absent Controller to request access.' });
+    }
+
     for (const record of attendanceData) {
       await prisma.attendance.upsert({
         where: {
@@ -145,6 +213,11 @@ router.post('/late-comer', authMiddleware, roleMiddleware(['CR', 'HOD', 'SUB_ADM
     // Verify CR permissions
     if (req.user.role === 'CR' && req.user.className !== student.section) {
       return res.status(403).json({ message: 'Forbidden: CR can only modify students in their own section' });
+    }
+
+    const hasAccess = await checkCRAttendanceAccess(req.user, student.section);
+    if (!hasAccess) {
+      return res.status(403).json({ message: 'Attendance window is closed. Contact HOD/Absent Controller to request access.' });
     }
 
     const attendance = await prisma.attendance.upsert({
@@ -216,13 +289,20 @@ router.get('/absentees', authMiddleware, async (req, res) => {
       const s = att.student;
       const matchingCallLog = callLogs.find(cl => cl.studentId === s.id);
       
+      const dateObj = new Date(att.updatedAt);
+      const kolkataTimeString = dateObj.toLocaleString("en-US", { timeZone: "Asia/Kolkata" });
+      const kolkataDate = new Date(kolkataTimeString);
+      const hour = kolkataDate.getHours();
+      const attendanceSession = hour >= 12 ? 'afternoon' : 'morning';
+
       const resObj = {
         id: s.id,
         rollNumber: s.rollNumber,
         name: s.name,
         section: s.section,
         status: att.status,
-        isLateComer: att.isLateComer
+        isLateComer: att.isLateComer,
+        attendanceSession
       };
 
       if (user.role !== 'CR') {

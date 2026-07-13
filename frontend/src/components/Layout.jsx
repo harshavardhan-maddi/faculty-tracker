@@ -115,7 +115,8 @@ const Layout = ({ children }) => {
   } else if (user?.role === 'ABSENT_CONTROLLER') {
     navLinks.push(
       { name: 'Absent Control', path: '/absent-controller', icon: Users },
-      { name: 'Reports', path: '/reports', icon: FileSpreadsheet }
+      { name: 'Reports', path: '/reports', icon: FileSpreadsheet },
+      { name: 'Settings', path: '/settings', icon: Settings }
     );
   }
 

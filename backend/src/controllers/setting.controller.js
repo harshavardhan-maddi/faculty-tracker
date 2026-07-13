@@ -105,8 +105,73 @@ const clearLogsHistory = async (req, res) => {
   }
 };
 
+const getCROverrides = async (req, res) => {
+  try {
+    const classrooms = await prisma.classroom.findMany({
+      orderBy: { className: 'asc' }
+    });
+
+    const todayKolkata = new Date().toLocaleDateString("en-US", { timeZone: "Asia/Kolkata" });
+    const [m, d, y] = todayKolkata.split('/');
+    const todayDateStr = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+
+    const overrides = [];
+    for (const cls of classrooms) {
+      const key = `override_attendance_date_${cls.className}`;
+      const setting = await prisma.systemSetting.findUnique({
+        where: { key }
+      });
+      overrides.push({
+        className: cls.className,
+        granted: setting ? setting.value === todayDateStr : false
+      });
+    }
+
+    res.json(overrides);
+  } catch (error) {
+    console.error('Error fetching CR overrides settings:', error);
+    res.status(500).json({ message: error.message || 'Internal Server Error' });
+  }
+};
+
+const toggleCROverride = async (req, res) => {
+  const { className, granted } = req.body;
+  if (!className) {
+    return res.status(400).json({ message: 'className is required' });
+  }
+
+  try {
+    const todayKolkata = new Date().toLocaleDateString("en-US", { timeZone: "Asia/Kolkata" });
+    const [m, d, y] = todayKolkata.split('/');
+    const todayDateStr = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+
+    const key = `override_attendance_date_${className}`;
+    
+    if (granted) {
+      await prisma.systemSetting.upsert({
+        where: { key },
+        update: { value: todayDateStr },
+        create: { key, value: todayDateStr }
+      });
+    } else {
+      await prisma.systemSetting.upsert({
+        where: { key },
+        update: { value: '' },
+        create: { key, value: '' }
+      });
+    }
+
+    res.json({ className, granted });
+  } catch (error) {
+    console.error('Error toggling CR overrides settings:', error);
+    res.status(500).json({ message: error.message || 'Internal Server Error' });
+  }
+};
+
 module.exports = {
   getTrackingStatus,
   updateTrackingStatus,
   clearLogsHistory,
+  getCROverrides,
+  toggleCROverride,
 };
