@@ -353,17 +353,23 @@ const AbsentControllerDashboard = () => {
                             </div>
                           )}
 
-                          <button
-                            onClick={() => handleMakeCall(student)}
-                            className={`mt-2 flex items-center justify-center gap-2 py-2 px-4 rounded-xl text-xs font-bold text-white transition-all active:scale-[0.98] ${
-                              hasCallLog 
-                                ? 'bg-slate-600 hover:bg-slate-700' 
-                                : 'bg-primary-dark hover:bg-primary text-white shadow-md shadow-primary-dark/10'
-                            }`}
-                          >
-                            <PhoneCall size={14} />
-                            <span>{hasCallLog ? 'Call Again' : 'Call Parent'}</span>
-                          </button>
+                          {isLate ? (
+                            <span className="mt-2 text-center text-xs font-bold text-amber-600 bg-amber-500/10 py-2 px-4 rounded-xl border border-amber-500/20">
+                              Late Entry - No Call Required
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => handleMakeCall(student)}
+                              className={`mt-2 flex items-center justify-center gap-2 py-2 px-4 rounded-xl text-xs font-bold text-white transition-all active:scale-[0.98] ${
+                                hasCallLog 
+                                  ? 'bg-slate-600 hover:bg-slate-700' 
+                                  : 'bg-primary-dark hover:bg-primary text-white shadow-md shadow-primary-dark/10'
+                              }`}
+                            >
+                              <PhoneCall size={14} />
+                              <span>{hasCallLog ? 'Call Again' : 'Call Parent'}</span>
+                            </button>
+                          )}
                         </div>
                       </div>
                     );
@@ -611,17 +617,23 @@ const AbsentControllerDashboard = () => {
                           </div>
                         )}
 
-                        <button
-                          onClick={() => handleMakeCall(student)}
-                          className={`mt-2 flex items-center justify-center gap-2 py-2 px-4 rounded-xl text-xs font-bold text-white transition-all active:scale-[0.98] ${
-                            hasCallLog 
-                              ? 'bg-slate-600 hover:bg-slate-700' 
-                              : 'bg-primary-dark hover:bg-primary text-white shadow-md shadow-primary-dark/10'
-                          }`}
-                        >
-                          <PhoneCall size={14} />
-                          <span>{hasCallLog ? 'Call Again' : 'Call Parent'}</span>
-                        </button>
+                        {isLate ? (
+                          <span className="mt-2 text-center text-xs font-bold text-amber-600 bg-amber-500/10 py-2 px-4 rounded-xl border border-amber-500/20">
+                            Late Entry - No Call Required
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => handleMakeCall(student)}
+                            className={`mt-2 flex items-center justify-center gap-2 py-2 px-4 rounded-xl text-xs font-bold text-white transition-all active:scale-[0.98] ${
+                              hasCallLog 
+                                ? 'bg-slate-600 hover:bg-slate-700' 
+                                : 'bg-primary-dark hover:bg-primary text-white shadow-md shadow-primary-dark/10'
+                            }`}
+                          >
+                            <PhoneCall size={14} />
+                            <span>{hasCallLog ? 'Call Again' : 'Call Parent'}</span>
+                          </button>
+                        )}
                       </div>
                     </div>
                   );

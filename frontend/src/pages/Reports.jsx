@@ -174,55 +174,45 @@ const Reports = () => {
     document.body.removeChild(link);
   };
 
-  // CSV Export for Absentees Report
+  // CSV Export for Absentees Report (Trigger Backend Excel XLSX with auto-fit)
   const handleExportAbsenteesCSV = () => {
-    if (absenteesList.length === 0) return;
-
-    const headers = [
-      'Date',
-      'Roll Number',
-      'Student Name',
-      'Section',
-      'Status',
-      'Student Mobile',
-      'Parent Mobile',
-      'Call Placed',
-      'Call Answered',
-      'Reason for Absence',
-      'Logged By'
-    ];
+    const params = new URLSearchParams();
+    params.append('section', absenteeSection);
+    params.append('format', 'excel');
     
-    const rows = absenteesList.map((item) => [
-      item.date,
-      item.rollNumber,
-      item.name,
-      item.section,
-      item.status,
-      item.studentMobile || 'N/A',
-      item.parentMobile || 'N/A',
-      item.called ? 'Yes' : 'No',
-      item.called ? (item.answered ? 'Answered' : 'Not Answered') : 'Not Called',
-      item.reason || 'N/A',
-      item.calledBy || 'N/A'
-    ]);
-
-    const csvContent =
-      'data:text/csv;charset=utf-8,' +
-      [headers.join(','), ...rows.map((e) => e.map((val) => `"${val}"`).join(','))].join('\n');
-
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `Absentees_Caller_Report_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const targetDate = absenteeDate || todayDate;
+    if (absenteeReportMode === 'single') {
+      params.append('date', targetDate);
+    } else {
+      if (absenteeStartDate) params.append('startDate', absenteeStartDate);
+      if (absenteeEndDate) params.append('endDate', absenteeEndDate);
+    }
+    
+    // Open in a new tab/iframe to trigger native browser attachment download
+    window.open(`/api/reports/absentees?${params.toString()}`, '_blank');
   };
 
-  // PDF Export
+  // PDF Export - stand-alone academic document printing route
   const handlePrintPDF = () => {
-    window.print();
+    if (reportType === 'faculty') {
+      window.print();
+    } else {
+      const params = new URLSearchParams();
+      params.append('section', absenteeSection);
+      
+      const targetDate = absenteeDate || todayDate;
+      if (absenteeReportMode === 'single') {
+        params.append('date', targetDate);
+      } else {
+        if (absenteeStartDate) params.append('startDate', absenteeStartDate);
+        if (absenteeEndDate) params.append('endDate', absenteeEndDate);
+      }
+      
+      // Open print page in a new window/tab
+      window.open(`/print-report?${params.toString()}`, '_blank');
+    }
   };
+
 
   return (
     <div className="space-y-6">

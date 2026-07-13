@@ -13,6 +13,7 @@ import Reports from './pages/Reports';
 import CRDashboard from './pages/CRDashboard';
 import FingerprintSettings from './pages/FingerprintSettings';
 import AbsentControllerDashboard from './pages/AbsentControllerDashboard';
+import PrintReport from './pages/PrintReport';
 
 // Custom router resolver to send authenticated users to their correct home dashboard
 const HomeRedirect = () => {
@@ -100,6 +101,15 @@ const AppRoutes = () => {
             <Layout>
               <Reports />
             </Layout>
+          </PrivateRoute>
+        }
+      />
+
+      <Route
+        path="/print-report"
+        element={
+          <PrivateRoute allowedRoles={['HOD', 'SUB_ADMIN', 'ABSENT_CONTROLLER']}>
+            <PrintReport />
           </PrivateRoute>
         }
       />

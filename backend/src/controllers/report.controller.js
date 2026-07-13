@@ -1,4 +1,5 @@
 const prisma = require('../db');
+const XLSX = require('xlsx');
 const { getTodayDay, getLocalDayBounds, getWeekdayForDate, STANDARD_PERIODS } = require('../utils/date');
 
 const getLogsReport = async (req, res) => {
@@ -272,6 +273,56 @@ const getAbsenteesReport = async (req, res) => {
         calledAt: callLog ? callLog.createdAt : null
       };
     });
+
+    if (req.query.format === 'excel') {
+      const excelRows = reportData.map(item => ({
+        'Date': item.date,
+        'Roll Number': item.rollNumber,
+        'Student Name': item.name,
+        'Section': item.section,
+        'Status': item.status,
+        'Student Mobile': item.studentMobile || 'N/A',
+        'Parent Mobile': item.parentMobile || 'N/A',
+        'Call Placed': item.called ? 'Yes' : 'No',
+        'Call Answered': item.called ? (item.answered ? 'Answered' : 'Not Answered') : 'Not Called',
+        'Reason for Absence': item.reason || 'N/A',
+        'Logged By': item.calledBy || 'N/A'
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(excelRows);
+      
+      const headers = Object.keys(excelRows[0] || {});
+      const colWidths = headers.map(header => ({ wch: header.length }));
+      
+      excelRows.forEach(row => {
+        headers.forEach((header, i) => {
+          const val = String(row[header] || '');
+          if (val.length > colWidths[i].wch) {
+            colWidths[i].wch = val.length;
+          }
+        });
+      });
+      
+      ws['!cols'] = colWidths.map(w => ({ wch: w.wch + 3 }));
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Absentees Report');
+
+      const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+      let filename = 'Absentees_Report';
+      if (date) {
+        filename += `_${date}`;
+      } else if (startDate && endDate) {
+        filename += `_${startDate}_to_${endDate}`;
+      } else {
+        filename += `_${new Date().toISOString().split('T')[0]}`;
+      }
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}.xlsx"`);
+      return res.send(buffer);
+    }
 
     res.json(reportData);
   } catch (error) {
