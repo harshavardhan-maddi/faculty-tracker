@@ -67,7 +67,7 @@ router.get('/students', authMiddleware, async (req, res) => {
 
     // For HOD, SUB_ADMIN, and ABSENT_CONTROLLER
     const where = {};
-    if (section) {
+    if (section && section !== 'All') {
       where.section = section;
     }
 
@@ -190,12 +190,16 @@ router.get('/absentees', authMiddleware, async (req, res) => {
       return res.status(403).json({ message: 'Forbidden: CR can only view their own section' });
     }
 
+    const whereClause = {
+      date: date,
+      status: { in: ['Absent', 'Late'] }
+    };
+    if (section !== 'All') {
+      whereClause.student = { section: section };
+    }
+
     const absentees = await prisma.attendance.findMany({
-      where: {
-        date: date,
-        status: { in: ['Absent', 'Late'] },
-        student: { section: section }
-      },
+      where: whereClause,
       include: {
         student: true
       }

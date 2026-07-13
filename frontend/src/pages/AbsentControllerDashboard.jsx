@@ -19,7 +19,7 @@ const AbsentControllerDashboard = () => {
   const { token, user } = useAuth();
   
   const [classrooms, setClassrooms] = useState([]);
-  const [selectedSection, setSelectedSection] = useState('');
+  const [selectedSection, setSelectedSection] = useState('All');
   const [students, setStudents] = useState([]);
   const [absentees, setAbsentees] = useState([]);
   
@@ -57,9 +57,6 @@ const AbsentControllerDashboard = () => {
         const data = await res.json();
         if (res.ok) {
           setClassrooms(data);
-          if (data.length > 0) {
-            setSelectedSection(data[0].className);
-          }
         } else {
           setError(data.message || 'Failed to fetch classrooms');
         }
@@ -202,6 +199,7 @@ const AbsentControllerDashboard = () => {
             onChange={(e) => setSelectedSection(e.target.value)}
             className="glass-input text-sm py-2"
           >
+            <option value="All">All Sections</option>
             {classrooms.map((c) => (
               <option key={c.id} value={c.className}>
                 {c.className}
@@ -241,7 +239,7 @@ const AbsentControllerDashboard = () => {
 
             {absentees.length === 0 ? (
               <div className="text-center py-12 bg-slate-50/50 dark:bg-slate-900/30 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 text-customText-muted dark:text-customText-mutedDark">
-                🎉 No absentees logged for {selectedSection} today!
+                🎉 No absentees logged {selectedSection === 'All' ? 'today' : `for ${selectedSection} today`}!
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -269,7 +267,7 @@ const AbsentControllerDashboard = () => {
 
                       <div className="space-y-1 pr-14">
                         <span className="text-[10px] text-customText-muted dark:text-customText-mutedDark font-bold tracking-wider uppercase">
-                          {student.rollNumber}
+                          {student.rollNumber} • {student.section}
                         </span>
                         <h4 className="text-sm font-bold text-customText dark:text-customText-dark">
                           {student.name}
@@ -421,15 +419,17 @@ const AbsentControllerDashboard = () => {
                   onClick={() => handleViewHistory(student)}
                   className="flex items-center justify-between p-3 bg-slate-50/50 dark:bg-slate-800/20 hover:bg-slate-100/50 dark:hover:bg-slate-800/40 border border-slate-200/40 dark:border-slate-800/40 rounded-xl cursor-pointer transition-all hover:translate-x-1"
                 >
-                  <div>
+                  <div className="flex-1">
                     <h4 className="text-xs font-bold text-customText dark:text-customText-dark">
                       {student.name}
                     </h4>
-                    <span className="text-[10px] text-customText-muted dark:text-customText-mutedDark font-medium">
-                      {student.rollNumber}
-                    </span>
+                    <div className="flex flex-col gap-0.5 mt-0.5 text-[10px] text-customText-muted dark:text-customText-mutedDark font-medium">
+                      <span>Roll: {student.rollNumber}</span>
+                      {student.studentMobile && <span>Student Mobile: {student.studentMobile}</span>}
+                      {student.parentMobile && <span>Parent Mobile: {student.parentMobile}</span>}
+                    </div>
                   </div>
-                  <History size={14} className="text-slate-400" />
+                  <History size={14} className="text-slate-400 shrink-0 ml-2" />
                 </div>
               ))}
               

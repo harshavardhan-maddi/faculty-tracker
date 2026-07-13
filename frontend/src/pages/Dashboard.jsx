@@ -94,7 +94,7 @@ const Dashboard = () => {
 
   // HOD Absentees States
   const [absentees, setAbsentees] = useState([]);
-  const [absenteesSection, setAbsenteesSection] = useState('');
+  const [absenteesSection, setAbsenteesSection] = useState('All');
   const [absenteesDate, setAbsenteesDate] = useState('');
   const [loadingAbsentees, setLoadingAbsentees] = useState(false);
   const [absenteesError, setAbsenteesError] = useState('');
@@ -246,7 +246,6 @@ const Dashboard = () => {
       if (classData.length > 0 && !studentSection) {
         setStudentSection(classData[0].className);
         setFilterStudentSection('');
-        setAbsenteesSection(classData[0].className);
       }
 
       const statsRes = await fetch('/api/reports/dashboard-stats', {
@@ -514,11 +513,35 @@ const Dashboard = () => {
     }
   };
 
-  // Filter classrooms by search query
-  const filteredClassrooms = classrooms.filter((c) =>
-    c.className.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    c.roomNumber.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Helper to determine status priority for classroom card sorting
+  // Top: Not Entered (1), Pending (2)
+  // Mid: No Active Period / College is on Holiday / others (3)
+  // Bottom: Present (4)
+  const getStatusPriority = (status) => {
+    switch (status) {
+      case 'Not Entered':
+        return 1;
+      case 'Pending':
+        return 2;
+      case 'No Active Period':
+      case 'College is on Holiday':
+      case 'Free Period':
+      case 'No Class':
+        return 3;
+      case 'Present':
+        return 4;
+      default:
+        return 5;
+    }
+  };
+
+  // Filter classrooms by search query and sort by priority (Not Entered & Pending at top, Present at bottom)
+  const filteredClassrooms = classrooms
+    .filter((c) =>
+      c.className.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      c.roomNumber.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+    .sort((a, b) => getStatusPriority(a.status) - getStatusPriority(b.status));
 
   // Filter registered students list
   const filteredStudentsList = students.filter((s) =>
@@ -940,6 +963,7 @@ const Dashboard = () => {
                   onChange={(e) => setAbsenteesSection(e.target.value)}
                   className="glass-input text-xs py-2"
                 >
+                  <option value="All">All Sections</option>
                   {classrooms.map((c) => (
                     <option key={c.id} value={c.className}>
                       {c.className}
@@ -975,7 +999,7 @@ const Dashboard = () => {
 
               {absentees.length === 0 ? (
                 <div className="text-center py-12 bg-slate-50/50 dark:bg-slate-900/30 rounded-2xl border border-dashed text-customText-muted">
-                  No absentees or late entries marked for this section on selected date.
+                  No absentees or late entries marked {absenteesSection === 'All' ? '' : `for ${absenteesSection}`} on selected date.
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
