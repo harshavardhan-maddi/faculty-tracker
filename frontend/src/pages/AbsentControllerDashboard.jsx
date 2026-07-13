@@ -322,6 +322,12 @@ const AbsentControllerDashboard = () => {
                         {/* Parent Phone Section */}
                         <div className="mt-4 pt-3 border-t border-slate-200/50 dark:border-slate-800/20 flex flex-col gap-2">
                           <div className="flex justify-between items-center text-xs text-customText-muted dark:text-customText-mutedDark">
+                            <span>Student's Mobile:</span>
+                            <span className="font-semibold text-customText dark:text-customText-dark">
+                              {student.studentMobile || 'N/A'}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center text-xs text-customText-muted dark:text-customText-mutedDark">
                             <span>Parent's Mobile:</span>
                             <span className="font-semibold text-customText dark:text-customText-dark">
                               {student.parentMobile}
@@ -573,6 +579,12 @@ const AbsentControllerDashboard = () => {
 
                       {/* Parent Phone / Calling actions */}
                       <div className="mt-4 pt-3 border-t border-slate-200/50 dark:border-slate-800/20 flex flex-col gap-2">
+                        <div className="flex justify-between items-center text-xs text-customText-muted dark:text-customText-mutedDark">
+                          <span>Student's Mobile:</span>
+                          <span className="font-semibold text-customText dark:text-customText-dark">
+                            {student.studentMobile || 'N/A'}
+                          </span>
+                        </div>
                         <div className="flex justify-between items-center text-xs text-customText-muted dark:text-customText-mutedDark">
                           <span>Parent's Mobile:</span>
                           <span className="font-semibold text-customText dark:text-customText-dark">
