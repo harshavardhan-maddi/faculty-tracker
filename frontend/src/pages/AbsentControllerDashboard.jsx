@@ -312,12 +312,12 @@ const AbsentControllerDashboard = () => {
                         </span>
 
                         <div className="space-y-1 pr-14">
-                          <span className="text-[10px] text-customText-muted dark:text-customText-mutedDark font-bold tracking-wider uppercase">
-                            {student.rollNumber} • {student.section}
-                          </span>
-                          <h4 className="text-sm font-bold text-customText dark:text-customText-dark">
-                            {student.name}
+                          <h4 className="text-sm font-bold text-customText dark:text-customText-dark uppercase">
+                            {student.rollNumber}
                           </h4>
+                          <span className="text-[11px] text-customText-muted dark:text-customText-mutedDark font-semibold block">
+                            {student.name} • {student.section}
+                          </span>
                         </div>
 
                         {/* Parent Phone Section */}
@@ -481,11 +481,11 @@ const AbsentControllerDashboard = () => {
                     className="p-4 bg-slate-50/50 dark:bg-slate-800/20 border border-slate-200/45 dark:border-slate-800/40 rounded-2xl flex flex-col gap-3 transition-all duration-200 shadow-sm hover:shadow-md"
                   >
                     <div>
-                      <h4 className="text-sm font-bold text-customText dark:text-customText-dark">
-                        {student.name}
-                      </h4>
-                      <span className="text-[10px] text-customText-muted dark:text-customText-mutedDark font-bold tracking-wider uppercase">
+                      <h4 className="text-sm font-bold text-customText dark:text-customText-dark uppercase">
                         {student.rollNumber}
+                      </h4>
+                      <span className="text-[11px] text-customText-muted dark:text-customText-mutedDark font-semibold block">
+                        {student.name}
                       </span>
                     </div>
 
@@ -581,12 +581,12 @@ const AbsentControllerDashboard = () => {
                       </span>
 
                       <div className="space-y-1 pr-14">
-                        <span className="text-[10px] text-customText-muted dark:text-customText-mutedDark font-bold tracking-wider uppercase">
-                          {student.rollNumber} • {student.section}
-                        </span>
-                        <h4 className="text-sm font-bold text-customText dark:text-customText-dark">
-                          {student.name}
+                        <h4 className="text-sm font-bold text-customText dark:text-customText-dark uppercase">
+                          {student.rollNumber}
                         </h4>
+                        <span className="text-[11px] text-customText-muted dark:text-customText-mutedDark font-semibold block">
+                          {student.name} • {student.section}
+                        </span>
                       </div>
 
                       {/* Parent Phone / Calling actions */}

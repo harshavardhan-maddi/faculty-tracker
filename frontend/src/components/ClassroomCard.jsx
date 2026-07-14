@@ -1,7 +1,7 @@
 import React from 'react';
 import { BookOpen, User, Clock, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
 
-const ClassroomCard = ({ roomNumber, className, status, currentPeriod, onClick }) => {
+const ClassroomCard = ({ roomNumber, className, status, currentPeriod, studentCount, onClick }) => {
   
   // Decide visual mapping based on calculated status
   let cardClass = 'border-slate-200/60 dark:border-slate-800/60';
@@ -50,6 +50,11 @@ const ClassroomCard = ({ roomNumber, className, status, currentPeriod, onClick }
           <h3 className="font-bold text-lg text-customText dark:text-customText-dark tracking-tight leading-snug mt-0.5">
             {className}
           </h3>
+          {studentCount !== undefined && (
+            <div className="text-[11px] font-bold text-customText-muted dark:text-customText-mutedDark mt-1 bg-slate-100/70 dark:bg-slate-800/40 px-2 py-0.5 rounded border border-slate-200/20 w-fit">
+              👥 {studentCount} Students
+            </div>
+          )}
         </div>
 
         {/* Live Status indicator */}

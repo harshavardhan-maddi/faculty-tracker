@@ -84,6 +84,18 @@ const Dashboard = () => {
   const [studentSubmitSuccess, setStudentSubmitSuccess] = useState('');
   const [studentSubmitting, setStudentSubmitting] = useState(false);
 
+  // Edit Student States
+  const [showEditStudentModal, setShowEditStudentModal] = useState(false);
+  const [editingStudent, setEditingStudent] = useState(null);
+  const [editStudentName, setEditStudentName] = useState('');
+  const [editStudentRoll, setEditStudentRoll] = useState('');
+  const [editStudentSection, setEditStudentSection] = useState('');
+  const [editStudentMobile, setEditStudentMobile] = useState('');
+  const [editParentMobile, setEditParentMobile] = useState('');
+  const [editStudentSubmitError, setEditStudentSubmitError] = useState('');
+  const [editStudentSubmitSuccess, setEditStudentSubmitSuccess] = useState('');
+  const [editStudentSubmitting, setEditStudentSubmitting] = useState(false);
+
   // HOD Student Registry - Bulk Upload States
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [bulkText, setBulkText] = useState('');
@@ -268,9 +280,8 @@ const Dashboard = () => {
   const fetchStudents = async () => {
     try {
       setError('');
-      const url = filterStudentSection 
-        ? `/api/student-attendance/students?section=${encodeURIComponent(filterStudentSection)}`
-        : '/api/student-attendance/students';
+      // Always fetch all students so we can display section/overall counts and filter locally in React memory.
+      const url = '/api/student-attendance/students';
       
       const res = await fetch(url, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -284,6 +295,10 @@ const Dashboard = () => {
     } catch (err) {
       setError('Network error fetching students directory');
     }
+  };
+
+  const getSectionCount = (className) => {
+    return students.filter(s => s.section === className).length;
   };
 
   // Fetch absentees today
@@ -318,10 +333,14 @@ const Dashboard = () => {
   useEffect(() => {
     if (activeTab === 'students') {
       fetchStudents();
-    } else if (activeTab === 'absentees') {
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab === 'absentees') {
       fetchAbsentees();
     }
-  }, [activeTab, filterStudentSection, absenteesSection, absenteesDate]);
+  }, [activeTab, absenteesSection, absenteesDate]);
 
   // Handle live WebSockets updates
   useEffect(() => {
@@ -417,6 +436,65 @@ const Dashboard = () => {
       setStudentSubmitError('Network connection issue');
     } finally {
       setStudentSubmitting(false);
+    }
+  };
+
+  const handleEditStudentClick = (student) => {
+    setEditingStudent(student);
+    setEditStudentName(student.name);
+    setEditStudentRoll(student.rollNumber);
+    setEditStudentSection(student.section);
+    setEditStudentMobile(student.studentMobile || '');
+    setEditParentMobile(student.parentMobile || '');
+    setEditStudentSubmitError('');
+    setEditStudentSubmitSuccess('');
+    setShowEditStudentModal(true);
+  };
+
+  const handleEditStudentSubmit = async (e) => {
+    e.preventDefault();
+    if (!editStudentName || !editStudentRoll || !editStudentSection || !editStudentMobile || !editParentMobile) {
+      setEditStudentSubmitError('All fields are required');
+      return;
+    }
+
+    setEditStudentSubmitting(true);
+    setEditStudentSubmitError('');
+    setEditStudentSubmitSuccess('');
+
+    try {
+      const res = await fetch(`/api/student-attendance/students/${editingStudent.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          name: editStudentName,
+          rollNumber: editStudentRoll,
+          section: editStudentSection,
+          studentMobile: editStudentMobile,
+          parentMobile: editParentMobile
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setEditStudentSubmitSuccess('Student details updated successfully.');
+        fetchStudents();
+        fetchDashboardData(true); // Silent update of classroom student counts
+        setTimeout(() => {
+          setShowEditStudentModal(false);
+          setEditingStudent(null);
+          setEditStudentSubmitSuccess('');
+        }, 1500);
+      } else {
+        setEditStudentSubmitError(data.message || 'Failed to update student details');
+      }
+    } catch (err) {
+      setEditStudentSubmitError('Network connection issue');
+    } finally {
+      setEditStudentSubmitting(false);
     }
   };
 
@@ -795,6 +873,7 @@ const Dashboard = () => {
                     className={c.className}
                     status={c.status}
                     currentPeriod={c.currentPeriod}
+                    studentCount={c.studentCount}
                     onClick={() => handleCardClick(c)}
                   />
                 ))}
@@ -879,14 +958,26 @@ const Dashboard = () => {
                   onChange={(e) => setFilterStudentSection(e.target.value)}
                   className="glass-input text-xs py-2 w-full sm:w-48"
                 >
-                  <option value="">-- All Sections --</option>
+                  <option value="">-- All Sections (Total: {students.length}) --</option>
                   {classrooms.map((c) => (
                     <option key={c.id} value={c.className}>
-                      {c.className}
+                      {c.className} ({getSectionCount(c.className)})
                     </option>
                   ))}
                 </select>
               </div>
+            </div>
+
+            {/* Student Count Summary Banner */}
+            <div className="flex flex-wrap gap-3 text-xs font-bold mt-2">
+              <span className="bg-primary/10 text-primary-dark dark:text-primary px-3 py-1.5 rounded-xl border border-primary/20 flex items-center gap-1.5 shadow-sm">
+                👥 Total Registered Students: {students.length}
+              </span>
+              {filterStudentSection && (
+                <span className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-450 px-3 py-1.5 rounded-xl border border-emerald-500/20 flex items-center gap-1.5 shadow-sm">
+                  📁 Section "{filterStudentSection}": {getSectionCount(filterStudentSection)} students
+                </span>
+              )}
             </div>
 
             {/* Students Table */}
@@ -918,7 +1009,14 @@ const Dashboard = () => {
                           <span>{s.parentMobile}</span>
                         </button>
                       </td>
-                      <td className="py-3 text-right">
+                      <td className="py-3 text-right flex items-center justify-end gap-1.5">
+                        <button
+                          onClick={() => handleEditStudentClick(s)}
+                          className="p-1 text-primary hover:bg-primary/10 rounded-lg transition-colors cursor-pointer"
+                          title="Edit Student details / Transfer section"
+                        >
+                          <Edit size={14} />
+                        </button>
                         <button
                           onClick={() => handleDeleteStudent(s)}
                           className="p-1 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg transition-colors cursor-pointer"
@@ -1024,14 +1122,11 @@ const Dashboard = () => {
                         </span>
 
                         <div className="space-y-0.5">
-                          <span className="text-[10px] text-customText-muted font-bold tracking-wider uppercase">
+                          <h4 className="text-sm font-bold text-customText dark:text-customText-dark uppercase">
                             {item.rollNumber}
-                          </span>
-                          <h4 className="text-sm font-bold text-customText dark:text-customText-dark">
-                            {item.name}
                           </h4>
-                          <span className="text-[10px] text-slate-400 block font-medium">
-                            {item.section}
+                          <span className="text-[11px] text-customText-muted dark:text-customText-mutedDark font-semibold block">
+                            {item.name} • {item.section}
                           </span>
                         </div>
 
@@ -1194,6 +1289,129 @@ const Dashboard = () => {
                   className="btn-primary py-2 text-xs bg-primary-dark"
                 >
                   {studentSubmitting ? 'Registering...' : 'Register Student'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT MODAL FOR STUDENTS (HOD ONLY) */}
+      {showEditStudentModal && editingStudent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => setShowEditStudentModal(false)} />
+          
+          <div className="relative glass-card border border-white/60 w-full max-w-md p-6 bg-white dark:bg-slate-900 shadow-2xl animate-fade-in z-10 text-left">
+            <div className="flex justify-between items-center pb-3 border-b mb-4">
+              <h3 className="font-extrabold text-base text-customText dark:text-customText-dark">
+                Edit Student details / Transfer section
+              </h3>
+              <button onClick={() => setShowEditStudentModal(false)} className="text-slate-400 hover:text-slate-600">
+                <X size={18} />
+              </button>
+            </div>
+
+            {editStudentSubmitError && (
+              <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-650 text-xs font-semibold rounded-lg mb-3 animate-shake">
+                ⚠️ {editStudentSubmitError}
+              </div>
+            )}
+
+            {editStudentSubmitSuccess && (
+              <div className="p-3 bg-green-500/10 border border-green-500/20 text-green-650 text-xs font-semibold rounded-lg mb-3">
+                ✓ {editStudentSubmitSuccess}
+              </div>
+            )}
+
+            <form onSubmit={handleEditStudentSubmit} className="space-y-3">
+              <div>
+                <label className="block text-[10px] font-bold text-customText-muted uppercase tracking-wider mb-1">
+                  Full Name
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. John Doe"
+                  value={editStudentName}
+                  onChange={(e) => setEditStudentName(e.target.value)}
+                  className="glass-input text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-customText-muted uppercase tracking-wider mb-1">
+                  Roll / Register Number
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. 22B81A0501"
+                  value={editStudentRoll}
+                  onChange={(e) => setEditStudentRoll(e.target.value)}
+                  className="glass-input text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-customText-muted uppercase tracking-wider mb-1">
+                  Assigned Section / Class (Transfer Section)
+                </label>
+                <select
+                  value={editStudentSection}
+                  onChange={(e) => setEditStudentSection(e.target.value)}
+                  className="glass-input text-xs"
+                  required
+                >
+                  {classrooms.map((c) => (
+                    <option key={c.id} value={c.className}>
+                      {c.className} ({c.roomNumber})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-customText-muted uppercase tracking-wider mb-1">
+                  Student Mobile Number
+                </label>
+                <input
+                  type="tel"
+                  required
+                  placeholder="e.g. 9876543201"
+                  value={editStudentMobile}
+                  onChange={(e) => setEditStudentMobile(e.target.value)}
+                  className="glass-input text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-customText-muted uppercase tracking-wider mb-1">
+                  Parent Mobile Number
+                </label>
+                <input
+                  type="tel"
+                  required
+                  placeholder="e.g. 9123456701"
+                  value={editParentMobile}
+                  onChange={(e) => setEditParentMobile(e.target.value)}
+                  className="glass-input text-xs"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-3 border-t">
+                <button
+                  type="button"
+                  onClick={() => setShowEditStudentModal(false)}
+                  className="btn-secondary py-2 text-xs"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={editStudentSubmitting}
+                  className="btn-primary py-2 text-xs bg-primary-dark"
+                >
+                  {editStudentSubmitting ? 'Saving changes...' : 'Save Changes'}
                 </button>
               </div>
             </form>

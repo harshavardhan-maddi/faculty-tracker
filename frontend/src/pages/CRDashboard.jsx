@@ -656,7 +656,7 @@ const CRDashboard = () => {
                 <option value="">-- Select Late Comer --</option>
                 {students.map((s) => (
                   <option key={s.id} value={s.id}>
-                    {s.name} ({s.rollNumber})
+                    {s.rollNumber} - {s.name}
                   </option>
                 ))}
               </select>
@@ -711,12 +711,12 @@ const CRDashboard = () => {
                     } ${statusClasses}`}
                   >
                     <div className="space-y-0.5">
-                      <span className="text-[9px] text-customText-muted dark:text-customText-mutedDark font-bold uppercase tracking-wider">
+                      <h4 className="text-xs font-bold text-customText dark:text-customText-dark line-clamp-1 leading-tight uppercase">
                         {s.rollNumber}
-                      </span>
-                      <h4 className="text-xs font-bold text-customText dark:text-customText-dark line-clamp-2 leading-tight">
-                        {s.name}
                       </h4>
+                      <span className="text-[10px] text-customText-muted dark:text-customText-mutedDark font-semibold block line-clamp-1">
+                        {s.name}
+                      </span>
                     </div>
                     
                     <div className="flex justify-between items-center mt-2">

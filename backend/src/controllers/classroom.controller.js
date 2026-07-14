@@ -7,6 +7,19 @@ const getClassrooms = async (req, res) => {
       orderBy: { className: 'asc' },
     });
 
+    // Fetch all student counts grouped by section
+    const studentCounts = await prisma.student.groupBy({
+      by: ['section'],
+      _count: {
+        id: true,
+      },
+    });
+
+    const studentCountMap = {};
+    studentCounts.forEach((sc) => {
+      studentCountMap[sc.section] = sc._count.id;
+    });
+
     const trackingSetting = await prisma.systemSetting.findUnique({
       where: { key: 'trackingEnabled' },
     });
@@ -19,6 +32,7 @@ const getClassrooms = async (req, res) => {
         className: c.className,
         status: 'College is on Holiday',
         currentPeriod: null,
+        studentCount: studentCountMap[c.className] || 0,
       }));
       return res.json(holidayResponse);
     }
@@ -117,6 +131,7 @@ const getClassrooms = async (req, res) => {
         className: classroom.className,
         status,
         currentPeriod: currentPeriodInfo,
+        studentCount: studentCountMap[classroom.className] || 0,
       });
     }
 
@@ -215,7 +230,14 @@ const getClassroomDetails = async (req, res) => {
       return res.status(404).json({ message: 'Classroom not found' });
     }
 
-    res.json(classroom);
+    const studentCount = await prisma.student.count({
+      where: { section: classroom.className }
+    });
+
+    res.json({
+      ...classroom,
+      studentCount
+    });
   } catch (error) {
     console.error('Error fetching classroom details:', error);
     res.status(500).json({ message: error.message || 'Internal Server Error' });

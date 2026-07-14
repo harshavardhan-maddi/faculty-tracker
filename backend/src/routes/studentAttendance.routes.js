@@ -446,4 +446,46 @@ router.post('/students/bulk', authMiddleware, roleMiddleware(['HOD', 'SUB_ADMIN'
   }
 });
 
+// 10. PUT /students/:id - HOD/Sub-Admin updates student details
+router.put('/students/:id', authMiddleware, roleMiddleware(['HOD', 'SUB_ADMIN']), async (req, res) => {
+  const { id } = req.params;
+  const { name, rollNumber, section, studentMobile, parentMobile } = req.body;
+
+  try {
+    const student = await prisma.student.findUnique({
+      where: { id: Number(id) }
+    });
+
+    if (!student) {
+      return res.status(404).json({ message: 'Student not found' });
+    }
+
+    if (rollNumber && rollNumber !== student.rollNumber) {
+      const existing = await prisma.student.findUnique({
+        where: { rollNumber }
+      });
+      if (existing) {
+        return res.status(400).json({ message: 'Student with this roll number already exists' });
+      }
+    }
+
+    const updatedStudent = await prisma.student.update({
+      where: { id: Number(id) },
+      data: {
+        name: name !== undefined ? name : student.name,
+        rollNumber: rollNumber !== undefined ? rollNumber : student.rollNumber,
+        section: section !== undefined ? section : student.section,
+        studentMobile: studentMobile !== undefined ? studentMobile : student.studentMobile,
+        parentMobile: parentMobile !== undefined ? parentMobile : student.parentMobile,
+      }
+    });
+
+    res.json(updatedStudent);
+  } catch (error) {
+    console.error('Update student error:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
+
 module.exports = router;
+
