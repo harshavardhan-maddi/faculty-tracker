@@ -269,9 +269,90 @@ const AbsentControllerDashboard = () => {
       {/* SECTION 1: SECTION-WISE LAYOUT */}
       {activeBoardTab === 'sectionWise' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          
-          {/* Today's Absentees list (2/3 width) */}
+               {/* Today's Absentees list (2/3 width) */}
           <div className="lg:col-span-2 space-y-6">
+            {/* Active Call Response Dialog */}
+            {activeCallStudent && (
+              <div className="glass-card p-6 border-2 border-primary-dark/30 animate-fade-in bg-primary-dark/5">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="font-bold text-sm text-primary-dark dark:text-primary uppercase tracking-wider">
+                    Call Feedback Log: {activeCallStudent.name}
+                  </h3>
+                  <button 
+                    onClick={() => setActiveCallStudent(null)}
+                    className="text-slate-400 hover:text-slate-600"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+
+                <form onSubmit={handleSaveCallLog} className="space-y-4 text-left">
+                  <div>
+                    <p className="text-xs font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider mb-2">
+                      Did the parent answer the call?
+                    </p>
+                    <div className="flex items-center gap-6">
+                      <label className="flex items-center gap-2 text-sm font-semibold text-customText dark:text-customText-dark cursor-pointer">
+                        <input
+                          type="radio"
+                          name="answered"
+                          checked={answeredCall === true}
+                          onChange={() => setAnsweredCall(true)}
+                          className="h-4 w-4 text-primary"
+                          required
+                        />
+                        <span>Yes</span>
+                      </label>
+                      <label className="flex items-center gap-2 text-sm font-semibold text-customText dark:text-customText-dark cursor-pointer">
+                        <input
+                          type="radio"
+                          name="answered"
+                          checked={answeredCall === false}
+                          onChange={() => setAnsweredCall(false)}
+                          className="h-4 w-4 text-primary"
+                          required
+                        />
+                        <span>No</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  {answeredCall === true && (
+                    <div className="space-y-1 animate-fade-in">
+                      <label className="block text-xs font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider">
+                        Reason for absence
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={absentReason}
+                        onChange={(e) => setAbsentReason(e.target.value)}
+                        placeholder="e.g. Family Emergency, Sick Leave, Traffic"
+                        className="glass-input text-xs"
+                      />
+                    </div>
+                  )}
+
+                  <div className="flex justify-end gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setActiveCallStudent(null)}
+                      className="btn-secondary py-2 text-xs"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={savingCall || answeredCall === null}
+                      className="btn-primary py-2 text-xs bg-primary-dark"
+                    >
+                      {savingCall ? 'Saving feedback...' : 'Save Feedback'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+
             <div className="glass-card p-6 border border-slate-200/50 dark:border-slate-800/45">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="font-bold text-base text-customText dark:text-customText-dark flex items-center gap-2">
@@ -382,88 +463,6 @@ const AbsentControllerDashboard = () => {
                 </div>
               )}
             </div>
-
-            {/* Active Call Response Dialog */}
-            {activeCallStudent && (
-              <div className="glass-card p-6 border-2 border-primary-dark/30 animate-fade-in bg-primary-dark/5">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="font-bold text-sm text-primary-dark dark:text-primary uppercase tracking-wider">
-                    Call Feedback Log: {activeCallStudent.name}
-                  </h3>
-                  <button 
-                    onClick={() => setActiveCallStudent(null)}
-                    className="text-slate-400 hover:text-slate-600"
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
-
-                <form onSubmit={handleSaveCallLog} className="space-y-4 text-left">
-                  <div>
-                    <p className="text-xs font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider mb-2">
-                      Did the parent answer the call?
-                    </p>
-                    <div className="flex items-center gap-6">
-                      <label className="flex items-center gap-2 text-sm font-semibold text-customText dark:text-customText-dark cursor-pointer">
-                        <input
-                          type="radio"
-                          name="answered"
-                          checked={answeredCall === true}
-                          onChange={() => setAnsweredCall(true)}
-                          className="h-4 w-4 text-primary"
-                          required
-                        />
-                        <span>Yes</span>
-                      </label>
-                      <label className="flex items-center gap-2 text-sm font-semibold text-customText dark:text-customText-dark cursor-pointer">
-                        <input
-                          type="radio"
-                          name="answered"
-                          checked={answeredCall === false}
-                          onChange={() => setAnsweredCall(false)}
-                          className="h-4 w-4 text-primary"
-                          required
-                        />
-                        <span>No</span>
-                      </label>
-                    </div>
-                  </div>
-
-                  {answeredCall === true && (
-                    <div className="space-y-1 animate-fade-in">
-                      <label className="block text-xs font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider">
-                        Reason for absence
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={absentReason}
-                        onChange={(e) => setAbsentReason(e.target.value)}
-                        placeholder="e.g. Family Emergency, Sick Leave, Traffic"
-                        className="glass-input text-xs"
-                      />
-                    </div>
-                  )}
-
-                  <div className="flex justify-end gap-3 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => setActiveCallStudent(null)}
-                      className="btn-secondary py-2 text-xs"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={savingCall || answeredCall === null}
-                      className="btn-primary py-2 text-xs bg-primary-dark"
-                    >
-                      {savingCall ? 'Saving feedback...' : 'Save Feedback'}
-                    </button>
-                  </div>
-                </form>
-              </div>
-            )}
           </div>
 
           {/* Right Column: All Students Cards List (1/3 width) */}
@@ -541,6 +540,88 @@ const AbsentControllerDashboard = () => {
       {/* SECTION 2: ALL SECTIONS TAB LAYOUT */}
       {activeBoardTab === 'allSections' && (
         <div className="space-y-6">
+          {/* Active Call Response Dialog in All Sections View */}
+          {activeCallStudent && (
+            <div className="glass-card p-6 border-2 border-primary-dark/30 animate-fade-in bg-primary-dark/5">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="font-bold text-sm text-primary-dark dark:text-primary uppercase tracking-wider">
+                  Call Feedback Log: {activeCallStudent.name} ({activeCallStudent.section})
+                </h3>
+                <button 
+                  onClick={() => setActiveCallStudent(null)}
+                  className="text-slate-400 hover:text-slate-600"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveCallLog} className="space-y-4 text-left">
+                <div>
+                  <p className="text-xs font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider mb-2">
+                    Did the parent answer the call?
+                  </p>
+                  <div className="flex items-center gap-6">
+                    <label className="flex items-center gap-2 text-sm font-semibold text-customText dark:text-customText-dark cursor-pointer">
+                      <input
+                        type="radio"
+                        name="answered"
+                        checked={answeredCall === true}
+                        onChange={() => setAnsweredCall(true)}
+                        className="h-4 w-4 text-primary"
+                        required
+                      />
+                      <span>Yes</span>
+                    </label>
+                    <label className="flex items-center gap-2 text-sm font-semibold text-customText dark:text-customText-dark cursor-pointer">
+                      <input
+                        type="radio"
+                        name="answered"
+                        checked={answeredCall === false}
+                        onChange={() => setAnsweredCall(false)}
+                        className="h-4 w-4 text-primary"
+                        required
+                      />
+                      <span>No</span>
+                    </label>
+                  </div>
+                </div>
+
+                {answeredCall === true && (
+                  <div className="space-y-1 animate-fade-in">
+                    <label className="block text-xs font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider">
+                      Reason for absence
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={absentReason}
+                      onChange={(e) => setAbsentReason(e.target.value)}
+                      placeholder="e.g. Family Emergency, Sick Leave, Traffic"
+                      className="glass-input text-xs"
+                    />
+                  </div>
+                )}
+
+                <div className="flex justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setActiveCallStudent(null)}
+                    className="btn-secondary py-2 text-xs"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={savingCall || answeredCall === null}
+                    className="btn-primary py-2 text-xs bg-primary-dark"
+                  >
+                    {savingCall ? 'Saving feedback...' : 'Save Feedback'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
           <div className="glass-card p-6 border border-slate-200/50 dark:border-slate-800/45">
             <div className="flex justify-between items-center mb-6">
               <h3 className="font-bold text-base text-customText dark:text-customText-dark flex items-center gap-2">
@@ -651,88 +732,6 @@ const AbsentControllerDashboard = () => {
               </div>
             )}
           </div>
-
-          {/* Active Call Response Dialog in All Sections View */}
-          {activeCallStudent && (
-            <div className="glass-card p-6 border-2 border-primary-dark/30 animate-fade-in bg-primary-dark/5">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="font-bold text-sm text-primary-dark dark:text-primary uppercase tracking-wider">
-                  Call Feedback Log: {activeCallStudent.name} ({activeCallStudent.section})
-                </h3>
-                <button 
-                  onClick={() => setActiveCallStudent(null)}
-                  className="text-slate-400 hover:text-slate-600"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-
-              <form onSubmit={handleSaveCallLog} className="space-y-4 text-left">
-                <div>
-                  <p className="text-xs font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider mb-2">
-                    Did the parent answer the call?
-                  </p>
-                  <div className="flex items-center gap-6">
-                    <label className="flex items-center gap-2 text-sm font-semibold text-customText dark:text-customText-dark cursor-pointer">
-                      <input
-                        type="radio"
-                        name="answered"
-                        checked={answeredCall === true}
-                        onChange={() => setAnsweredCall(true)}
-                        className="h-4 w-4 text-primary"
-                        required
-                      />
-                      <span>Yes</span>
-                    </label>
-                    <label className="flex items-center gap-2 text-sm font-semibold text-customText dark:text-customText-dark cursor-pointer">
-                      <input
-                        type="radio"
-                        name="answered"
-                        checked={answeredCall === false}
-                        onChange={() => setAnsweredCall(false)}
-                        className="h-4 w-4 text-primary"
-                        required
-                      />
-                      <span>No</span>
-                    </label>
-                  </div>
-                </div>
-
-                {answeredCall === true && (
-                  <div className="space-y-1 animate-fade-in">
-                    <label className="block text-xs font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider">
-                      Reason for absence
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={absentReason}
-                      onChange={(e) => setAbsentReason(e.target.value)}
-                      placeholder="e.g. Family Emergency, Sick Leave, Traffic"
-                      className="glass-input text-xs"
-                    />
-                  </div>
-                )}
-
-                <div className="flex justify-end gap-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setActiveCallStudent(null)}
-                    className="btn-secondary py-2 text-xs"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={savingCall || answeredCall === null}
-                    className="btn-primary py-2 text-xs bg-primary-dark"
-                  >
-                    {savingCall ? 'Saving feedback...' : 'Save Feedback'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          )}
         </div>
       )}
 
