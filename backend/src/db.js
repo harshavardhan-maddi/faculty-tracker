@@ -1,3 +1,13 @@
+if (process.env.DATABASE_URL) {
+  let url = process.env.DATABASE_URL.trim();
+  if (url.startsWith('"') && url.endsWith('"')) {
+    url = url.slice(1, -1);
+  } else if (url.startsWith("'") && url.endsWith("'")) {
+    url = url.slice(1, -1);
+  }
+  process.env.DATABASE_URL = url;
+}
+
 if (process.env.VERCEL) {
   process.env.PRISMA_CLIENT_ENGINE_TYPE = 'library';
   process.env.PRISMA_CLI_QUERY_ENGINE_TYPE = 'library';
