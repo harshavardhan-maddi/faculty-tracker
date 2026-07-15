@@ -1,3 +1,8 @@
+if (process.env.VERCEL) {
+  process.env.PRISMA_CLIENT_ENGINE_TYPE = 'library';
+  process.env.PRISMA_CLI_QUERY_ENGINE_TYPE = 'library';
+}
+
 const { PrismaClient } = require('@prisma/client');
 
 let prisma;
