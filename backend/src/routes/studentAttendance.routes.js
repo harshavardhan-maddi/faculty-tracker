@@ -308,12 +308,30 @@ router.get('/absentees', authMiddleware, async (req, res) => {
       if (user.role !== 'CR') {
         resObj.studentMobile = s.studentMobile;
         resObj.parentMobile = s.parentMobile;
-        resObj.callLog = matchingCallLog ? {
-          id: matchingCallLog.id,
-          answered: matchingCallLog.answered,
-          reason: matchingCallLog.reason,
-          createdAt: matchingCallLog.createdAt
-        } : null;
+        resObj.preExcusedStart = s.preExcusedStart;
+        resObj.preExcusedEnd = s.preExcusedEnd;
+        resObj.preExcusedReason = s.preExcusedReason;
+
+        // Check if student is pre-excused for the queried date
+        const queryDateStr = date; // Format: "YYYY-MM-DD"
+        const isPreExcused = s.preExcusedStart && s.preExcusedEnd && 
+                             queryDateStr >= s.preExcusedStart && queryDateStr <= s.preExcusedEnd;
+
+        if (isPreExcused) {
+          resObj.callLog = {
+            id: matchingCallLog ? matchingCallLog.id : -1,
+            answered: true,
+            reason: `Pre-informed Absent: ${s.preExcusedReason || 'No reason specified'} (${s.preExcusedStart} to ${s.preExcusedEnd})`,
+            isPreExcused: true
+          };
+        } else {
+          resObj.callLog = matchingCallLog ? {
+            id: matchingCallLog.id,
+            answered: matchingCallLog.answered,
+            reason: matchingCallLog.reason,
+            createdAt: matchingCallLog.createdAt
+          } : null;
+        }
       }
 
       return resObj;
@@ -328,12 +346,13 @@ router.get('/absentees', authMiddleware, async (req, res) => {
 
 // 6. POST /call-log - Absent Controller records call stats
 router.post('/call-log', authMiddleware, roleMiddleware(['ABSENT_CONTROLLER', 'HOD', 'SUB_ADMIN']), async (req, res) => {
-  const { studentId, date, answered, reason } = req.body;
+  const { studentId, date, answered, reason, preExcusedStart, preExcusedEnd, preExcusedReason } = req.body;
   if (!studentId || !date || answered === undefined) {
     return res.status(400).json({ message: 'Missing studentId, date, or answered status' });
   }
 
   try {
+    // 1. Delete and re-create Call Log
     await prisma.absenteeCallLog.deleteMany({
       where: {
         studentId: Number(studentId),
@@ -350,6 +369,28 @@ router.post('/call-log', authMiddleware, roleMiddleware(['ABSENT_CONTROLLER', 'H
         calledById: req.user.id
       }
     });
+
+    // 2. Update Student's pre-excused schedule if parent answered and provided date range
+    if (answered && preExcusedStart && preExcusedEnd) {
+      await prisma.student.update({
+        where: { id: Number(studentId) },
+        data: {
+          preExcusedStart,
+          preExcusedEnd,
+          preExcusedReason: preExcusedReason || reason || ''
+        }
+      });
+    } else if (!answered || (!preExcusedStart && !preExcusedEnd)) {
+      // Clear pre-excused dates if they are cleared or parent didn't answer
+      await prisma.student.update({
+        where: { id: Number(studentId) },
+        data: {
+          preExcusedStart: null,
+          preExcusedEnd: null,
+          preExcusedReason: null
+        }
+      });
+    }
 
     res.status(201).json(callLog);
   } catch (error) {

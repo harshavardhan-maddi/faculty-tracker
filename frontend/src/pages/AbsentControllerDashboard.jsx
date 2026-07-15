@@ -33,6 +33,9 @@ const AbsentControllerDashboard = () => {
   const [answeredCall, setAnsweredCall] = useState(null); // true or false
   const [absentReason, setAbsentReason] = useState('');
   const [savingCall, setSavingCall] = useState(false);
+  const [isMultiDay, setIsMultiDay] = useState(false);
+  const [preExcusedStart, setPreExcusedStart] = useState('');
+  const [preExcusedEnd, setPreExcusedEnd] = useState('');
 
   // Student history modal state
   const [selectedHistoryStudent, setSelectedHistoryStudent] = useState(null);
@@ -120,8 +123,19 @@ const AbsentControllerDashboard = () => {
 
   const handleMakeCall = (student) => {
     setActiveCallStudent(student);
-    setAnsweredCall(null);
-    setAbsentReason('');
+    if (student.callLog) {
+      setAnsweredCall(student.callLog.answered);
+      setAbsentReason(student.callLog.reason || '');
+      setIsMultiDay(!!student.preExcusedStart);
+      setPreExcusedStart(student.preExcusedStart || '');
+      setPreExcusedEnd(student.preExcusedEnd || '');
+    } else {
+      setAnsweredCall(null);
+      setAbsentReason('');
+      setIsMultiDay(false);
+      setPreExcusedStart('');
+      setPreExcusedEnd('');
+    }
     
     // Trigger standard tel call link simulation
     window.location.href = `tel:${student.parentMobile}`;
@@ -146,7 +160,10 @@ const AbsentControllerDashboard = () => {
           studentId: activeCallStudent.id,
           date: todayDate,
           answered: answeredCall,
-          reason: answeredCall ? absentReason : null
+          reason: answeredCall ? absentReason : null,
+          preExcusedStart: (answeredCall && isMultiDay) ? preExcusedStart : null,
+          preExcusedEnd: (answeredCall && isMultiDay) ? preExcusedEnd : null,
+          preExcusedReason: (answeredCall && isMultiDay) ? absentReason : null
         })
       });
 
@@ -156,6 +173,9 @@ const AbsentControllerDashboard = () => {
         setActiveCallStudent(null);
         setAnsweredCall(null);
         setAbsentReason('');
+        setIsMultiDay(false);
+        setPreExcusedStart('');
+        setPreExcusedEnd('');
         loadSectionData(); // Reload to show updated call log details
       } else {
         setError(data.message || 'Failed to save call log');
@@ -318,19 +338,62 @@ const AbsentControllerDashboard = () => {
                   </div>
 
                   {answeredCall === true && (
-                    <div className="space-y-1 animate-fade-in">
-                      <label className="block text-xs font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider">
-                        Reason for absence
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={absentReason}
-                        onChange={(e) => setAbsentReason(e.target.value)}
-                        placeholder="e.g. Family Emergency, Sick Leave, Traffic"
-                        className="glass-input text-xs"
-                      />
-                    </div>
+                    <>
+                      <div className="space-y-1 animate-fade-in">
+                        <label className="block text-xs font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider">
+                          Reason for absence
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={absentReason}
+                          onChange={(e) => setAbsentReason(e.target.value)}
+                          placeholder="e.g. Family Emergency, Sick Leave, Traffic"
+                          className="glass-input text-xs"
+                        />
+                      </div>
+
+                      <div className="mt-3 animate-fade-in">
+                        <label className="flex items-center gap-2 text-xs font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={isMultiDay}
+                            onChange={(e) => setIsMultiDay(e.target.checked)}
+                            className="h-4 w-4 text-primary rounded"
+                          />
+                          <span>Student will be absent for future dates</span>
+                        </label>
+                      </div>
+
+                      {isMultiDay && (
+                        <div className="grid grid-cols-2 gap-4 mt-3 animate-fade-in">
+                          <div className="space-y-1">
+                            <label className="block text-[10px] font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider">
+                              From Date
+                            </label>
+                            <input
+                              type="date"
+                              required={isMultiDay}
+                              value={preExcusedStart}
+                              onChange={(e) => setPreExcusedStart(e.target.value)}
+                              className="glass-input text-xs"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="block text-[10px] font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider">
+                              To Date
+                            </label>
+                            <input
+                              type="date"
+                              required={isMultiDay}
+                              value={preExcusedEnd}
+                              onChange={(e) => setPreExcusedEnd(e.target.value)}
+                              className="glass-input text-xs"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </>
                   )}
 
                   <div className="flex justify-end gap-3 pt-2">
@@ -419,15 +482,21 @@ const AbsentControllerDashboard = () => {
                           {/* Call Logs Detail if any */}
                           {hasCallLog && (
                             <div className={`p-2.5 rounded-xl text-xs ${
-                              student.callLog.answered 
-                                ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-450' 
-                                : 'bg-red-500/10 text-red-700 dark:text-red-450'
+                              student.callLog.isPreExcused
+                                ? 'bg-sky-500/10 text-sky-700 dark:text-sky-450'
+                                : student.callLog.answered 
+                                  ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-450' 
+                                  : 'bg-red-500/10 text-red-700 dark:text-red-450'
                             }`}>
                               <p className="font-bold flex items-center gap-1.5">
-                                {student.callLog.answered ? <CheckCircle size={12} /> : <XCircle size={12} />}
-                                <span>{student.callLog.answered ? 'Answered' : 'Not Answered'}</span>
+                                {student.callLog.isPreExcused ? <Calendar size={12} /> : student.callLog.answered ? <CheckCircle size={12} /> : <XCircle size={12} />}
+                                <span>
+                                  {student.callLog.isPreExcused 
+                                    ? 'Pre-informed Absent' 
+                                    : student.callLog.answered ? 'Answered' : 'Not Answered'}
+                                </span>
                               </p>
-                              {student.callLog.answered && student.callLog.reason && (
+                              {student.callLog.reason && (
                                 <p className="mt-1 font-medium italic text-[11px] opacity-90">
                                   Reason: "{student.callLog.reason}"
                                 </p>
@@ -443,6 +512,10 @@ const AbsentControllerDashboard = () => {
                             <span className="mt-2 text-center text-xs font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 py-2 px-4 rounded-xl border border-slate-200 dark:border-slate-700">
                               Afternoon Entry - No Call Required
                             </span>
+                          ) : student.callLog?.isPreExcused ? (
+                            <span className="mt-2 text-center text-xs font-bold text-sky-600 bg-sky-500/10 py-2 px-4 rounded-xl border border-sky-500/20">
+                              No Call Required (Pre-informed)
+                            </span>
                           ) : (
                             <button
                               onClick={() => handleMakeCall(student)}
@@ -453,7 +526,7 @@ const AbsentControllerDashboard = () => {
                               }`}
                             >
                               <PhoneCall size={14} />
-                              <span>{hasCallLog ? 'Call Again' : 'Call Parent'}</span>
+                              <span>{hasCallLog ? 'Call Again / Update' : 'Call Parent'}</span>
                             </button>
                           )}
                         </div>
@@ -587,19 +660,62 @@ const AbsentControllerDashboard = () => {
                 </div>
 
                 {answeredCall === true && (
-                  <div className="space-y-1 animate-fade-in">
-                    <label className="block text-xs font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider">
-                      Reason for absence
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={absentReason}
-                      onChange={(e) => setAbsentReason(e.target.value)}
-                      placeholder="e.g. Family Emergency, Sick Leave, Traffic"
-                      className="glass-input text-xs"
-                    />
-                  </div>
+                  <>
+                    <div className="space-y-1 animate-fade-in">
+                      <label className="block text-xs font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider">
+                        Reason for absence
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={absentReason}
+                        onChange={(e) => setAbsentReason(e.target.value)}
+                        placeholder="e.g. Family Emergency, Sick Leave, Traffic"
+                        className="glass-input text-xs"
+                      />
+                    </div>
+
+                    <div className="mt-3 animate-fade-in">
+                      <label className="flex items-center gap-2 text-xs font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={isMultiDay}
+                          onChange={(e) => setIsMultiDay(e.target.checked)}
+                          className="h-4 w-4 text-primary rounded"
+                        />
+                        <span>Student will be absent for future dates</span>
+                      </label>
+                    </div>
+
+                    {isMultiDay && (
+                      <div className="grid grid-cols-2 gap-4 mt-3 animate-fade-in">
+                        <div className="space-y-1">
+                          <label className="block text-[10px] font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider">
+                            From Date
+                          </label>
+                          <input
+                            type="date"
+                            required={isMultiDay}
+                            value={preExcusedStart}
+                            onChange={(e) => setPreExcusedStart(e.target.value)}
+                            className="glass-input text-xs"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="block text-[10px] font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider">
+                            To Date
+                          </label>
+                          <input
+                            type="date"
+                            required={isMultiDay}
+                            value={preExcusedEnd}
+                            onChange={(e) => setPreExcusedEnd(e.target.value)}
+                            className="glass-input text-xs"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
 
                 <div className="flex justify-end gap-3 pt-2">
@@ -688,15 +804,21 @@ const AbsentControllerDashboard = () => {
                         {/* Call Logs Detail if any */}
                         {hasCallLog && (
                           <div className={`p-2.5 rounded-xl text-xs ${
-                            student.callLog.answered 
-                              ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-450' 
-                              : 'bg-red-500/10 text-red-700 dark:text-red-450'
+                            student.callLog.isPreExcused
+                              ? 'bg-sky-500/10 text-sky-700 dark:text-sky-450'
+                              : student.callLog.answered 
+                                ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-450' 
+                                : 'bg-red-500/10 text-red-700 dark:text-red-450'
                           }`}>
                             <p className="font-bold flex items-center gap-1.5">
-                              {student.callLog.answered ? <CheckCircle size={12} /> : <XCircle size={12} />}
-                              <span>{student.callLog.answered ? 'Answered' : 'Not Answered'}</span>
+                              {student.callLog.isPreExcused ? <Calendar size={12} /> : student.callLog.answered ? <CheckCircle size={12} /> : <XCircle size={12} />}
+                              <span>
+                                {student.callLog.isPreExcused 
+                                  ? 'Pre-informed Absent' 
+                                  : student.callLog.answered ? 'Answered' : 'Not Answered'}
+                              </span>
                             </p>
-                            {student.callLog.answered && student.callLog.reason && (
+                            {student.callLog.reason && (
                               <p className="mt-1 font-medium italic text-[11px] opacity-90">
                                 Reason: "{student.callLog.reason}"
                               </p>
@@ -712,6 +834,10 @@ const AbsentControllerDashboard = () => {
                           <span className="mt-2 text-center text-xs font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 py-2 px-4 rounded-xl border border-slate-200 dark:border-slate-700">
                             Afternoon Entry - No Call Required
                           </span>
+                        ) : student.callLog?.isPreExcused ? (
+                          <span className="mt-2 text-center text-xs font-bold text-sky-600 bg-sky-500/10 py-2 px-4 rounded-xl border border-sky-500/20">
+                            No Call Required (Pre-informed)
+                          </span>
                         ) : (
                           <button
                             onClick={() => handleMakeCall(student)}
@@ -722,7 +848,7 @@ const AbsentControllerDashboard = () => {
                             }`}
                           >
                             <PhoneCall size={14} />
-                            <span>{hasCallLog ? 'Call Again' : 'Call Parent'}</span>
+                            <span>{hasCallLog ? 'Call Again / Update' : 'Call Parent'}</span>
                           </button>
                         )}
                       </div>

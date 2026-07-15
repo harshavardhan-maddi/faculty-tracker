@@ -109,15 +109,18 @@ model FingerprintAuditLog {
 }
 
 model Student {
-  id            Int               @id @default(autoincrement())
-  rollNumber    String            @unique @map("roll_number")
-  name          String
-  section       String            // Represents the classroom/section name, e.g. "CSE 3rd Year"
-  studentMobile String            @map("student_mobile")
-  parentMobile  String            @map("parent_mobile")
-  createdAt     DateTime          @default(now()) @map("created_at")
-  attendance    Attendance[]
-  callLogs      AbsenteeCallLog[]
+  id               Int               @id @default(autoincrement())
+  rollNumber       String            @unique @map("roll_number")
+  name             String
+  section          String            // Represents the classroom/section name, e.g. "CSE 3rd Year"
+  studentMobile    String            @map("student_mobile")
+  parentMobile     String            @map("parent_mobile")
+  preExcusedStart  String?           @map("pre_excused_start")
+  preExcusedEnd    String?           @map("pre_excused_end")
+  preExcusedReason String?           @map("pre_excused_reason")
+  createdAt        DateTime          @default(now()) @map("created_at")
+  attendance       Attendance[]
+  callLogs         AbsenteeCallLog[]
 
   @@map("students")
 }
