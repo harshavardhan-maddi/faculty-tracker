@@ -1175,10 +1175,10 @@ const Dashboard = () => {
 
       {/* REGISTRATION MODAL FOR STUDENTS (HOD ONLY) */}
       {showAddStudentModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-10 overflow-y-auto">
           <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => setShowAddStudentModal(false)} />
           
-          <div className="relative glass-card border border-white/60 w-full max-w-md p-6 bg-white dark:bg-slate-900 shadow-2xl animate-fade-in z-10 text-left">
+          <div className="relative glass-card border border-white/60 w-full max-w-7xl p-6 bg-white dark:bg-slate-900 shadow-2xl animate-fade-in z-10 text-left">
             <div className="flex justify-between items-center pb-3 border-b mb-4">
               <h3 className="font-extrabold text-base text-customText dark:text-customText-dark">
                 Add Student Profile
@@ -1189,90 +1189,92 @@ const Dashboard = () => {
             </div>
 
             {studentSubmitError && (
-              <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-650 text-xs font-semibold rounded-lg mb-3">
+              <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-655 text-xs font-semibold rounded-lg mb-3">
                 ⚠️ {studentSubmitError}
               </div>
             )}
 
             {studentSubmitSuccess && (
-              <div className="p-3 bg-green-500/10 border border-green-500/20 text-green-650 text-xs font-semibold rounded-lg mb-3">
+              <div className="p-3 bg-green-500/10 border border-green-500/20 text-green-655 text-xs font-semibold rounded-lg mb-3">
                 ✓ {studentSubmitSuccess}
               </div>
             )}
 
-            <form onSubmit={handleAddStudentSubmit} className="space-y-3">
-              <div>
-                <label className="block text-[10px] font-bold text-customText-muted uppercase tracking-wider mb-1">
-                  Full Name
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. John Doe"
-                  value={studentName}
-                  onChange={(e) => setStudentName(e.target.value)}
-                  className="glass-input text-xs"
-                />
-              </div>
+            <form onSubmit={handleAddStudentSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-customText-muted uppercase tracking-wider mb-1">
+                    Full Name
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. John Doe"
+                    value={studentName}
+                    onChange={(e) => setStudentName(e.target.value)}
+                    className="glass-input text-xs"
+                  />
+                </div>
 
-              <div>
-                <label className="block text-[10px] font-bold text-customText-muted uppercase tracking-wider mb-1">
-                  Roll / Register Number
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. 22B81A0501"
-                  value={studentRoll}
-                  onChange={(e) => setStudentRoll(e.target.value)}
-                  className="glass-input text-xs"
-                />
-              </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-customText-muted uppercase tracking-wider mb-1">
+                    Roll / Register Number
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. 22B81A0501"
+                    value={studentRoll}
+                    onChange={(e) => setStudentRoll(e.target.value)}
+                    className="glass-input text-xs"
+                  />
+                </div>
 
-              <div>
-                <label className="block text-[10px] font-bold text-customText-muted uppercase tracking-wider mb-1">
-                  Assigned Section / Class
-                </label>
-                <select
-                  value={studentSection}
-                  onChange={(e) => setStudentSection(e.target.value)}
-                  className="glass-input text-xs"
-                  required
-                >
-                  {classrooms.map((c) => (
-                    <option key={c.id} value={c.className}>
-                      {c.className} ({c.roomNumber})
-                    </option>
-                  ))}
-                </select>
-              </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-customText-muted uppercase tracking-wider mb-1">
+                    Assigned Section / Class
+                  </label>
+                  <select
+                    value={studentSection}
+                    onChange={(e) => setStudentSection(e.target.value)}
+                    className="glass-input text-xs"
+                    required
+                  >
+                    {classrooms.map((c) => (
+                      <option key={c.id} value={c.className}>
+                        {c.className} ({c.roomNumber})
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-              <div>
-                <label className="block text-[10px] font-bold text-customText-muted uppercase tracking-wider mb-1">
-                  Student Mobile Number
-                </label>
-                <input
-                  type="tel"
-                  required
-                  placeholder="e.g. 9876543201"
-                  value={studentMobile}
-                  onChange={(e) => setStudentMobile(e.target.value)}
-                  className="glass-input text-xs"
-                />
-              </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-customText-muted uppercase tracking-wider mb-1">
+                    Student Mobile Number
+                  </label>
+                  <input
+                    type="tel"
+                    required
+                    placeholder="e.g. 9876543201"
+                    value={studentMobile}
+                    onChange={(e) => setStudentMobile(e.target.value)}
+                    className="glass-input text-xs"
+                  />
+                </div>
 
-              <div>
-                <label className="block text-[10px] font-bold text-customText-muted uppercase tracking-wider mb-1">
-                  Parent Mobile Number
-                </label>
-                <input
-                  type="tel"
-                  required
-                  placeholder="e.g. 9123456701"
-                  value={parentMobile}
-                  onChange={(e) => setParentMobile(e.target.value)}
-                  className="glass-input text-xs"
-                />
+                <div>
+                  <label className="block text-[10px] font-bold text-customText-muted uppercase tracking-wider mb-1">
+                    Parent Mobile Number
+                  </label>
+                  <input
+                    type="tel"
+                    required
+                    placeholder="e.g. 9123456701"
+                    value={parentMobile}
+                    onChange={(e) => setParentMobile(e.target.value)}
+                    className="glass-input text-xs"
+                  />
+                </div>
               </div>
 
               <div className="flex justify-end gap-3 pt-3 border-t">
@@ -1298,10 +1300,10 @@ const Dashboard = () => {
 
       {/* EDIT MODAL FOR STUDENTS (HOD ONLY) */}
       {showEditStudentModal && editingStudent && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-10 overflow-y-auto">
           <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => setShowEditStudentModal(false)} />
           
-          <div className="relative glass-card border border-white/60 w-full max-w-md p-6 bg-white dark:bg-slate-900 shadow-2xl animate-fade-in z-10 text-left">
+          <div className="relative glass-card border border-white/60 w-full max-w-7xl p-6 bg-white dark:bg-slate-900 shadow-2xl animate-fade-in z-10 text-left">
             <div className="flex justify-between items-center pb-3 border-b mb-4">
               <h3 className="font-extrabold text-base text-customText dark:text-customText-dark">
                 Edit Student details / Transfer section
@@ -1323,79 +1325,81 @@ const Dashboard = () => {
               </div>
             )}
 
-            <form onSubmit={handleEditStudentSubmit} className="space-y-3">
-              <div>
-                <label className="block text-[10px] font-bold text-customText-muted uppercase tracking-wider mb-1">
-                  Full Name
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. John Doe"
-                  value={editStudentName}
-                  onChange={(e) => setEditStudentName(e.target.value)}
-                  className="glass-input text-xs"
-                />
-              </div>
+            <form onSubmit={handleEditStudentSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-customText-muted uppercase tracking-wider mb-1">
+                    Full Name
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. John Doe"
+                    value={editStudentName}
+                    onChange={(e) => setEditStudentName(e.target.value)}
+                    className="glass-input text-xs"
+                  />
+                </div>
 
-              <div>
-                <label className="block text-[10px] font-bold text-customText-muted uppercase tracking-wider mb-1">
-                  Roll / Register Number
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. 22B81A0501"
-                  value={editStudentRoll}
-                  onChange={(e) => setEditStudentRoll(e.target.value)}
-                  className="glass-input text-xs"
-                />
-              </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-customText-muted uppercase tracking-wider mb-1">
+                    Roll / Register Number
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. 22B81A0501"
+                    value={editStudentRoll}
+                    onChange={(e) => setEditStudentRoll(e.target.value)}
+                    className="glass-input text-xs"
+                  />
+                </div>
 
-              <div>
-                <label className="block text-[10px] font-bold text-customText-muted uppercase tracking-wider mb-1">
-                  Assigned Section / Class (Transfer Section)
-                </label>
-                <select
-                  value={editStudentSection}
-                  onChange={(e) => setEditStudentSection(e.target.value)}
-                  className="glass-input text-xs"
-                  required
-                >
-                  {classrooms.map((c) => (
-                    <option key={c.id} value={c.className}>
-                      {c.className} ({c.roomNumber})
-                    </option>
-                  ))}
-                </select>
-              </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-customText-muted uppercase tracking-wider mb-1">
+                    Assigned Section / Class (Transfer Section)
+                  </label>
+                  <select
+                    value={editStudentSection}
+                    onChange={(e) => setEditStudentSection(e.target.value)}
+                    className="glass-input text-xs"
+                    required
+                  >
+                    {classrooms.map((c) => (
+                      <option key={c.id} value={c.className}>
+                        {c.className} ({c.roomNumber})
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-              <div>
-                <label className="block text-[10px] font-bold text-customText-muted uppercase tracking-wider mb-1">
-                  Student Mobile Number
-                </label>
-                <input
-                  type="tel"
-                  required
-                  placeholder="e.g. 9876543201"
-                  value={editStudentMobile}
-                  onChange={(e) => setEditStudentMobile(e.target.value)}
-                  className="glass-input text-xs"
-                />
-              </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-customText-muted uppercase tracking-wider mb-1">
+                    Student Mobile Number
+                  </label>
+                  <input
+                    type="tel"
+                    required
+                    placeholder="e.g. 9876543201"
+                    value={editStudentMobile}
+                    onChange={(e) => setEditStudentMobile(e.target.value)}
+                    className="glass-input text-xs"
+                  />
+                </div>
 
-              <div>
-                <label className="block text-[10px] font-bold text-customText-muted uppercase tracking-wider mb-1">
-                  Parent Mobile Number
-                </label>
-                <input
-                  type="tel"
-                  required
-                  placeholder="e.g. 9123456701"
-                  value={editParentMobile}
-                  onChange={(e) => setEditParentMobile(e.target.value)}
-                  className="glass-input text-xs"
-                />
+                <div>
+                  <label className="block text-[10px] font-bold text-customText-muted uppercase tracking-wider mb-1">
+                    Parent Mobile Number
+                  </label>
+                  <input
+                    type="tel"
+                    required
+                    placeholder="e.g. 9123456701"
+                    value={editParentMobile}
+                    onChange={(e) => setEditParentMobile(e.target.value)}
+                    className="glass-input text-xs"
+                  />
+                </div>
               </div>
 
               <div className="flex justify-end gap-3 pt-3 border-t">
@@ -1421,10 +1425,10 @@ const Dashboard = () => {
 
       {/* BULK UPLOAD MODAL FOR STUDENTS (HOD ONLY) */}
       {showBulkModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-10 overflow-y-auto">
           <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => setShowBulkModal(false)} />
           
-          <div className="relative glass-card border border-white/60 w-full max-w-lg p-6 bg-white dark:bg-slate-900 shadow-2xl animate-fade-in z-10 text-left">
+          <div className="relative glass-card border border-white/60 w-full max-w-7xl p-6 bg-white dark:bg-slate-900 shadow-2xl animate-fade-in z-10 text-left">
             <div className="flex justify-between items-center pb-3 border-b mb-4">
               <h3 className="font-extrabold text-base text-customText dark:text-customText-dark">
                 Bulk Student Import (CSV/Text)
@@ -1447,39 +1451,60 @@ const Dashboard = () => {
             )}
 
             <form onSubmit={handleBulkSubmit} className="space-y-4">
-              <div>
-                <label className="block text-[10px] font-bold text-customText-muted uppercase tracking-wider mb-1">
-                  Target Section / Class
-                </label>
-                <select
-                  value={bulkSection}
-                  onChange={(e) => setBulkSection(e.target.value)}
-                  className="glass-input text-xs"
-                  required
-                >
-                  {classrooms.map((c) => (
-                    <option key={c.id} value={c.className}>
-                      {c.className} ({c.roomNumber})
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+                <div className="md:col-span-2 space-y-4">
+                  <div>
+                    <label className="block text-[10px] font-bold text-customText-muted uppercase tracking-wider mb-1">
+                      Target Section / Class
+                    </label>
+                    <select
+                      value={bulkSection}
+                      onChange={(e) => setBulkSection(e.target.value)}
+                      className="glass-input text-xs"
+                      required
+                    >
+                      {classrooms.map((c) => (
+                        <option key={c.id} value={c.className}>
+                          {c.className} ({c.roomNumber})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div className="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-100 dark:border-slate-800/60">
+                    <h4 className="text-xs font-extrabold text-customText dark:text-customText-dark mb-2">CSV Upload Guide</h4>
+                    <p className="text-[10px] text-customText-muted leading-relaxed">
+                      Please format your CSV data line-by-line as follows:
+                    </p>
+                    <code className="block p-2 bg-slate-100 dark:bg-slate-900/60 rounded text-[10px] font-mono text-primary dark:text-primary-light my-2 select-all leading-normal whitespace-pre">
+                      RollNumber,Name,StudentMobile,ParentMobile
+                    </code>
+                    <p className="text-[10px] text-customText-muted leading-relaxed">
+                      Example:
+                    </p>
+                    <code className="block p-2 bg-slate-100 dark:bg-slate-900/60 rounded text-[10px] font-mono text-slate-600 dark:text-slate-400 my-1 leading-normal whitespace-pre">
+                      22B81A0501,Aarav Mehta,9876543201,9123456701{"\n"}
+                      22B81A0502,Bhavya Sen,9876543202,9123456702
+                    </code>
+                  </div>
+                </div>
 
-              <div>
-                <label className="block text-[10px] font-bold text-customText-muted uppercase tracking-wider mb-1">
-                  Paste Student CSV Data
-                </label>
-                <textarea
-                  rows="8"
-                  required
-                  placeholder="Format: RollNumber,Name,StudentMobile,ParentMobile&#10;e.g.&#10;22B81A0501,Aarav Mehta,9876543201,9123456701&#10;22B81A0502,Bhavya Sen,9876543202,9123456702"
-                  value={bulkText}
-                  onChange={(e) => setBulkText(e.target.value)}
-                  className="w-full glass-input text-xs font-mono p-3 leading-relaxed focus:outline-none focus:ring-1 focus:ring-primary border border-slate-200 dark:border-slate-800 rounded-xl"
-                />
-                <p className="text-[10px] text-customText-muted mt-1 leading-snug">
-                  * Note: Each line must contain four values separated by a comma (,) or a tab (\t). Upserts are supported, so re-importing existing roll numbers updates their details.
-                </p>
+                <div className="md:col-span-3 space-y-2">
+                  <label className="block text-[10px] font-bold text-customText-muted uppercase tracking-wider mb-1">
+                    Paste Student CSV Data
+                  </label>
+                  <textarea
+                    rows="10"
+                    required
+                    placeholder="Format: RollNumber,Name,StudentMobile,ParentMobile"
+                    value={bulkText}
+                    onChange={(e) => setBulkText(e.target.value)}
+                    className="w-full glass-input text-xs font-mono p-3 leading-relaxed focus:outline-none focus:ring-1 focus:ring-primary border border-slate-200 dark:border-slate-800 rounded-xl"
+                  />
+                  <p className="text-[10px] text-customText-muted mt-1 leading-snug">
+                    * Note: Each line must contain four values separated by a comma (,) or a tab (\t). Upserts are supported, so re-importing existing roll numbers updates their details.
+                  </p>
+                </div>
               </div>
 
               <div className="flex justify-end gap-3 pt-3 border-t">
