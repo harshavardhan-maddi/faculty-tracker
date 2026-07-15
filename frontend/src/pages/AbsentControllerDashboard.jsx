@@ -214,6 +214,9 @@ const AbsentControllerDashboard = () => {
     );
   }
 
+  const morningAbsentees = absentees.filter(s => s.attendanceSession === 'morning');
+  const afternoonAbsentees = absentees.filter(s => s.attendanceSession === 'afternoon');
+
   return (
     <div className="space-y-6">
       
@@ -308,29 +311,312 @@ const AbsentControllerDashboard = () => {
                   🎉 No absentees logged for {selectedSection} today!
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {absentees.map((student) => {
-                    const isLate = student.status === 'Late';
-                    const isAfternoon = student.attendanceSession === 'afternoon';
-                    const hasCallLog = !!student.callLog;
-                    const isActiveCall = activeCallStudent?.id === student.id;
-                    
-                    return (
-                      <div 
-                        key={student.id} 
-                        className={`relative flex flex-col justify-between p-5 rounded-2xl border transition-all duration-300 ${
-                          isActiveCall
-                            ? 'col-span-1 sm:col-span-2 border-primary-dark/50 bg-primary-dark/5 shadow-lg'
-                            : isLate 
-                              ? 'bg-amber-500/5 border-amber-500/30 hover:border-amber-500/60 shadow-amber-500/5' 
-                              : 'bg-red-500/5 border-red-500/20 hover:border-red-500/40 shadow-red-500/5'
-                        } hover:shadow-md`}
-                      >
-                        {isActiveCall ? (
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full text-left">
-                            {/* Left Column: Student Details */}
-                            <div className="space-y-3">
-                              <span className={`inline-block text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                <div className="space-y-8">
+                  {/* Morning Session Absentees */}
+                  <div>
+                    <h4 className="font-extrabold text-xs text-primary dark:text-primary uppercase tracking-wider mb-4 flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+                      <span>Morning Session Absentees ({morningAbsentees.length})</span>
+                    </h4>
+                    {morningAbsentees.length === 0 ? (
+                      <div className="text-center py-6 bg-slate-50/50 dark:bg-slate-900/30 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 text-xs text-customText-muted dark:text-customText-mutedDark">
+                        No morning absentees.
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {morningAbsentees.map((student) => {
+                          const isLate = student.status === 'Late';
+                          const hasCallLog = !!student.callLog;
+                          const isActiveCall = activeCallStudent?.id === student.id;
+                          
+                          return (
+                            <div 
+                              key={student.id} 
+                              className={`relative flex flex-col justify-between p-5 rounded-2xl border transition-all duration-300 ${
+                                isActiveCall
+                                  ? 'col-span-1 sm:col-span-2 border-primary-dark/50 bg-primary-dark/5 shadow-lg'
+                                  : isLate 
+                                    ? 'bg-amber-500/5 border-amber-500/30 hover:border-amber-500/60 shadow-amber-500/5' 
+                                    : 'bg-red-500/5 border-red-500/20 hover:border-red-500/40 shadow-red-500/5'
+                              } hover:shadow-md`}
+                            >
+                              {isActiveCall ? (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full text-left">
+                                  {/* Left Column: Student Details */}
+                                  <div className="space-y-3">
+                                    <span className={`inline-block text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                                      isLate 
+                                        ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-450 border border-amber-250 dark:border-amber-800' 
+                                        : 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-450 border border-red-250 dark:border-red-800'
+                                    }`}>
+                                      {student.status}
+                                    </span>
+
+                                    <div className="space-y-1">
+                                      <h4 className="text-sm font-bold text-customText dark:text-customText-dark uppercase">
+                                        {student.rollNumber}
+                                      </h4>
+                                      <span className="text-[11px] text-customText-muted dark:text-customText-mutedDark font-semibold block">
+                                        {student.name} • {student.section}
+                                      </span>
+                                    </div>
+
+                                    <div className="pt-3 border-t border-slate-200/50 dark:border-slate-800/20 flex flex-col gap-2">
+                                      <div className="flex justify-between items-center text-xs text-customText-muted dark:text-customText-mutedDark">
+                                        <span>Student's Mobile:</span>
+                                        <span className="font-semibold text-customText dark:text-customText-dark">
+                                          {student.studentMobile || 'N/A'}
+                                        </span>
+                                      </div>
+                                      <div className="flex justify-between items-center text-xs text-customText-muted dark:text-customText-mutedDark">
+                                        <span>Parent's Mobile:</span>
+                                        <span className="font-semibold text-customText dark:text-customText-dark">
+                                          {student.parentMobile}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Right Column: Inline Call Feedback form */}
+                                  <div className="border-t md:border-t-0 md:border-l border-slate-200/50 dark:border-slate-800/30 pt-4 md:pt-0 md:pl-6">
+                                    <div className="flex justify-between items-center mb-3">
+                                      <h5 className="font-bold text-xs text-primary-dark dark:text-primary uppercase tracking-wider">
+                                        Call Feedback Log
+                                      </h5>
+                                      <button 
+                                        type="button"
+                                        onClick={() => setActiveCallStudent(null)}
+                                        className="text-slate-400 hover:text-slate-600"
+                                      >
+                                        <X size={14} />
+                                      </button>
+                                    </div>
+
+                                    <form onSubmit={handleSaveCallLog} className="space-y-3">
+                                      <div>
+                                        <p className="text-[10px] font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider mb-1.5">
+                                          Did the parent answer?
+                                        </p>
+                                        <div className="flex items-center gap-4">
+                                          <label className="flex items-center gap-1.5 text-xs font-semibold text-customText dark:text-customText-dark cursor-pointer">
+                                            <input
+                                              type="radio"
+                                              name={`answered-${student.id}`}
+                                              checked={answeredCall === true}
+                                              onChange={() => setAnsweredCall(true)}
+                                              className="h-3.5 w-3.5 text-primary"
+                                              required
+                                            />
+                                            <span>Yes</span>
+                                          </label>
+                                          <label className="flex items-center gap-1.5 text-xs font-semibold text-customText dark:text-customText-dark cursor-pointer">
+                                            <input
+                                              type="radio"
+                                              name={`answered-${student.id}`}
+                                              checked={answeredCall === false}
+                                              onChange={() => setAnsweredCall(false)}
+                                              className="h-3.5 w-3.5 text-primary"
+                                              required
+                                            />
+                                            <span>No</span>
+                                          </label>
+                                        </div>
+                                      </div>
+
+                                      {answeredCall === true && (
+                                        <>
+                                          <div className="space-y-1">
+                                            <label className="block text-[10px] font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider">
+                                              Reason for absence
+                                            </label>
+                                            <input
+                                              type="text"
+                                              required
+                                              value={absentReason}
+                                              onChange={(e) => setAbsentReason(e.target.value)}
+                                              placeholder="e.g. Sick Leave, Emergency"
+                                              className="glass-input text-[11px] py-1.5"
+                                            />
+                                          </div>
+
+                                          <div className="mt-2">
+                                            <label className="flex items-center gap-2 text-[10px] font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider cursor-pointer">
+                                              <input
+                                                type="checkbox"
+                                                checked={isMultiDay}
+                                                onChange={(e) => setIsMultiDay(e.target.checked)}
+                                                className="h-3.5 w-3.5 text-primary rounded"
+                                              />
+                                              <span>Absent for future dates</span>
+                                            </label>
+                                          </div>
+
+                                          {isMultiDay && (
+                                            <div className="grid grid-cols-2 gap-2 mt-2">
+                                              <div className="space-y-1">
+                                                <label className="block text-[9px] font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider">
+                                                  From
+                                                </label>
+                                                <input
+                                                  type="date"
+                                                  required={isMultiDay}
+                                                  value={preExcusedStart}
+                                                  onChange={(e) => setPreExcusedStart(e.target.value)}
+                                                  className="glass-input text-[10px] py-1 px-2"
+                                                />
+                                              </div>
+                                              <div className="space-y-1">
+                                                <label className="block text-[9px] font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider">
+                                                  To
+                                                </label>
+                                                <input
+                                                  type="date"
+                                                  required={isMultiDay}
+                                                  value={preExcusedEnd}
+                                                  onChange={(e) => setPreExcusedEnd(e.target.value)}
+                                                  className="glass-input text-[10px] py-1 px-2"
+                                                />
+                                              </div>
+                                            </div>
+                                          )}
+                                        </>
+                                      )}
+
+                                      <div className="flex justify-end gap-2 pt-1">
+                                        <button
+                                          type="button"
+                                          onClick={() => setActiveCallStudent(null)}
+                                          className="btn-secondary py-1 px-3 text-[10px]"
+                                        >
+                                          Cancel
+                                        </button>
+                                        <button
+                                          type="submit"
+                                          disabled={savingCall || answeredCall === null}
+                                          className="btn-primary py-1 px-3 text-[10px] bg-primary-dark"
+                                        >
+                                          {savingCall ? 'Saving...' : 'Save'}
+                                        </button>
+                                      </div>
+                                    </form>
+                                  </div>
+                                </div>
+                              ) : (
+                                <>
+                                  <span className={`absolute top-4 right-4 text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                                    isLate 
+                                      ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-450 border border-amber-250 dark:border-amber-800' 
+                                      : 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-450 border border-red-250 dark:border-red-800'
+                                  }`}>
+                                    {student.status}
+                                  </span>
+
+                                  <div className="space-y-1 pr-14">
+                                    <h4 className="text-sm font-bold text-customText dark:text-customText-dark uppercase">
+                                      {student.rollNumber}
+                                    </h4>
+                                    <span className="text-[11px] text-customText-muted dark:text-customText-mutedDark font-semibold block">
+                                      {student.name} • {student.section}
+                                    </span>
+                                  </div>
+
+                                  {/* Parent Phone Section */}
+                                  <div className="mt-4 pt-3 border-t border-slate-200/50 dark:border-slate-800/20 flex flex-col gap-2">
+                                    <div className="flex justify-between items-center text-xs text-customText-muted dark:text-customText-mutedDark">
+                                      <span>Student's Mobile:</span>
+                                      <span className="font-semibold text-customText dark:text-customText-dark">
+                                        {student.studentMobile || 'N/A'}
+                                      </span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-xs text-customText-muted dark:text-customText-mutedDark">
+                                      <span>Parent's Mobile:</span>
+                                      <span className="font-semibold text-customText dark:text-customText-dark">
+                                        {student.parentMobile}
+                                      </span>
+                                    </div>
+
+                                    {/* Call Logs Detail if any */}
+                                    {hasCallLog && (
+                                      <div className={`p-2.5 rounded-xl text-xs ${
+                                        student.callLog.isPreExcused
+                                          ? 'bg-sky-500/10 text-sky-700 dark:text-sky-450'
+                                          : student.callLog.answered 
+                                            ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-450' 
+                                            : 'bg-red-500/10 text-red-700 dark:text-red-450'
+                                      }`}>
+                                        <p className="font-bold flex items-center gap-1.5">
+                                          {student.callLog.isPreExcused ? <Calendar size={12} /> : student.callLog.answered ? <CheckCircle size={12} /> : <XCircle size={12} />}
+                                          <span>
+                                            {student.callLog.isPreExcused 
+                                              ? 'Pre-informed Absent' 
+                                              : student.callLog.answered ? 'Answered' : 'Not Answered'}
+                                          </span>
+                                        </p>
+                                        {student.callLog.reason && (
+                                          <p className="mt-1 font-medium italic text-[11px] opacity-90">
+                                            Reason: "{student.callLog.reason}"
+                                          </p>
+                                        )}
+                                      </div>
+                                    )}
+
+                                    {isLate ? (
+                                      <span className="mt-2 text-center text-xs font-bold text-amber-600 bg-amber-500/10 py-2 px-4 rounded-xl border border-amber-500/20">
+                                        Late Entry - No Call Required
+                                      </span>
+                                    ) : student.callLog?.isPreExcused ? (
+                                      <span className="mt-2 text-center text-xs font-bold text-sky-600 bg-sky-500/10 py-2 px-4 rounded-xl border border-sky-500/20">
+                                        No Call Required (Pre-informed)
+                                      </span>
+                                    ) : (
+                                      <button
+                                        onClick={() => handleMakeCall(student)}
+                                        className={`mt-2 flex items-center justify-center gap-2 py-2 px-4 rounded-xl text-xs font-bold text-white transition-all active:scale-[0.98] ${
+                                          hasCallLog 
+                                            ? 'bg-slate-600 hover:bg-slate-700' 
+                                            : 'bg-primary-dark hover:bg-primary text-white shadow-md shadow-primary-dark/10'
+                                        }`}
+                                      >
+                                        <PhoneCall size={14} />
+                                        <span>{hasCallLog ? 'Call Again / Update' : 'Call Parent'}</span>
+                                      </button>
+                                    )}
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Afternoon Session Absentees */}
+                  <div className="pt-4 border-t border-slate-200/50 dark:border-slate-800/10">
+                    <h4 className="font-extrabold text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full bg-slate-400" />
+                      <span>Afternoon Session Absentees ({afternoonAbsentees.length})</span>
+                    </h4>
+                    {afternoonAbsentees.length === 0 ? (
+                      <div className="text-center py-6 bg-slate-50/50 dark:bg-slate-900/30 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 text-xs text-customText-muted dark:text-customText-mutedDark">
+                        No afternoon absentees.
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {afternoonAbsentees.map((student) => {
+                          const isLate = student.status === 'Late';
+                          const hasCallLog = !!student.callLog;
+                          
+                          return (
+                            <div 
+                              key={student.id} 
+                              className={`relative flex flex-col justify-between p-5 rounded-2xl border transition-all duration-300 ${
+                                isLate 
+                                  ? 'bg-amber-500/5 border-amber-500/30 hover:border-amber-500/60 shadow-amber-500/5' 
+                                  : 'bg-red-500/5 border-red-500/20 hover:border-red-500/40 shadow-red-500/5'
+                              } hover:shadow-md`}
+                            >
+                              <span className={`absolute top-4 right-4 text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${
                                 isLate 
                                   ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-450 border border-amber-250 dark:border-amber-800' 
                                   : 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-450 border border-red-250 dark:border-red-800'
@@ -338,7 +624,7 @@ const AbsentControllerDashboard = () => {
                                 {student.status}
                               </span>
 
-                              <div className="space-y-1">
+                              <div className="space-y-1 pr-14">
                                 <h4 className="text-sm font-bold text-customText dark:text-customText-dark uppercase">
                                   {student.rollNumber}
                                 </h4>
@@ -347,7 +633,7 @@ const AbsentControllerDashboard = () => {
                                 </span>
                               </div>
 
-                              <div className="pt-3 border-t border-slate-200/50 dark:border-slate-800/20 flex flex-col gap-2">
+                              <div className="mt-4 pt-3 border-t border-slate-200/50 dark:border-slate-800/20 flex flex-col gap-2">
                                 <div className="flex justify-between items-center text-xs text-customText-muted dark:text-customText-mutedDark">
                                   <span>Student's Mobile:</span>
                                   <span className="font-semibold text-customText dark:text-customText-dark">
@@ -360,223 +646,42 @@ const AbsentControllerDashboard = () => {
                                     {student.parentMobile}
                                   </span>
                                 </div>
-                              </div>
-                            </div>
 
-                            {/* Right Column: Inline Call Feedback form */}
-                            <div className="border-t md:border-t-0 md:border-l border-slate-200/50 dark:border-slate-800/30 pt-4 md:pt-0 md:pl-6">
-                              <div className="flex justify-between items-center mb-3">
-                                <h5 className="font-bold text-xs text-primary-dark dark:text-primary uppercase tracking-wider">
-                                  Call Feedback Log
-                                </h5>
-                                <button 
-                                  type="button"
-                                  onClick={() => setActiveCallStudent(null)}
-                                  className="text-slate-400 hover:text-slate-600"
-                                >
-                                  <X size={14} />
-                                </button>
-                              </div>
-
-                              <form onSubmit={handleSaveCallLog} className="space-y-3">
-                                <div>
-                                  <p className="text-[10px] font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider mb-1.5">
-                                    Did the parent answer?
-                                  </p>
-                                  <div className="flex items-center gap-4">
-                                    <label className="flex items-center gap-1.5 text-xs font-semibold text-customText dark:text-customText-dark cursor-pointer">
-                                      <input
-                                        type="radio"
-                                        name={`answered-${student.id}`}
-                                        checked={answeredCall === true}
-                                        onChange={() => setAnsweredCall(true)}
-                                        className="h-3.5 w-3.5 text-primary"
-                                        required
-                                      />
-                                      <span>Yes</span>
-                                    </label>
-                                    <label className="flex items-center gap-1.5 text-xs font-semibold text-customText dark:text-customText-dark cursor-pointer">
-                                      <input
-                                        type="radio"
-                                        name={`answered-${student.id}`}
-                                        checked={answeredCall === false}
-                                        onChange={() => setAnsweredCall(false)}
-                                        className="h-3.5 w-3.5 text-primary"
-                                        required
-                                      />
-                                      <span>No</span>
-                                    </label>
-                                  </div>
-                                </div>
-
-                                {answeredCall === true && (
-                                  <>
-                                    <div className="space-y-1">
-                                      <label className="block text-[10px] font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider">
-                                        Reason for absence
-                                      </label>
-                                      <input
-                                        type="text"
-                                        required
-                                        value={absentReason}
-                                        onChange={(e) => setAbsentReason(e.target.value)}
-                                        placeholder="e.g. Sick Leave, Emergency"
-                                        className="glass-input text-[11px] py-1.5"
-                                      />
-                                    </div>
-
-                                    <div className="mt-2">
-                                      <label className="flex items-center gap-2 text-[10px] font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider cursor-pointer">
-                                        <input
-                                          type="checkbox"
-                                          checked={isMultiDay}
-                                          onChange={(e) => setIsMultiDay(e.target.checked)}
-                                          className="h-3.5 w-3.5 text-primary rounded"
-                                        />
-                                        <span>Absent for future dates</span>
-                                      </label>
-                                    </div>
-
-                                    {isMultiDay && (
-                                      <div className="grid grid-cols-2 gap-2 mt-2">
-                                        <div className="space-y-1">
-                                          <label className="block text-[9px] font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider">
-                                            From
-                                          </label>
-                                          <input
-                                            type="date"
-                                            required={isMultiDay}
-                                            value={preExcusedStart}
-                                            onChange={(e) => setPreExcusedStart(e.target.value)}
-                                            className="glass-input text-[10px] py-1 px-2"
-                                          />
-                                        </div>
-                                        <div className="space-y-1">
-                                          <label className="block text-[9px] font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider">
-                                            To
-                                          </label>
-                                          <input
-                                            type="date"
-                                            required={isMultiDay}
-                                            value={preExcusedEnd}
-                                            onChange={(e) => setPreExcusedEnd(e.target.value)}
-                                            className="glass-input text-[10px] py-1 px-2"
-                                          />
-                                        </div>
-                                      </div>
+                                {/* Call Logs Detail if any */}
+                                {hasCallLog && (
+                                  <div className={`p-2.5 rounded-xl text-xs ${
+                                    student.callLog.isPreExcused
+                                      ? 'bg-sky-500/10 text-sky-700 dark:text-sky-450'
+                                      : student.callLog.answered 
+                                        ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-450' 
+                                        : 'bg-red-500/10 text-red-700 dark:text-red-450'
+                                  }`}>
+                                    <p className="font-bold flex items-center gap-1.5">
+                                      {student.callLog.isPreExcused ? <Calendar size={12} /> : student.callLog.answered ? <CheckCircle size={12} /> : <XCircle size={12} />}
+                                      <span>
+                                        {student.callLog.isPreExcused 
+                                          ? 'Pre-informed Absent' 
+                                          : student.callLog.answered ? 'Answered' : 'Not Answered'}
+                                      </span>
+                                    </p>
+                                    {student.callLog.reason && (
+                                      <p className="mt-1 font-medium italic text-[11px] opacity-90">
+                                        Reason: "{student.callLog.reason}"
+                                      </p>
                                     )}
-                                  </>
+                                  </div>
                                 )}
 
-                                <div className="flex justify-end gap-2 pt-1">
-                                  <button
-                                    type="button"
-                                    onClick={() => setActiveCallStudent(null)}
-                                    className="btn-secondary py-1 px-3 text-[10px]"
-                                  >
-                                    Cancel
-                                  </button>
-                                  <button
-                                    type="submit"
-                                    disabled={savingCall || answeredCall === null}
-                                    className="btn-primary py-1 px-3 text-[10px] bg-primary-dark"
-                                  >
-                                    {savingCall ? 'Saving...' : 'Save'}
-                                  </button>
-                                </div>
-                              </form>
-                            </div>
-                          </div>
-                        ) : (
-                          <>
-                            <span className={`absolute top-4 right-4 text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${
-                              isLate 
-                                ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-450 border border-amber-250 dark:border-amber-800' 
-                                : 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-450 border border-red-250 dark:border-red-800'
-                            }`}>
-                              {student.status}
-                            </span>
-
-                            <div className="space-y-1 pr-14">
-                              <h4 className="text-sm font-bold text-customText dark:text-customText-dark uppercase">
-                                {student.rollNumber}
-                              </h4>
-                              <span className="text-[11px] text-customText-muted dark:text-customText-mutedDark font-semibold block">
-                                {student.name} • {student.section}
-                              </span>
-                            </div>
-
-                            {/* Parent Phone Section */}
-                            <div className="mt-4 pt-3 border-t border-slate-200/50 dark:border-slate-800/20 flex flex-col gap-2">
-                              <div className="flex justify-between items-center text-xs text-customText-muted dark:text-customText-mutedDark">
-                                <span>Student's Mobile:</span>
-                                <span className="font-semibold text-customText dark:text-customText-dark">
-                                  {student.studentMobile || 'N/A'}
-                                </span>
-                              </div>
-                              <div className="flex justify-between items-center text-xs text-customText-muted dark:text-customText-mutedDark">
-                                <span>Parent's Mobile:</span>
-                                <span className="font-semibold text-customText dark:text-customText-dark">
-                                  {student.parentMobile}
-                                </span>
-                              </div>
-
-                              {/* Call Logs Detail if any */}
-                              {hasCallLog && (
-                                <div className={`p-2.5 rounded-xl text-xs ${
-                                  student.callLog.isPreExcused
-                                    ? 'bg-sky-500/10 text-sky-700 dark:text-sky-450'
-                                    : student.callLog.answered 
-                                      ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-450' 
-                                      : 'bg-red-500/10 text-red-700 dark:text-red-450'
-                                }`}>
-                                  <p className="font-bold flex items-center gap-1.5">
-                                    {student.callLog.isPreExcused ? <Calendar size={12} /> : student.callLog.answered ? <CheckCircle size={12} /> : <XCircle size={12} />}
-                                    <span>
-                                      {student.callLog.isPreExcused 
-                                        ? 'Pre-informed Absent' 
-                                        : student.callLog.answered ? 'Answered' : 'Not Answered'}
-                                    </span>
-                                  </p>
-                                  {student.callLog.reason && (
-                                    <p className="mt-1 font-medium italic text-[11px] opacity-90">
-                                      Reason: "{student.callLog.reason}"
-                                    </p>
-                                  )}
-                                </div>
-                              )}
-
-                              {isLate ? (
-                                <span className="mt-2 text-center text-xs font-bold text-amber-600 bg-amber-500/10 py-2 px-4 rounded-xl border border-amber-500/20">
-                                  Late Entry - No Call Required
-                                </span>
-                              ) : isAfternoon ? (
                                 <span className="mt-2 text-center text-xs font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 py-2 px-4 rounded-xl border border-slate-200 dark:border-slate-700">
-                                  Afternoon Entry - No Call Required
+                                  Afternoon Entry - Calling Not Allowed
                                 </span>
-                              ) : student.callLog?.isPreExcused ? (
-                                <span className="mt-2 text-center text-xs font-bold text-sky-600 bg-sky-500/10 py-2 px-4 rounded-xl border border-sky-500/20">
-                                  No Call Required (Pre-informed)
-                                </span>
-                              ) : (
-                                <button
-                                  onClick={() => handleMakeCall(student)}
-                                  className={`mt-2 flex items-center justify-center gap-2 py-2 px-4 rounded-xl text-xs font-bold text-white transition-all active:scale-[0.98] ${
-                                    hasCallLog 
-                                      ? 'bg-slate-600 hover:bg-slate-700' 
-                                      : 'bg-primary-dark hover:bg-primary text-white shadow-md shadow-primary-dark/10'
-                                  }`}
-                                >
-                                  <PhoneCall size={14} />
-                                  <span>{hasCallLog ? 'Call Again / Update' : 'Call Parent'}</span>
-                                </button>
-                              )}
+                              </div>
                             </div>
-                          </>
-                        )}
+                          );
+                        })}
                       </div>
-                    );
-                  })}
+                    )}
+                  </div>
                 </div>
               )}
             </div>
@@ -675,29 +780,312 @@ const AbsentControllerDashboard = () => {
                 🎉 No absentees logged across any sections today!
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                {absentees.map((student) => {
-                  const isLate = student.status === 'Late';
-                  const isAfternoon = student.attendanceSession === 'afternoon';
-                  const hasCallLog = !!student.callLog;
-                  const isActiveCall = activeCallStudent?.id === student.id;
-                  
-                  return (
-                    <div 
-                      key={student.id} 
-                      className={`relative flex flex-col justify-between p-5 rounded-2xl border transition-all duration-300 ${
-                        isActiveCall
-                          ? 'col-span-1 sm:col-span-2 md:col-span-3 border-primary-dark/50 bg-primary-dark/5 shadow-lg'
-                          : isLate 
-                            ? 'bg-amber-500/5 border-amber-500/30 hover:border-amber-500/60 shadow-amber-500/5' 
-                            : 'bg-red-500/5 border-red-500/20 hover:border-red-500/40 shadow-red-500/5'
-                      } hover:shadow-md`}
-                    >
-                      {isActiveCall ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full text-left">
-                          {/* Left Column: Student Details */}
-                          <div className="space-y-3">
-                            <span className={`inline-block text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+              <div className="space-y-8">
+                {/* Morning Session Absentees */}
+                <div>
+                  <h4 className="font-extrabold text-xs text-primary dark:text-primary uppercase tracking-wider mb-4 flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+                    <span>Morning Session Absentees ({morningAbsentees.length})</span>
+                  </h4>
+                  {morningAbsentees.length === 0 ? (
+                    <div className="text-center py-6 bg-slate-50/50 dark:bg-slate-900/30 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 text-xs text-customText-muted dark:text-customText-mutedDark">
+                      No morning absentees.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                      {morningAbsentees.map((student) => {
+                        const isLate = student.status === 'Late';
+                        const hasCallLog = !!student.callLog;
+                        const isActiveCall = activeCallStudent?.id === student.id;
+                        
+                        return (
+                          <div 
+                            key={student.id} 
+                            className={`relative flex flex-col justify-between p-5 rounded-2xl border transition-all duration-300 ${
+                              isActiveCall
+                                ? 'col-span-1 sm:col-span-2 md:col-span-3 border-primary-dark/50 bg-primary-dark/5 shadow-lg'
+                                : isLate 
+                                  ? 'bg-amber-500/5 border-amber-500/30 hover:border-amber-500/60 shadow-amber-500/5' 
+                                  : 'bg-red-500/5 border-red-500/20 hover:border-red-500/40 shadow-red-500/5'
+                            } hover:shadow-md`}
+                          >
+                            {isActiveCall ? (
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full text-left">
+                                {/* Left Column: Student Details */}
+                                <div className="space-y-3">
+                                  <span className={`inline-block text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                                    isLate 
+                                      ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-450 border border-amber-250 dark:border-amber-800' 
+                                      : 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-450 border border-red-250 dark:border-red-800'
+                                  }`}>
+                                    {student.status}
+                                  </span>
+
+                                  <div className="space-y-1">
+                                    <h4 className="text-sm font-bold text-customText dark:text-customText-dark uppercase">
+                                      {student.rollNumber}
+                                    </h4>
+                                    <span className="text-[11px] text-customText-muted dark:text-customText-mutedDark font-semibold block">
+                                      {student.name} • {student.section}
+                                    </span>
+                                  </div>
+
+                                  <div className="pt-3 border-t border-slate-200/50 dark:border-slate-800/20 flex flex-col gap-2">
+                                    <div className="flex justify-between items-center text-xs text-customText-muted dark:text-customText-mutedDark">
+                                      <span>Student's Mobile:</span>
+                                      <span className="font-semibold text-customText dark:text-customText-dark">
+                                        {student.studentMobile || 'N/A'}
+                                      </span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-xs text-customText-muted dark:text-customText-mutedDark">
+                                      <span>Parent's Mobile:</span>
+                                      <span className="font-semibold text-customText dark:text-customText-dark">
+                                        {student.parentMobile}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Right Column: Inline Call Feedback form */}
+                                <div className="border-t md:border-t-0 md:border-l border-slate-200/50 dark:border-slate-800/30 pt-4 md:pt-0 md:pl-6">
+                                  <div className="flex justify-between items-center mb-3">
+                                    <h5 className="font-bold text-xs text-primary-dark dark:text-primary uppercase tracking-wider">
+                                      Call Feedback Log
+                                    </h5>
+                                    <button 
+                                      type="button"
+                                      onClick={() => setActiveCallStudent(null)}
+                                      className="text-slate-400 hover:text-slate-600"
+                                    >
+                                      <X size={14} />
+                                    </button>
+                                  </div>
+
+                                  <form onSubmit={handleSaveCallLog} className="space-y-3">
+                                    <div>
+                                      <p className="text-[10px] font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider mb-1.5">
+                                        Did the parent answer?
+                                      </p>
+                                      <div className="flex items-center gap-4">
+                                        <label className="flex items-center gap-1.5 text-xs font-semibold text-customText dark:text-customText-dark cursor-pointer">
+                                          <input
+                                            type="radio"
+                                            name={`answered-${student.id}`}
+                                            checked={answeredCall === true}
+                                            onChange={() => setAnsweredCall(true)}
+                                            className="h-3.5 w-3.5 text-primary"
+                                            required
+                                          />
+                                          <span>Yes</span>
+                                        </label>
+                                        <label className="flex items-center gap-1.5 text-xs font-semibold text-customText dark:text-customText-dark cursor-pointer">
+                                          <input
+                                            type="radio"
+                                            name={`answered-${student.id}`}
+                                            checked={answeredCall === false}
+                                            onChange={() => setAnsweredCall(false)}
+                                            className="h-3.5 w-3.5 text-primary"
+                                            required
+                                          />
+                                          <span>No</span>
+                                        </label>
+                                      </div>
+                                    </div>
+
+                                    {answeredCall === true && (
+                                      <>
+                                        <div className="space-y-1">
+                                          <label className="block text-[10px] font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider">
+                                            Reason for absence
+                                          </label>
+                                          <input
+                                            type="text"
+                                            required
+                                            value={absentReason}
+                                            onChange={(e) => setAbsentReason(e.target.value)}
+                                            placeholder="e.g. Sick Leave, Emergency"
+                                            className="glass-input text-[11px] py-1.5"
+                                          />
+                                        </div>
+
+                                        <div className="mt-2">
+                                          <label className="flex items-center gap-2 text-[10px] font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider cursor-pointer">
+                                            <input
+                                              type="checkbox"
+                                              checked={isMultiDay}
+                                              onChange={(e) => setIsMultiDay(e.target.checked)}
+                                              className="h-3.5 w-3.5 text-primary rounded"
+                                            />
+                                            <span>Absent for future dates</span>
+                                          </label>
+                                        </div>
+
+                                        {isMultiDay && (
+                                          <div className="grid grid-cols-2 gap-2 mt-2">
+                                            <div className="space-y-1">
+                                              <label className="block text-[9px] font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider">
+                                                From
+                                              </label>
+                                              <input
+                                                type="date"
+                                                required={isMultiDay}
+                                                value={preExcusedStart}
+                                                onChange={(e) => setPreExcusedStart(e.target.value)}
+                                                className="glass-input text-[10px] py-1 px-2"
+                                              />
+                                            </div>
+                                            <div className="space-y-1">
+                                              <label className="block text-[9px] font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider">
+                                                To
+                                              </label>
+                                              <input
+                                                type="date"
+                                                required={isMultiDay}
+                                                value={preExcusedEnd}
+                                                onChange={(e) => setPreExcusedEnd(e.target.value)}
+                                                className="glass-input text-[10px] py-1 px-2"
+                                              />
+                                            </div>
+                                          </div>
+                                        )}
+                                      </>
+                                    )}
+
+                                    <div className="flex justify-end gap-2 pt-1">
+                                      <button
+                                        type="button"
+                                        onClick={() => setActiveCallStudent(null)}
+                                        className="btn-secondary py-1 px-3 text-[10px]"
+                                      >
+                                        Cancel
+                                      </button>
+                                      <button
+                                        type="submit"
+                                        disabled={savingCall || answeredCall === null}
+                                        className="btn-primary py-1 px-3 text-[10px] bg-primary-dark"
+                                      >
+                                        {savingCall ? 'Saving...' : 'Save'}
+                                      </button>
+                                    </div>
+                                  </form>
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                <span className={`absolute top-4 right-4 text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                                  isLate 
+                                    ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-450 border border-amber-250 dark:border-amber-800' 
+                                    : 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-450 border border-red-250 dark:border-red-800'
+                                }`}>
+                                  {student.status}
+                                </span>
+
+                                <div className="space-y-1 pr-14">
+                                  <h4 className="text-sm font-bold text-customText dark:text-customText-dark uppercase">
+                                    {student.rollNumber}
+                                  </h4>
+                                  <span className="text-[11px] text-customText-muted dark:text-customText-mutedDark font-semibold block">
+                                    {student.name} • {student.section}
+                                  </span>
+                                </div>
+
+                                {/* Parent Phone Section */}
+                                <div className="mt-4 pt-3 border-t border-slate-200/50 dark:border-slate-800/20 flex flex-col gap-2">
+                                  <div className="flex justify-between items-center text-xs text-customText-muted dark:text-customText-mutedDark">
+                                    <span>Student's Mobile:</span>
+                                    <span className="font-semibold text-customText dark:text-customText-dark">
+                                      {student.studentMobile || 'N/A'}
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between items-center text-xs text-customText-muted dark:text-customText-mutedDark">
+                                    <span>Parent's Mobile:</span>
+                                    <span className="font-semibold text-customText dark:text-customText-dark">
+                                      {student.parentMobile}
+                                    </span>
+                                  </div>
+
+                                  {/* Call Logs Detail if any */}
+                                  {hasCallLog && (
+                                    <div className={`p-2.5 rounded-xl text-xs ${
+                                      student.callLog.isPreExcused
+                                        ? 'bg-sky-500/10 text-sky-700 dark:text-sky-450'
+                                        : student.callLog.answered 
+                                          ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-450' 
+                                          : 'bg-red-500/10 text-red-700 dark:text-red-450'
+                                    }`}>
+                                      <p className="font-bold flex items-center gap-1.5">
+                                        {student.callLog.isPreExcused ? <Calendar size={12} /> : student.callLog.answered ? <CheckCircle size={12} /> : <XCircle size={12} />}
+                                        <span>
+                                          {student.callLog.isPreExcused 
+                                            ? 'Pre-informed Absent' 
+                                            : student.callLog.answered ? 'Answered' : 'Not Answered'}
+                                        </span>
+                                      </p>
+                                      {student.callLog.reason && (
+                                        <p className="mt-1 font-medium italic text-[11px] opacity-90">
+                                          Reason: "{student.callLog.reason}"
+                                        </p>
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {isLate ? (
+                                    <span className="mt-2 text-center text-xs font-bold text-amber-600 bg-amber-500/10 py-2 px-4 rounded-xl border border-amber-500/20">
+                                      Late Entry - No Call Required
+                                    </span>
+                                  ) : student.callLog?.isPreExcused ? (
+                                    <span className="mt-2 text-center text-xs font-bold text-sky-600 bg-sky-500/10 py-2 px-4 rounded-xl border border-sky-500/20">
+                                      No Call Required (Pre-informed)
+                                    </span>
+                                  ) : (
+                                    <button
+                                      onClick={() => handleMakeCall(student)}
+                                      className={`mt-2 flex items-center justify-center gap-2 py-2 px-4 rounded-xl text-xs font-bold text-white transition-all active:scale-[0.98] ${
+                                        hasCallLog 
+                                          ? 'bg-slate-600 hover:bg-slate-700' 
+                                          : 'bg-primary-dark hover:bg-primary text-white shadow-md shadow-primary-dark/10'
+                                      }`}
+                                    >
+                                      <PhoneCall size={14} />
+                                      <span>{hasCallLog ? 'Call Again / Update' : 'Call Parent'}</span>
+                                    </button>
+                                  )}
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Afternoon Session Absentees */}
+                <div className="pt-4 border-t border-slate-200/50 dark:border-slate-800/10">
+                  <h4 className="font-extrabold text-xs text-slate-500 dark:text-slate-400 tracking-wider mb-4 flex items-center gap-2 uppercase">
+                    <span className="h-2 w-2 rounded-full bg-slate-400" />
+                    <span>Afternoon Session Absentees ({afternoonAbsentees.length})</span>
+                  </h4>
+                  {afternoonAbsentees.length === 0 ? (
+                    <div className="text-center py-6 bg-slate-50/50 dark:bg-slate-900/30 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 text-xs text-customText-muted dark:text-customText-mutedDark">
+                      No afternoon absentees.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                      {afternoonAbsentees.map((student) => {
+                        const isLate = student.status === 'Late';
+                        const hasCallLog = !!student.callLog;
+                        
+                        return (
+                          <div 
+                            key={student.id} 
+                            className={`relative flex flex-col justify-between p-5 rounded-2xl border transition-all duration-300 ${
+                              isLate 
+                                ? 'bg-amber-500/5 border-amber-500/30 hover:border-amber-500/60 shadow-amber-500/5' 
+                                : 'bg-red-500/5 border-red-500/20 hover:border-red-500/40 shadow-red-500/5'
+                            } hover:shadow-md`}
+                          >
+                            <span className={`absolute top-4 right-4 text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${
                               isLate 
                                 ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-450 border border-amber-250 dark:border-amber-800' 
                                 : 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-450 border border-red-250 dark:border-red-800'
@@ -705,7 +1093,7 @@ const AbsentControllerDashboard = () => {
                               {student.status}
                             </span>
 
-                            <div className="space-y-1">
+                            <div className="space-y-1 pr-14">
                               <h4 className="text-sm font-bold text-customText dark:text-customText-dark uppercase">
                                 {student.rollNumber}
                               </h4>
@@ -714,7 +1102,7 @@ const AbsentControllerDashboard = () => {
                               </span>
                             </div>
 
-                            <div className="pt-3 border-t border-slate-200/50 dark:border-slate-800/20 flex flex-col gap-2">
+                            <div className="mt-4 pt-3 border-t border-slate-200/50 dark:border-slate-800/20 flex flex-col gap-2">
                               <div className="flex justify-between items-center text-xs text-customText-muted dark:text-customText-mutedDark">
                                 <span>Student's Mobile:</span>
                                 <span className="font-semibold text-customText dark:text-customText-dark">
@@ -727,223 +1115,42 @@ const AbsentControllerDashboard = () => {
                                   {student.parentMobile}
                                 </span>
                               </div>
-                            </div>
-                          </div>
 
-                          {/* Right Column: Inline Call Feedback form */}
-                          <div className="border-t md:border-t-0 md:border-l border-slate-200/50 dark:border-slate-800/30 pt-4 md:pt-0 md:pl-6">
-                            <div className="flex justify-between items-center mb-3">
-                              <h5 className="font-bold text-xs text-primary-dark dark:text-primary uppercase tracking-wider">
-                                Call Feedback Log
-                              </h5>
-                              <button 
-                                type="button"
-                                onClick={() => setActiveCallStudent(null)}
-                                className="text-slate-400 hover:text-slate-600"
-                              >
-                                <X size={14} />
-                              </button>
-                            </div>
-
-                            <form onSubmit={handleSaveCallLog} className="space-y-3">
-                              <div>
-                                <p className="text-[10px] font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider mb-1.5">
-                                  Did the parent answer?
-                                </p>
-                                <div className="flex items-center gap-4">
-                                  <label className="flex items-center gap-1.5 text-xs font-semibold text-customText dark:text-customText-dark cursor-pointer">
-                                    <input
-                                      type="radio"
-                                      name={`answered-${student.id}`}
-                                      checked={answeredCall === true}
-                                      onChange={() => setAnsweredCall(true)}
-                                      className="h-3.5 w-3.5 text-primary"
-                                      required
-                                    />
-                                    <span>Yes</span>
-                                  </label>
-                                  <label className="flex items-center gap-1.5 text-xs font-semibold text-customText dark:text-customText-dark cursor-pointer">
-                                    <input
-                                      type="radio"
-                                      name={`answered-${student.id}`}
-                                      checked={answeredCall === false}
-                                      onChange={() => setAnsweredCall(false)}
-                                      className="h-3.5 w-3.5 text-primary"
-                                      required
-                                    />
-                                    <span>No</span>
-                                  </label>
-                                </div>
-                              </div>
-
-                              {answeredCall === true && (
-                                <>
-                                  <div className="space-y-1">
-                                    <label className="block text-[10px] font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider">
-                                      Reason for absence
-                                    </label>
-                                    <input
-                                      type="text"
-                                      required
-                                      value={absentReason}
-                                      onChange={(e) => setAbsentReason(e.target.value)}
-                                      placeholder="e.g. Sick Leave, Emergency"
-                                      className="glass-input text-[11px] py-1.5"
-                                    />
-                                  </div>
-
-                                  <div className="mt-2">
-                                    <label className="flex items-center gap-2 text-[10px] font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider cursor-pointer">
-                                      <input
-                                        type="checkbox"
-                                        checked={isMultiDay}
-                                        onChange={(e) => setIsMultiDay(e.target.checked)}
-                                        className="h-3.5 w-3.5 text-primary rounded"
-                                      />
-                                      <span>Absent for future dates</span>
-                                    </label>
-                                  </div>
-
-                                  {isMultiDay && (
-                                    <div className="grid grid-cols-2 gap-2 mt-2">
-                                      <div className="space-y-1">
-                                        <label className="block text-[9px] font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider">
-                                          From
-                                        </label>
-                                        <input
-                                          type="date"
-                                          required={isMultiDay}
-                                          value={preExcusedStart}
-                                          onChange={(e) => setPreExcusedStart(e.target.value)}
-                                          className="glass-input text-[10px] py-1 px-2"
-                                        />
-                                      </div>
-                                      <div className="space-y-1">
-                                        <label className="block text-[9px] font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider">
-                                          To
-                                        </label>
-                                        <input
-                                          type="date"
-                                          required={isMultiDay}
-                                          value={preExcusedEnd}
-                                          onChange={(e) => setPreExcusedEnd(e.target.value)}
-                                          className="glass-input text-[10px] py-1 px-2"
-                                        />
-                                      </div>
-                                    </div>
+                              {/* Call Logs Detail if any */}
+                              {hasCallLog && (
+                                <div className={`p-2.5 rounded-xl text-xs ${
+                                  student.callLog.isPreExcused
+                                    ? 'bg-sky-500/10 text-sky-700 dark:text-sky-450'
+                                    : student.callLog.answered 
+                                      ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-450' 
+                                      : 'bg-red-500/10 text-red-700 dark:text-red-450'
+                                }`}>
+                                  <p className="font-bold flex items-center gap-1.5">
+                                    {student.callLog.isPreExcused ? <Calendar size={12} /> : student.callLog.answered ? <CheckCircle size={12} /> : <XCircle size={12} />}
+                                    <span>
+                                      {student.callLog.isPreExcused 
+                                        ? 'Pre-informed Absent' 
+                                        : student.callLog.answered ? 'Answered' : 'Not Answered'}
+                                    </span>
+                                  </p>
+                                  {student.callLog.reason && (
+                                    <p className="mt-1 font-medium italic text-[11px] opacity-90">
+                                      Reason: "{student.callLog.reason}"
+                                    </p>
                                   )}
-                                </>
+                                </div>
                               )}
 
-                              <div className="flex justify-end gap-2 pt-1">
-                                <button
-                                  type="button"
-                                  onClick={() => setActiveCallStudent(null)}
-                                  className="btn-secondary py-1 px-3 text-[10px]"
-                                >
-                                  Cancel
-                                </button>
-                                <button
-                                  type="submit"
-                                  disabled={savingCall || answeredCall === null}
-                                  className="btn-primary py-1 px-3 text-[10px] bg-primary-dark"
-                                >
-                                  {savingCall ? 'Saving...' : 'Save'}
-                                </button>
-                              </div>
-                            </form>
-                          </div>
-                        </div>
-                      ) : (
-                        <>
-                          <span className={`absolute top-4 right-4 text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${
-                            isLate 
-                              ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-450 border border-amber-250 dark:border-amber-800' 
-                              : 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-450 border border-red-250 dark:border-red-800'
-                          }`}>
-                            {student.status}
-                          </span>
-
-                          <div className="space-y-1 pr-14">
-                            <h4 className="text-sm font-bold text-customText dark:text-customText-dark uppercase">
-                              {student.rollNumber}
-                            </h4>
-                            <span className="text-[11px] text-customText-muted dark:text-customText-mutedDark font-semibold block">
-                              {student.name} • {student.section}
-                            </span>
-                          </div>
-
-                          {/* Parent Phone / Calling actions */}
-                          <div className="mt-4 pt-3 border-t border-slate-200/50 dark:border-slate-800/20 flex flex-col gap-2">
-                            <div className="flex justify-between items-center text-xs text-customText-muted dark:text-customText-mutedDark">
-                              <span>Student's Mobile:</span>
-                              <span className="font-semibold text-customText dark:text-customText-dark">
-                                {student.studentMobile || 'N/A'}
-                              </span>
-                            </div>
-                            <div className="flex justify-between items-center text-xs text-customText-muted dark:text-customText-mutedDark">
-                              <span>Parent's Mobile:</span>
-                              <span className="font-semibold text-customText dark:text-customText-dark">
-                                {student.parentMobile}
-                              </span>
-                            </div>
-
-                            {/* Call Logs Detail if any */}
-                            {hasCallLog && (
-                              <div className={`p-2.5 rounded-xl text-xs ${
-                                student.callLog.isPreExcused
-                                  ? 'bg-sky-500/10 text-sky-700 dark:text-sky-450'
-                                  : student.callLog.answered 
-                                    ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-450' 
-                                    : 'bg-red-500/10 text-red-700 dark:text-red-450'
-                              }`}>
-                                <p className="font-bold flex items-center gap-1.5">
-                                  {student.callLog.isPreExcused ? <Calendar size={12} /> : student.callLog.answered ? <CheckCircle size={12} /> : <XCircle size={12} />}
-                                  <span>
-                                    {student.callLog.isPreExcused 
-                                      ? 'Pre-informed Absent' 
-                                      : student.callLog.answered ? 'Answered' : 'Not Answered'}
-                                  </span>
-                                </p>
-                                {student.callLog.reason && (
-                                  <p className="mt-1 font-medium italic text-[11px] opacity-90">
-                                    Reason: "{student.callLog.reason}"
-                                  </p>
-                                )}
-                              </div>
-                            )}
-
-                            {isLate ? (
-                              <span className="mt-2 text-center text-xs font-bold text-amber-600 bg-amber-500/10 py-2 px-4 rounded-xl border border-amber-500/20">
-                                Late Entry - No Call Required
-                              </span>
-                            ) : isAfternoon ? (
                               <span className="mt-2 text-center text-xs font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 py-2 px-4 rounded-xl border border-slate-200 dark:border-slate-700">
-                                Afternoon Entry - No Call Required
+                                Afternoon Entry - Calling Not Allowed
                               </span>
-                            ) : student.callLog?.isPreExcused ? (
-                              <span className="mt-2 text-center text-xs font-bold text-sky-600 bg-sky-500/10 py-2 px-4 rounded-xl border border-sky-500/20">
-                                No Call Required (Pre-informed)
-                              </span>
-                            ) : (
-                              <button
-                                onClick={() => handleMakeCall(student)}
-                                className={`mt-2 flex items-center justify-center gap-2 py-2 px-4 rounded-xl text-xs font-bold text-white transition-all active:scale-[0.98] ${
-                                  hasCallLog 
-                                    ? 'bg-slate-600 hover:bg-slate-700' 
-                                    : 'bg-primary-dark hover:bg-primary text-white shadow-md shadow-primary-dark/10'
-                                }`}
-                              >
-                                <PhoneCall size={14} />
-                                <span>{hasCallLog ? 'Call Again / Update' : 'Call Parent'}</span>
-                              </button>
-                            )}
+                            </div>
                           </div>
-                        </>
-                      )}
+                        );
+                      })}
                     </div>
-                  );
-                })}
+                  )}
+                </div>
               </div>
             )}
           </div>

@@ -4,6 +4,45 @@ const prisma = require('../db');
 const authMiddleware = require('../middleware/auth.middleware');
 const roleMiddleware = require('../middleware/role.middleware');
 
+const getTimingSettings = async () => {
+  const defaults = {
+    morningStart: "09:10",
+    morningEnd: "09:50",
+    afternoonStart: "13:30",
+    afternoonEnd: "14:10"
+  };
+
+  try {
+    const settings = await prisma.systemSetting.findMany({
+      where: {
+        key: {
+          in: [
+            'morning_start_time',
+            'morning_end_time',
+            'afternoon_start_time',
+            'afternoon_end_time'
+          ]
+        }
+      }
+    });
+
+    const timingMap = {};
+    settings.forEach(s => {
+      timingMap[s.key] = s.value;
+    });
+
+    return {
+      morningStart: timingMap['morning_start_time'] || defaults.morningStart,
+      morningEnd: timingMap['morning_end_time'] || defaults.morningEnd,
+      afternoonStart: timingMap['afternoon_start_time'] || defaults.afternoonStart,
+      afternoonEnd: timingMap['afternoon_end_time'] || defaults.afternoonEnd
+    };
+  } catch (error) {
+    console.error('Error fetching timing settings:', error);
+    return defaults;
+  }
+};
+
 const checkCRAttendanceAccess = async (user, className) => {
   if (user.role !== 'CR') return true;
 
@@ -14,11 +53,17 @@ const checkCRAttendanceAccess = async (user, className) => {
   const hours = kolkataDate.getHours();
   const minutes = kolkataDate.getMinutes();
   const currentMinutes = hours * 60 + minutes;
+
+  const timings = await getTimingSettings();
+  const [msH, msM] = timings.morningStart.split(':').map(Number);
+  const [meH, meM] = timings.morningEnd.split(':').map(Number);
+  const [asH, asM] = timings.afternoonStart.split(':').map(Number);
+  const [aeH, aeM] = timings.afternoonEnd.split(':').map(Number);
   
-  const morningStart = 9 * 60 + 10;
-  const morningEnd = 9 * 60 + 50;
-  const afternoonStart = 13 * 60 + 30;
-  const afternoonEnd = 14 * 60 + 10;
+  const morningStart = msH * 60 + msM;
+  const morningEnd = meH * 60 + meM;
+  const afternoonStart = asH * 60 + asM;
+  const afternoonEnd = aeH * 60 + aeM;
   
   const inWindow = (currentMinutes >= morningStart && currentMinutes < morningEnd) ||
                    (currentMinutes >= afternoonStart && currentMinutes < afternoonEnd);
@@ -57,12 +102,53 @@ router.get('/can-submit', authMiddleware, async (req, res) => {
       return res.json({ canSubmit: true });
     }
 
+    const timings = await getTimingSettings();
     res.json({ 
       canSubmit: false, 
-      reason: 'Attendance window closed. Morning window: 9:10 AM - 9:50 AM, Afternoon window: 1:30 PM - 2:10 PM. Contact HOD/Absent Controller to request access.' 
+      reason: `Attendance window closed. Morning window: ${timings.morningStart} - ${timings.morningEnd}, Afternoon window: ${timings.afternoonStart} - ${timings.afternoonEnd}. Contact HOD/Absent Controller to request access.` 
     });
   } catch (error) {
     console.error('Error in can-submit check:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
+
+// Settings endpoints for timing configuration
+router.get('/settings/timings', authMiddleware, roleMiddleware(['HOD']), async (req, res) => {
+  try {
+    const timings = await getTimingSettings();
+    res.json(timings);
+  } catch (error) {
+    console.error('Error getting settings:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
+
+router.post('/settings/timings', authMiddleware, roleMiddleware(['HOD']), async (req, res) => {
+  const { morningStart, morningEnd, afternoonStart, afternoonEnd } = req.body;
+  if (!morningStart || !morningEnd || !afternoonStart || !afternoonEnd) {
+    return res.status(400).json({ message: 'All timing fields are required' });
+  }
+
+  try {
+    const settings = [
+      { key: 'morning_start_time', value: morningStart },
+      { key: 'morning_end_time', value: morningEnd },
+      { key: 'afternoon_start_time', value: afternoonStart },
+      { key: 'afternoon_end_time', value: afternoonEnd },
+    ];
+
+    for (const setting of settings) {
+      await prisma.systemSetting.upsert({
+        where: { key: setting.key },
+        update: { value: setting.value },
+        create: { key: setting.key, value: setting.value }
+      });
+    }
+
+    res.json({ message: 'Timings updated successfully' });
+  } catch (error) {
+    console.error('Error updating settings:', error);
     res.status(500).json({ message: 'Internal Server Error' });
   }
 });
@@ -161,7 +247,10 @@ router.post('/bulk', authMiddleware, roleMiddleware(['CR', 'HOD', 'SUB_ADMIN']),
 
     const hasAccess = await checkCRAttendanceAccess(req.user, section);
     if (!hasAccess) {
-      return res.status(403).json({ message: 'Attendance window is closed. Contact HOD/Absent Controller to request access.' });
+      const timings = await getTimingSettings();
+      return res.status(403).json({ 
+        message: `Attendance window is closed. Morning: ${timings.morningStart}-${timings.morningEnd}, Afternoon: ${timings.afternoonStart}-${timings.afternoonEnd}. Contact HOD/Absent Controller to request access.` 
+      });
     }
 
     for (const record of attendanceData) {
@@ -217,7 +306,10 @@ router.post('/late-comer', authMiddleware, roleMiddleware(['CR', 'HOD', 'SUB_ADM
 
     const hasAccess = await checkCRAttendanceAccess(req.user, student.section);
     if (!hasAccess) {
-      return res.status(403).json({ message: 'Attendance window is closed. Contact HOD/Absent Controller to request access.' });
+      const timings = await getTimingSettings();
+      return res.status(403).json({ 
+        message: `Attendance window is closed. Morning: ${timings.morningStart}-${timings.morningEnd}, Afternoon: ${timings.afternoonStart}-${timings.afternoonEnd}. Contact HOD/Absent Controller to request access.` 
+      });
     }
 
     const attendance = await prisma.attendance.upsert({

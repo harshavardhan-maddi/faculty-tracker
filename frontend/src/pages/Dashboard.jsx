@@ -25,15 +25,24 @@ import {
   Plus,
   Save,
   CheckCircle2,
-  Trash2
+  Trash2,
+  Settings
 } from 'lucide-react';
 
 const Dashboard = () => {
   const { token, user } = useAuth();
   const { socket } = useSocket();
 
-  // Active Tab: 'faculty', 'students', 'absentees' (Only HOD sees student/absent tabs)
+  // Active Tab: 'faculty', 'students', 'absentees', 'settings' (Only HOD sees student/absent/settings tabs)
   const [activeTab, setActiveTab] = useState('faculty');
+  const [success, setSuccess] = useState('');
+
+  // HOD Timing settings states
+  const [morningStart, setMorningStart] = useState('09:10');
+  const [morningEnd, setMorningEnd] = useState('09:50');
+  const [afternoonStart, setAfternoonStart] = useState('13:30');
+  const [afternoonEnd, setAfternoonEnd] = useState('14:10');
+  const [savingTimings, setSavingTimings] = useState(false);
 
   // Existing Faculty Tracker States
   const [classrooms, setClassrooms] = useState([]);
@@ -359,7 +368,63 @@ const Dashboard = () => {
       socket.off('logs_cleared');
     };
   }, [socket]);
+  useEffect(() => {
+    setError('');
+    setSuccess('');
+  }, [activeTab]);
 
+  useEffect(() => {
+    if (activeTab === 'settings' && token) {
+      const fetchTimings = async () => {
+        try {
+          const res = await fetch('/api/student-attendance/settings/timings', {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          if (res.ok) {
+            const data = await res.json();
+            setMorningStart(data.morningStart);
+            setMorningEnd(data.morningEnd);
+            setAfternoonStart(data.afternoonStart);
+            setAfternoonEnd(data.afternoonEnd);
+          }
+        } catch (error) {
+          console.error('Failed to load timings settings:', error);
+        }
+      };
+      fetchTimings();
+    }
+  }, [activeTab, token]);
+
+  const handleSaveTimings = async (e) => {
+    e.preventDefault();
+    setSavingTimings(true);
+    setError('');
+    setSuccess('');
+    try {
+      const res = await fetch('/api/student-attendance/settings/timings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          morningStart,
+          morningEnd,
+          afternoonStart,
+          afternoonEnd
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to save settings');
+      setSuccess('Attendance timings updated successfully!');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSavingTimings(false);
+    }
+  };
   const fetchClassroomDetails = async (classroomId, dateStr = '') => {
     setLoadingDetails(true);
     try {
@@ -670,12 +735,29 @@ const Dashboard = () => {
             <AlertCircle size={16} />
             <span>Absentees Tracking</span>
           </button>
+          <button
+            onClick={() => setActiveTab('settings')}
+            className={`flex items-center gap-2 py-3 px-6 text-sm font-semibold border-b-2 transition-all ${
+              activeTab === 'settings' 
+                ? 'border-primary text-primary-dark dark:text-primary font-bold' 
+                : 'border-transparent text-customText-muted dark:text-customText-mutedDark hover:text-customText'
+            }`}
+          >
+            <Settings size={16} />
+            <span>Attendance Timings</span>
+          </button>
         </div>
       )}
 
       {error && (
         <div className="p-4 bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-sm font-semibold rounded-xl">
           ⚠️ {error}
+        </div>
+      )}
+
+      {success && (
+        <div className="p-4 bg-green-500/10 border border-green-500/20 text-green-600 dark:text-green-400 text-sm font-semibold rounded-xl animate-fade-in">
+          ✓ {success}
         </div>
       )}
 
@@ -1170,6 +1252,105 @@ const Dashboard = () => {
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {/* VIEW 4: ATTENDANCE TIMINGS SETTINGS (HOD ONLY) */}
+      {activeTab === 'settings' && (
+        <div className="glass-card p-8 max-w-4xl mx-auto border border-slate-200/50 dark:border-slate-800/45 space-y-6">
+          <div>
+            <h3 className="font-extrabold text-lg text-customText dark:text-customText-dark">
+              CR Attendance Timing Settings
+            </h3>
+            <p className="text-xs text-customText-muted dark:text-customText-mutedDark mt-1">
+              Configure the time ranges during which Class Representatives are allowed to submit attendance.
+            </p>
+          </div>
+
+          <form onSubmit={handleSaveTimings} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Morning Session Timings */}
+              <div className="p-6 bg-slate-50/50 dark:bg-slate-900/35 border border-slate-200/40 dark:border-slate-800/30 rounded-2xl space-y-4">
+                <h4 className="text-sm font-bold text-primary-dark dark:text-primary uppercase tracking-wider flex items-center gap-2">
+                  <CalendarDays size={16} />
+                  <span>Morning Session</span>
+                </h4>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="block text-xs font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider">
+                      Start Time
+                    </label>
+                    <input
+                      type="time"
+                      required
+                      value={morningStart}
+                      onChange={(e) => setMorningStart(e.target.value)}
+                      className="glass-input text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-xs font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider">
+                      End Time
+                    </label>
+                    <input
+                      type="time"
+                      required
+                      value={morningEnd}
+                      onChange={(e) => setMorningEnd(e.target.value)}
+                      className="glass-input text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Afternoon Session Timings */}
+              <div className="p-6 bg-slate-50/50 dark:bg-slate-900/35 border border-slate-200/40 dark:border-slate-800/30 rounded-2xl space-y-4">
+                <h4 className="text-sm font-bold text-primary-dark dark:text-primary uppercase tracking-wider flex items-center gap-2">
+                  <CalendarDays size={16} />
+                  <span>Afternoon Session</span>
+                </h4>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="block text-xs font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider">
+                      Start Time
+                    </label>
+                    <input
+                      type="time"
+                      required
+                      value={afternoonStart}
+                      onChange={(e) => setAfternoonStart(e.target.value)}
+                      className="glass-input text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-xs font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider">
+                      End Time
+                    </label>
+                    <input
+                      type="time"
+                      required
+                      value={afternoonEnd}
+                      onChange={(e) => setAfternoonEnd(e.target.value)}
+                      className="glass-input text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button
+                type="submit"
+                disabled={savingTimings}
+                className="btn-primary py-2.5 px-6 font-bold flex items-center gap-2 bg-primary-dark"
+              >
+                <Save size={16} />
+                <span>{savingTimings ? 'Saving Settings...' : 'Save Settings'}</span>
+              </button>
+            </div>
+          </form>
         </div>
       )}
 
