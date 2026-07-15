@@ -37,11 +37,13 @@ const checkExpiredPeriods = async () => {
       },
     });
 
+    const newLogsData = [];
+    const createdLogsToBroadcast = [];
+
     for (const classroom of classrooms) {
       const classroomLogs = allLogs.filter(l => l.classroomId === classroom.id);
 
       for (const period of expiredStdPeriods) {
-        // Check if log already exists
         const existingLog = classroomLogs.find(l => l.periodNo === period.periodNo);
 
         if (!existingLog) {
@@ -50,24 +52,16 @@ const checkExpiredPeriods = async () => {
           const startTime = period.startTime;
           const endTime = period.endTime;
 
-          const newLog = await prisma.facultyLog.create({
-            data: {
-              classroomId: classroom.id,
-              facultyName: facultyName,
-              periodNo: period.periodNo,
-              entryTime: null,
-              status: 'Not Entered',
-              createdAt: new Date(),
-            },
-            include: {
-              classroom: true,
-            },
+          newLogsData.push({
+            classroomId: classroom.id,
+            facultyName: facultyName,
+            periodNo: period.periodNo,
+            entryTime: null,
+            status: 'Not Entered',
+            createdAt: new Date(),
           });
 
-          console.log(`[Auto-Status] Marked ${facultyName} as Not Entered in ${classroom.roomNumber} - Period ${period.periodNo}`);
-
-          // Broadcast the update to HOD / Sub Admin
-          emitClassroomStatusUpdate({
+          createdLogsToBroadcast.push({
             classroomId: classroom.id,
             roomNumber: classroom.roomNumber,
             className: classroom.className,
@@ -79,15 +73,27 @@ const checkExpiredPeriods = async () => {
             endTime: endTime,
             entryTime: null,
           });
-
-          // Broadcast notifications
-          emitNotification({
-            message: `${facultyName} not entered into Room ${classroom.roomNumber} (${classroom.className})`,
-            type: 'danger',
-            classroomName: classroom.className,
-            roomNumber: classroom.roomNumber,
-          });
         }
+      }
+    }
+
+    if (newLogsData.length > 0) {
+      await prisma.facultyLog.createMany({
+        data: newLogsData,
+      });
+
+      console.log(`[Auto-Status] Bulk marked ${newLogsData.length} records as Not Entered.`);
+
+      // Broadcast updates and notifications
+      for (const item of createdLogsToBroadcast) {
+        emitClassroomStatusUpdate(item);
+
+        emitNotification({
+          message: `Faculty not entered into Room ${item.roomNumber} (${item.className})`,
+          type: 'danger',
+          classroomName: item.className,
+          roomNumber: item.roomNumber,
+        });
       }
     }
   } catch (error) {
