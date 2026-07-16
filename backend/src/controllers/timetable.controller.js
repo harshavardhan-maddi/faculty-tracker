@@ -130,23 +130,32 @@ const getCRSchedule = async (req, res) => {
     const today = getTodayDay();
     const { start: startOfToday, end: endOfToday } = getLocalDayBounds();
 
-    // Fetch all logs for today in a single query
-    const logsToday = await prisma.facultyLog.findMany({
-      where: {
-        classroomId: classroom.id,
-        createdAt: {
-          gte: startOfToday,
-          lte: endOfToday,
+    // Fetch all logs and timetable entries for today
+    const [logsToday, timetablesToday] = await Promise.all([
+      prisma.facultyLog.findMany({
+        where: {
+          classroomId: classroom.id,
+          createdAt: {
+            gte: startOfToday,
+            lte: endOfToday,
+          },
         },
-      },
-    });
+      }),
+      prisma.timetable.findMany({
+        where: {
+          classroomId: classroom.id,
+          day: today,
+        },
+      }),
+    ]);
 
     const currentTime = getCurrentTimeInHHMM();
     const schedule = [];
 
     for (const stdPeriod of STANDARD_PERIODS) {
-      // Find matching log if any
+      // Find matching log and timetable if any
       const log = logsToday.find(l => l.periodNo === stdPeriod.periodNo);
+      const timetable = timetablesToday.find(t => t.periodNo === stdPeriod.periodNo);
 
       let status = 'Future';
       const isActive = stdPeriod.startTime <= currentTime && currentTime < stdPeriod.endTime;
@@ -165,8 +174,8 @@ const getCRSchedule = async (req, res) => {
         periodNo: stdPeriod.periodNo,
         startTime: stdPeriod.startTime,
         endTime: stdPeriod.endTime,
-        facultyName: 'Faculty',
-        subjectName: 'Class',
+        facultyName: log ? log.facultyName : (timetable ? timetable.facultyName : 'Faculty'),
+        subjectName: timetable ? timetable.subjectName : 'Class',
         status,
         entryTime: log ? log.entryTime : null,
       });

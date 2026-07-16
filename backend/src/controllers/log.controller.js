@@ -45,8 +45,18 @@ const createEntryLog = async (req, res) => {
 
     const startTime = periodConfig.startTime;
     const endTime = periodConfig.endTime;
-    const facultyName = 'Faculty';
-    const subjectName = 'Class';
+
+    // Fetch actual timetable entry if exists
+    const timetable = await prisma.timetable.findFirst({
+      where: {
+        classroomId: classroom.id,
+        day: today,
+        periodNo: parseInt(periodNo),
+      },
+    });
+
+    const facultyName = timetable ? timetable.facultyName : 'Faculty';
+    const subjectName = timetable ? timetable.subjectName : 'Class';
 
     // Check time constraints
     const isActive = startTime <= currentTime && currentTime < endTime;
@@ -109,6 +119,85 @@ const createEntryLog = async (req, res) => {
       classroomName: classroom.className,
       roomNumber: classroom.roomNumber,
     });
+
+    // Auto-mark continuous periods of the same subject if this is the first starting period of a block
+    if (timetable) {
+      const timetablesToday = await prisma.timetable.findMany({
+        where: {
+          classroomId: classroom.id,
+          day: today,
+        },
+        orderBy: {
+          periodNo: 'asc',
+        },
+      });
+
+      const currentP = parseInt(periodNo);
+      const prevPeriod = timetablesToday.find(t => t.periodNo === currentP - 1);
+      const isStartOfBlock = !prevPeriod || prevPeriod.subjectName !== subjectName;
+
+      if (isStartOfBlock) {
+        let nextP = currentP + 1;
+        while (true) {
+          const nextTimetable = timetablesToday.find(t => t.periodNo === nextP);
+          if (nextTimetable && nextTimetable.subjectName === subjectName) {
+            // Check if log already exists for this next period today
+            const existingAutoLog = await prisma.facultyLog.findFirst({
+              where: {
+                classroomId: classroom.id,
+                periodNo: nextP,
+                createdAt: {
+                  gte: startOfToday,
+                  lte: endOfToday,
+                },
+              },
+            });
+
+            if (!existingAutoLog) {
+              const autoLog = await prisma.facultyLog.create({
+                data: {
+                  classroomId: classroom.id,
+                  facultyName: nextTimetable.facultyName,
+                  periodNo: nextP,
+                  entryTime: new Date(),
+                  status: 'Present',
+                },
+              });
+
+              // Find standard period configuration for socket event details
+              const autoPeriodConfig = STANDARD_PERIODS.find(p => p.periodNo === nextP);
+              const autoStartTime = autoPeriodConfig ? autoPeriodConfig.startTime : nextTimetable.startTime;
+              const autoEndTime = autoPeriodConfig ? autoPeriodConfig.endTime : nextTimetable.endTime;
+
+              // Broadcast live update for auto-marked period
+              emitClassroomStatusUpdate({
+                classroomId: classroom.id,
+                roomNumber: classroom.roomNumber,
+                className: classroom.className,
+                periodNo: nextP,
+                facultyName: nextTimetable.facultyName,
+                status: 'Present',
+                subjectName: nextTimetable.subjectName,
+                startTime: autoStartTime,
+                endTime: autoEndTime,
+                entryTime: autoLog.entryTime,
+              });
+
+              // Emit notification for auto-marked period
+              emitNotification({
+                message: `${nextTimetable.facultyName} entered Room ${classroom.roomNumber} (${classroom.className})`,
+                type: 'success',
+                classroomName: classroom.className,
+                roomNumber: classroom.roomNumber,
+              });
+            }
+            nextP++;
+          } else {
+            break;
+          }
+        }
+      }
+    }
 
     res.status(201).json(log);
   } catch (error) {
