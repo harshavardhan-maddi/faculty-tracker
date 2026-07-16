@@ -45,6 +45,7 @@ const FacultyDashboard = () => {
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [answeredCall, setAnsweredCall] = useState(true); // default to Yes (true)
   const [callType, setCallType] = useState('ABSENT'); // 'ABSENT' or 'INFO'
+  const [callRecipient, setCallRecipient] = useState('PARENT'); // 'PARENT' or 'STUDENT'
   const [callRemark, setCallRemark] = useState('');
   const [savingCallLog, setSavingCallLog] = useState(false);
   const [callHistory, setCallHistory] = useState([]);
@@ -264,6 +265,7 @@ const FacultyDashboard = () => {
     setCallHistory([]);
     const status = attendanceMap[student.id] || 'Present';
     setCallType(status === 'Absent' ? 'ABSENT' : 'INFO');
+    setCallRecipient('PARENT'); // Default to calling parent
     loadStudentCallHistory(student.id);
   };
 
@@ -287,7 +289,8 @@ const FacultyDashboard = () => {
           date: todayDate,
           answered: answeredCall,
           reason: callRemark,
-          callType: callType
+          callType: callType,
+          recipient: callRecipient
         })
       });
 
@@ -541,10 +544,11 @@ const FacultyDashboard = () => {
             {/* Modal Body */}
             <div className="p-6 overflow-y-auto space-y-6 flex-1">
               
-              {/* Quick Contacts Bar */}
+               {/* Quick Contacts Bar */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 dark:bg-slate-800/20 p-4 rounded-xl border border-slate-200/40 dark:border-slate-800/40">
                 <a
                   href={`tel:${selectedStudent.studentMobile}`}
+                  onClick={() => setCallRecipient('STUDENT')}
                   className="flex items-center justify-between p-3 bg-white dark:bg-slate-900 rounded-lg border hover:border-primary active:scale-[0.99] transition-all"
                 >
                   <div className="flex items-center gap-2">
@@ -558,6 +562,7 @@ const FacultyDashboard = () => {
                 </a>
                 <a
                   href={`tel:${selectedStudent.parentMobile}`}
+                  onClick={() => setCallRecipient('PARENT')}
                   className="flex items-center justify-between p-3 bg-white dark:bg-slate-900 rounded-lg border hover:border-primary active:scale-[0.99] transition-all"
                 >
                   <div className="flex items-center gap-2">
@@ -576,6 +581,37 @@ const FacultyDashboard = () => {
                 <h4 className="font-extrabold text-xs text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider">
                   Record Call Outcome for Today
                 </h4>
+
+                {/* Called Recipient Selector */}
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold text-slate-400 dark:text-slate-500">
+                    Person Called (Recipient)
+                  </label>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setCallRecipient('PARENT')}
+                      className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-bold border transition-all ${
+                        callRecipient === 'PARENT'
+                          ? 'bg-indigo-500/10 border-indigo-500/35 text-indigo-600 dark:text-indigo-400'
+                          : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 hover:bg-slate-100/50'
+                      }`}
+                    >
+                      Parent / Guardian
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCallRecipient('STUDENT')}
+                      className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-bold border transition-all ${
+                        callRecipient === 'STUDENT'
+                          ? 'bg-purple-500/10 border-purple-500/35 text-purple-600 dark:text-purple-400'
+                          : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 hover:bg-slate-100/50'
+                      }`}
+                    >
+                      Student
+                    </button>
+                  </div>
+                </div>
 
                 {/* Call Purpose Selector */}
                 <div className="space-y-2">
@@ -701,6 +737,13 @@ const FacultyDashboard = () => {
                               {new Date(log.date).toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' })}
                             </span>
                             <div className="flex gap-1.5 items-center">
+                              <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${
+                                log.recipient === 'STUDENT'
+                                  ? 'bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-500/10'
+                                  : 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border border-indigo-500/10'
+                              }`}>
+                                {log.recipient === 'STUDENT' ? 'Student' : 'Parent'}
+                              </span>
                               <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${
                                 log.callType === 'INFO'
                                   ? 'bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/10'

@@ -439,7 +439,7 @@ router.get('/absentees', authMiddleware, async (req, res) => {
 
 // 6. POST /call-log - Absent Controller records call stats
 router.post('/call-log', authMiddleware, roleMiddleware(['ABSENT_CONTROLLER', 'HOD', 'SUB_ADMIN', 'FACULTY']), async (req, res) => {
-  const { studentId, date, answered, reason, callType, preExcusedStart, preExcusedEnd, preExcusedReason } = req.body;
+  const { studentId, date, answered, reason, callType, recipient, preExcusedStart, preExcusedEnd, preExcusedReason } = req.body;
   if (!studentId || !date || answered === undefined) {
     return res.status(400).json({ message: 'Missing studentId, date, or answered status' });
   }
@@ -454,7 +454,8 @@ router.post('/call-log', authMiddleware, roleMiddleware(['ABSENT_CONTROLLER', 'H
         answered: Boolean(answered),
         reason: answered ? (reason || '') : null,
         calledById: req.user.id,
-        callType: callType || 'ABSENT'
+        callType: callType || 'ABSENT',
+        recipient: recipient || 'PARENT'
       }
     });
 
@@ -549,7 +550,8 @@ router.get('/student/:studentId/call-history', authMiddleware, async (req, res) 
       reason: log.reason,
       createdAt: log.createdAt,
       calledBy: userMap[log.calledById] || 'Unknown User',
-      callType: log.callType
+      callType: log.callType,
+      recipient: log.recipient
     }));
 
     res.json(formattedLogs);
