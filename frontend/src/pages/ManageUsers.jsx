@@ -174,6 +174,7 @@ const ManageUsers = () => {
                 if (u.role === 'HOD') roleBadge = 'bg-red-500/10 text-red-700 dark:text-red-400 border border-red-500/10';
                 if (u.role === 'SUB_ADMIN') roleBadge = 'bg-primary/10 text-primary-dark dark:text-primary border border-primary/10';
                 if (u.role === 'CR') roleBadge = 'bg-green-500/10 text-green-700 dark:text-green-400 border border-green-500/10';
+                if (u.role === 'FACULTY') roleBadge = 'bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-500/10';
 
                 return (
                   <tr key={u.id} className="hover:bg-slate-50/40 dark:hover:bg-slate-900/10">
@@ -313,6 +314,7 @@ const ManageUsers = () => {
                   <option value="SUB_ADMIN">Sub Admin</option>
                   <option value="HOD">HOD (Head of Department)</option>
                   <option value="ABSENT_CONTROLLER">Absent Controller</option>
+                  <option value="FACULTY">Faculty</option>
                 </select>
               </div>
 

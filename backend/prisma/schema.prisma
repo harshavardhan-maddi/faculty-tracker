@@ -13,6 +13,7 @@ enum Role {
   SUB_ADMIN
   CR
   ABSENT_CONTROLLER
+  FACULTY
 }
 
 model User {

@@ -233,7 +233,7 @@ router.get('/students', authMiddleware, async (req, res) => {
 });
 
 // 3. POST /bulk - Bulk hit student attendance
-router.post('/bulk', authMiddleware, roleMiddleware(['CR', 'HOD', 'SUB_ADMIN']), async (req, res) => {
+router.post('/bulk', authMiddleware, roleMiddleware(['CR', 'HOD', 'SUB_ADMIN', 'FACULTY']), async (req, res) => {
   const { section, date, attendanceData } = req.body;
   if (!section || !date || !Array.isArray(attendanceData)) {
     return res.status(400).json({ message: 'Missing required fields' });
@@ -437,7 +437,7 @@ router.get('/absentees', authMiddleware, async (req, res) => {
 });
 
 // 6. POST /call-log - Absent Controller records call stats
-router.post('/call-log', authMiddleware, roleMiddleware(['ABSENT_CONTROLLER', 'HOD', 'SUB_ADMIN']), async (req, res) => {
+router.post('/call-log', authMiddleware, roleMiddleware(['ABSENT_CONTROLLER', 'HOD', 'SUB_ADMIN', 'FACULTY']), async (req, res) => {
   const { studentId, date, answered, reason, preExcusedStart, preExcusedEnd, preExcusedReason } = req.body;
   if (!studentId || !date || answered === undefined) {
     return res.status(400).json({ message: 'Missing studentId, date, or answered status' });
@@ -511,6 +511,53 @@ router.get('/student/:studentId/absent-days', authMiddleware, async (req, res) =
     })));
   } catch (error) {
     console.error('Fetch absent days error:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
+
+// 7b. GET /student/:studentId/call-history - Fetch all call logs/remarks for a student
+router.get('/student/:studentId/call-history', authMiddleware, async (req, res) => {
+  const { studentId } = req.params;
+
+  try {
+    const logs = await prisma.absenteeCallLog.findMany({
+      where: {
+        studentId: Number(studentId)
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    // Fetch user details for calledByIds
+    const calledByIds = [...new Set(logs.map(log => log.calledById))];
+    const users = await prisma.user.findMany({
+      where: {
+        id: { in: calledByIds }
+      },
+      select: {
+        id: true,
+        name: true
+      }
+    });
+
+    const userMap = {};
+    users.forEach(u => {
+      userMap[u.id] = u.name;
+    });
+
+    const formattedLogs = logs.map(log => ({
+      id: log.id,
+      date: log.date,
+      answered: log.answered,
+      reason: log.reason,
+      createdAt: log.createdAt,
+      calledBy: userMap[log.calledById] || 'Unknown User'
+    }));
+
+    res.json(formattedLogs);
+  } catch (error) {
+    console.error('Fetch student call history error:', error);
     res.status(500).json({ message: 'Internal Server Error' });
   }
 });

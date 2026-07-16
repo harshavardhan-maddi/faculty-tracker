@@ -118,6 +118,10 @@ const Layout = ({ children }) => {
       { name: 'Reports', path: '/reports', icon: FileSpreadsheet },
       { name: 'Settings', path: '/settings', icon: Settings }
     );
+  } else if (user?.role === 'FACULTY') {
+    navLinks.push(
+      { name: 'Faculty Portal', path: '/faculty-dashboard', icon: LayoutDashboard }
+    );
   }
 
   const formatClockTime = (date) => {
