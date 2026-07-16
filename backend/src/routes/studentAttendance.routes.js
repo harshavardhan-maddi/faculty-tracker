@@ -373,7 +373,8 @@ router.get('/absentees', authMiddleware, async (req, res) => {
     let callLogs = [];
     if (user.role !== 'CR') {
       callLogs = await prisma.absenteeCallLog.findMany({
-        where: { date: date }
+        where: { date: date },
+        orderBy: { createdAt: 'desc' }
       });
     }
 
@@ -444,13 +445,7 @@ router.post('/call-log', authMiddleware, roleMiddleware(['ABSENT_CONTROLLER', 'H
   }
 
   try {
-    // 1. Delete and re-create Call Log
-    await prisma.absenteeCallLog.deleteMany({
-      where: {
-        studentId: Number(studentId),
-        date: date
-      }
-    });
+    // Preserving all historical logs. No deletion of past logs for the same day.
 
     const callLog = await prisma.absenteeCallLog.create({
       data: {

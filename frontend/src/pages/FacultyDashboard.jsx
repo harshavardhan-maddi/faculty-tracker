@@ -345,36 +345,7 @@ const FacultyDashboard = () => {
         </div>
       </div>
 
-      {/* Tabs Switcher */}
-      <div className="flex border-b border-slate-200 dark:border-slate-800">
-        <button
-          onClick={() => setActiveTab('attendance')}
-          className={`flex items-center gap-2 px-6 py-3 font-semibold text-sm border-b-2 transition-all ${
-            activeTab === 'attendance'
-              ? 'border-primary text-primary dark:text-primary-dark'
-              : 'border-transparent text-customText-muted dark:text-customText-mutedDark hover:text-customText dark:hover:text-customText-dark'
-          }`}
-        >
-          <Users size={16} />
-          <span>Attendance Registry</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('calls')}
-          className={`flex items-center gap-2 px-6 py-3 font-semibold text-sm border-b-2 transition-all ${
-            activeTab === 'calls'
-              ? 'border-primary text-primary dark:text-primary-dark'
-              : 'border-transparent text-customText-muted dark:text-customText-mutedDark hover:text-customText dark:hover:text-customText-dark'
-          }`}
-        >
-          <PhoneCall size={16} />
-          <span>Call Absentees</span>
-          {absentees.length > 0 && (
-            <span className="bg-red-500 text-white font-bold text-[10px] px-1.5 py-0.5 rounded-full">
-              {absentees.length}
-            </span>
-          )}
-        </button>
-      </div>
+      {/* Direct Call Registry Portal */}
 
       {/* Feedback Alerts */}
       {error && (
@@ -451,13 +422,23 @@ const FacultyDashboard = () => {
                         key={student.id}
                         className={`flex flex-col justify-between p-4 rounded-2xl border-2 shadow-sm transition-all ${borderClass}`}
                       >
-                        <div className="space-y-1">
-                          <h4 className="text-xs font-extrabold text-customText dark:text-customText-dark uppercase tracking-wide truncate">
-                            {student.rollNumber}
-                          </h4>
-                          <p className="text-[11px] text-customText-muted dark:text-customText-mutedDark font-semibold truncate">
-                            {student.name}
-                          </p>
+                        <div className="flex justify-between items-start">
+                          <div className="space-y-1 min-w-0 flex-1">
+                            <h4 className="text-xs font-extrabold text-customText dark:text-customText-dark uppercase tracking-wide truncate">
+                              {student.rollNumber}
+                            </h4>
+                            <p className="text-[11px] text-customText-muted dark:text-customText-mutedDark font-semibold truncate">
+                              {student.name}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => openCallModal(student)}
+                            className="p-1.5 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary-dark dark:text-primary transition-colors ml-2 shrink-0 active:scale-[0.93]"
+                            title="Call parent or student to pass information"
+                          >
+                            <PhoneCall size={14} />
+                          </button>
                         </div>
 
                         {/* Segmented P/A/L Buttons */}
@@ -526,111 +507,7 @@ const FacultyDashboard = () => {
         </div>
       )}
 
-      {/* TAB 2: Call Absentees */}
-      {activeTab === 'calls' && (
-        <div className="space-y-6">
-          {loadingAbsentees ? (
-            <div className="flex items-center justify-center py-20">
-              <Loading fullPage={false} size="sm" />
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <h3 className="font-bold text-sm text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider">
-                  Absentees & Late Comers Today ({absentees.length})
-                </h3>
-                <p className="text-[10px] text-customText-muted dark:text-customText-mutedDark font-semibold">
-                  Click on any card to document remarks or review historical call logs.
-                </p>
-              </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {absentees.map((abs) => {
-                  const student = abs.student || abs;
-                  const isLate = abs.status === 'Late';
-
-                  // Call log indicator info
-                  const logged = abs.callLog;
-                  
-                  let logStatusText = 'No call remark';
-                  let logStatusStyle = 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400';
-                  
-                  if (logged) {
-                    if (logged.isPreExcused) {
-                      logStatusText = 'Pre-informed';
-                      logStatusStyle = 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/10';
-                    } else if (logged.answered) {
-                      logStatusText = 'Answered';
-                      logStatusStyle = 'bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/10';
-                    } else {
-                      logStatusText = 'No Answer';
-                      logStatusStyle = 'bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/10';
-                    }
-                  }
-
-                  return (
-                    <div
-                      key={student.id}
-                      onClick={() => openCallModal(student)}
-                      className={`flex flex-col justify-between p-5 rounded-2xl border-2 hover:border-primary bg-white dark:bg-slate-900 shadow-sm cursor-pointer transition-all duration-200 active:scale-[0.98] relative overflow-hidden`}
-                    >
-                      <div className="space-y-1">
-                        <div className="flex justify-between items-start">
-                          <h4 className="text-xs font-extrabold text-customText dark:text-customText-dark uppercase tracking-wide truncate pr-2">
-                            {student.rollNumber}
-                          </h4>
-                          <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
-                            isLate 
-                              ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400' 
-                              : 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400'
-                          }`}>
-                            {abs.status}
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-customText-muted dark:text-customText-mutedDark font-semibold truncate">
-                          {student.name}
-                        </p>
-                      </div>
-
-                      {/* Contact Details */}
-                      <div className="mt-4 space-y-2 border-t border-slate-100 dark:border-slate-800 pt-3">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-slate-400 dark:text-slate-500">Student Contact:</span>
-                          <span className="font-semibold text-customText dark:text-customText-dark">{student.studentMobile || 'N/A'}</span>
-                        </div>
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-slate-400 dark:text-slate-500">Parent Contact:</span>
-                          <span className="font-semibold text-customText dark:text-customText-dark">{student.parentMobile || 'N/A'}</span>
-                        </div>
-                      </div>
-
-                      {/* Call Log Badge */}
-                      <div className="flex justify-between items-center mt-4">
-                        <span className={`inline-flex px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase ${logStatusStyle}`}>
-                          {logStatusText}
-                        </span>
-                        <button
-                          type="button"
-                          className="p-1.5 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary-dark dark:text-primary transition-colors"
-                          title="Call or Log remark"
-                        >
-                          <PhoneCall size={12} />
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-
-                {absentees.length === 0 && (
-                  <div className="col-span-full py-16 text-center text-sm text-customText-muted dark:text-customText-mutedDark bg-slate-50/50 dark:bg-slate-900/30 rounded-2xl border border-dashed">
-                    Zero absentees or late comers logged today. High attendance! 🎉
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* ABSENTEE CALL DETAILS & LOGGING MODAL */}
       {selectedStudent && (
@@ -730,14 +607,15 @@ const FacultyDashboard = () => {
                 {/* Remark Text area */}
                 <div className="space-y-1.5">
                   <label className="block text-xs font-bold text-slate-400 dark:text-slate-500">
-                    Call Remarks / Reason for Absence
+                    Call Remarks / Message to Parent
                   </label>
                   <textarea
-                    required
+                    required={answeredCall}
                     value={callRemark}
                     onChange={(e) => setCallRemark(e.target.value)}
-                    placeholder="Enter reason e.g., Medical leave, attending wedding, out of station..."
+                    placeholder={answeredCall ? "Enter message passed e.g., informed about poor attendance, discussed exam performance, parents notified..." : "No remarks needed for unanswered calls"}
                     className="glass-input text-sm py-2 px-3 h-20 resize-none"
+                    disabled={!answeredCall}
                   />
                 </div>
 
