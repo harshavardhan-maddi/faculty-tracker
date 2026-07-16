@@ -304,7 +304,11 @@ const FacultyDashboard = () => {
   };
 
   if (loadingClassrooms) {
-    return <Loading message="Loading classrooms..." />;
+    return (
+      <div className="flex items-center justify-center py-32">
+        <Loading fullPage={false} />
+      </div>
+    );
   }
 
   return (
@@ -391,7 +395,9 @@ const FacultyDashboard = () => {
       {activeTab === 'attendance' && (
         <div className="space-y-6">
           {loadingStudents ? (
-            <Loading message="Loading students..." />
+            <div className="flex items-center justify-center py-20">
+              <Loading fullPage={false} size="sm" />
+            </div>
           ) : (
             <>
               {/* Quick Actions Panel */}
@@ -524,7 +530,9 @@ const FacultyDashboard = () => {
       {activeTab === 'calls' && (
         <div className="space-y-6">
           {loadingAbsentees ? (
-            <Loading message="Loading absentees list..." />
+            <div className="flex items-center justify-center py-20">
+              <Loading fullPage={false} size="sm" />
+            </div>
           ) : (
             <div className="space-y-4">
               <div className="flex justify-between items-center">
