@@ -149,6 +149,7 @@ model AbsenteeCallLog {
   reason      String?  // Reason for absent if answered
   calledById  Int      @map("called_by_id")
   createdAt   DateTime @default(now()) @map("created_at")
+  callType    String   @default("ABSENT") @map("call_type")
 
   @@map("absentee_call_logs")
 }

@@ -235,7 +235,10 @@ const getAbsenteesReport = async (req, res) => {
     }
 
     const callLogs = await prisma.absenteeCallLog.findMany({
-      where: callLogWhere
+      where: {
+        ...callLogWhere,
+        callType: 'ABSENT'
+      }
     });
 
     // Map call logs for fast O(1) lookup

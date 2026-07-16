@@ -44,6 +44,7 @@ const FacultyDashboard = () => {
   // Call Log Modal States
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [answeredCall, setAnsweredCall] = useState(true); // default to Yes (true)
+  const [callType, setCallType] = useState('ABSENT'); // 'ABSENT' or 'INFO'
   const [callRemark, setCallRemark] = useState('');
   const [savingCallLog, setSavingCallLog] = useState(false);
   const [callHistory, setCallHistory] = useState([]);
@@ -261,6 +262,8 @@ const FacultyDashboard = () => {
     setAnsweredCall(true);
     setCallRemark('');
     setCallHistory([]);
+    const status = attendanceMap[student.id] || 'Present';
+    setCallType(status === 'Absent' ? 'ABSENT' : 'INFO');
     loadStudentCallHistory(student.id);
   };
 
@@ -283,7 +286,8 @@ const FacultyDashboard = () => {
           studentId: selectedStudent.id,
           date: todayDate,
           answered: answeredCall,
-          reason: callRemark
+          reason: callRemark,
+          callType: callType
         })
       });
 
@@ -572,6 +576,37 @@ const FacultyDashboard = () => {
                 <h4 className="font-extrabold text-xs text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider">
                   Record Call Outcome for Today
                 </h4>
+
+                {/* Call Purpose Selector */}
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold text-slate-400 dark:text-slate-500">
+                    Call Purpose / Type
+                  </label>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setCallType('INFO')}
+                      className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-bold border transition-all ${
+                        callType === 'INFO'
+                          ? 'bg-blue-500/10 border-blue-500/35 text-blue-600 dark:text-blue-400'
+                          : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 hover:bg-slate-100/50'
+                      }`}
+                    >
+                      Information Pass (General info)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCallType('ABSENT')}
+                      className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-bold border transition-all ${
+                        callType === 'ABSENT'
+                          ? 'bg-amber-500/10 border-amber-500/35 text-amber-600 dark:text-amber-400'
+                          : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 hover:bg-slate-100/50'
+                      }`}
+                    >
+                      Absent Call (Absence follow-up)
+                    </button>
+                  </div>
+                </div>
                 
                 {/* Answered Selector Toggle */}
                 <div className="space-y-2">
@@ -665,13 +700,22 @@ const FacultyDashboard = () => {
                             <span className="font-extrabold text-customText dark:text-customText-dark">
                               {new Date(log.date).toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' })}
                             </span>
-                            <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${
-                              log.answered
-                                ? 'bg-green-500/10 text-green-700 dark:text-green-400 border border-green-500/10'
-                                : 'bg-red-500/10 text-red-700 dark:text-red-400 border border-red-500/10'
-                            }`}>
-                              {log.answered ? 'Answered' : 'No Answer'}
-                            </span>
+                            <div className="flex gap-1.5 items-center">
+                              <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${
+                                log.callType === 'INFO'
+                                  ? 'bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/10'
+                                  : 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/10'
+                              }`}>
+                                {log.callType === 'INFO' ? 'Info Pass' : 'Absent Call'}
+                              </span>
+                              <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${
+                                log.answered
+                                  ? 'bg-green-500/10 text-green-700 dark:text-green-400 border border-green-500/10'
+                                  : 'bg-red-500/10 text-red-700 dark:text-red-400 border border-red-500/10'
+                              }`}>
+                                {log.answered ? 'Answered' : 'No Answer'}
+                              </span>
+                            </div>
                           </div>
                           
                           <p className="text-[11px] text-customText-muted dark:text-customText-mutedDark font-medium leading-relaxed">
