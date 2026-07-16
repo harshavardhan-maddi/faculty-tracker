@@ -26,6 +26,8 @@ const PrivateRoute = ({ children, allowedRoles }) => {
       defaultRoute = '/cr-dashboard';
     } else if (user.role === 'ABSENT_CONTROLLER') {
       defaultRoute = '/absent-controller';
+    } else if (user.role === 'FACULTY') {
+      defaultRoute = '/faculty-dashboard';
     }
     return <Navigate to={defaultRoute} replace />;
   }

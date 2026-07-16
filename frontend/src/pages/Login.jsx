@@ -76,6 +76,8 @@ const Login = () => {
         navigate('/cr-dashboard');
       } else if (loggedUser.role === 'ABSENT_CONTROLLER') {
         navigate('/absent-controller');
+      } else if (loggedUser.role === 'FACULTY') {
+        navigate('/faculty-dashboard');
       } else {
         navigate('/dashboard');
       }
@@ -178,6 +180,10 @@ const Login = () => {
       
       if (verifyData.user.role === 'CR') {
         navigate('/cr-dashboard');
+      } else if (verifyData.user.role === 'ABSENT_CONTROLLER') {
+        navigate('/absent-controller');
+      } else if (verifyData.user.role === 'FACULTY') {
+        navigate('/faculty-dashboard');
       } else {
         navigate('/dashboard');
       }
