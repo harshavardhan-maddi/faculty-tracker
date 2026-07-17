@@ -418,6 +418,7 @@ const FacultyDashboard = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                   {students.map((student) => {
                     const status = attendanceMap[student.id] || 'Present';
+                    const isActiveCall = selectedStudent?.id === student.id;
 
                     // Cards style overrides
                     let borderClass = 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900';
