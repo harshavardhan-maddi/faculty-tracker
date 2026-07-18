@@ -756,6 +756,11 @@ const FacultyDashboard = () => {
                                       "{callLog.reason}"
                                     </p>
                                   )}
+                                  {callLog.caller && (
+                                    <p className="mt-0.5 text-[8px] opacity-75 font-semibold">
+                                      By: {callLog.caller.name} ({callLog.caller.role})
+                                    </p>
+                                  )}
                                 </div>
                               );
                             })()}
