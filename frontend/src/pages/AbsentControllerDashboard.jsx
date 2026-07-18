@@ -15,6 +15,19 @@ import {
   X
 } from 'lucide-react';
 
+const ABSENCE_REASONS = {
+  "Medical": ["Fever", "Hospital", "Injury", "Medical Check-up"],
+  "Family": ["Marriage", "Emergency", "Death", "Sick Family Member"],
+  "Academic": ["Exam", "Project", "Internship", "Workshop"],
+  "Transport": ["Bus Missed", "Vehicle Breakdown", "Traffic"],
+  "Personal": ["Personal Work", "Stress", "Overslept"],
+  "Official": ["Bank", "Passport", "Government Work"],
+  "College Activity": ["Sports", "NSS", "Cultural Event"],
+  "Weather": ["Heavy Rain", "Flood", "Cyclone"],
+  "Work": ["Part-time Job", "Family Business"],
+  "Other": ["Travel", "Festival", "Miscellaneous"]
+};
+
 const AbsentControllerDashboard = () => {
   const { token, user } = useAuth();
   
@@ -31,7 +44,9 @@ const AbsentControllerDashboard = () => {
   // Call follow-up panel state
   const [activeCallStudent, setActiveCallStudent] = useState(null);
   const [answeredCall, setAnsweredCall] = useState(null); // true or false
-  const [absentReason, setAbsentReason] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('Medical');
+  const [selectedReason, setSelectedReason] = useState('Fever');
+  const [customReason, setCustomReason] = useState('');
   const [savingCall, setSavingCall] = useState(false);
   const [isMultiDay, setIsMultiDay] = useState(false);
   const [preExcusedStart, setPreExcusedStart] = useState('');
@@ -125,13 +140,38 @@ const AbsentControllerDashboard = () => {
     setActiveCallStudent(student);
     if (student.callLog) {
       setAnsweredCall(student.callLog.answered);
-      setAbsentReason(student.callLog.reason || '');
+      const logReason = student.callLog.reason || '';
       setIsMultiDay(!!student.preExcusedStart);
       setPreExcusedStart(student.preExcusedStart || '');
       setPreExcusedEnd(student.preExcusedEnd || '');
+
+      let matched = false;
+      const parts = logReason.split(' - ');
+      if (parts.length >= 2) {
+        const cat = parts[0];
+        const res = parts.slice(1).join(' - ');
+        if (ABSENCE_REASONS[cat]) {
+          setSelectedCategory(cat);
+          if (ABSENCE_REASONS[cat].includes(res)) {
+            setSelectedReason(res);
+            setCustomReason('');
+          } else {
+            setSelectedReason('Others');
+            setCustomReason(res);
+          }
+          matched = true;
+        }
+      }
+      if (!matched) {
+        setSelectedCategory('Other');
+        setSelectedReason('Others');
+        setCustomReason(logReason);
+      }
     } else {
       setAnsweredCall(null);
-      setAbsentReason('');
+      setSelectedCategory('Medical');
+      setSelectedReason('Fever');
+      setCustomReason('');
       setIsMultiDay(false);
       setPreExcusedStart('');
       setPreExcusedEnd('');
@@ -149,6 +189,10 @@ const AbsentControllerDashboard = () => {
     setError('');
     setSuccess('');
 
+    const finalReason = answeredCall
+      ? (selectedReason === 'Others' ? `${selectedCategory} - ${customReason}` : `${selectedCategory} - ${selectedReason}`)
+      : null;
+
     try {
       const res = await fetch('/api/student-attendance/call-log', {
         method: 'POST',
@@ -160,10 +204,10 @@ const AbsentControllerDashboard = () => {
           studentId: activeCallStudent.id,
           date: todayDate,
           answered: answeredCall,
-          reason: answeredCall ? absentReason : null,
+          reason: finalReason,
           preExcusedStart: (answeredCall && isMultiDay) ? preExcusedStart : null,
           preExcusedEnd: (answeredCall && isMultiDay) ? preExcusedEnd : null,
-          preExcusedReason: (answeredCall && isMultiDay) ? absentReason : null
+          preExcusedReason: (answeredCall && isMultiDay) ? finalReason : null
         })
       });
 
@@ -172,7 +216,9 @@ const AbsentControllerDashboard = () => {
         setSuccess(`Call log saved successfully for ${activeCallStudent.name}.`);
         setActiveCallStudent(null);
         setAnsweredCall(null);
-        setAbsentReason('');
+        setSelectedCategory('Medical');
+        setSelectedReason('Fever');
+        setCustomReason('');
         setIsMultiDay(false);
         setPreExcusedStart('');
         setPreExcusedEnd('');
@@ -424,20 +470,61 @@ const AbsentControllerDashboard = () => {
                                       </div>
 
                                       {answeredCall === true && (
-                                        <>
-                                          <div className="space-y-1">
-                                            <label className="block text-[10px] font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider">
-                                              Reason for absence
-                                            </label>
-                                            <input
-                                              type="text"
-                                              required
-                                              value={absentReason}
-                                              onChange={(e) => setAbsentReason(e.target.value)}
-                                              placeholder="e.g. Sick Leave, Emergency"
-                                              className="glass-input text-[11px] py-1.5"
-                                            />
-                                          </div>
+                                         <>
+                                           <div className="space-y-2">
+                                             <div className="space-y-1">
+                                               <label className="block text-[10px] font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider">
+                                                 Category
+                                               </label>
+                                               <select
+                                                 value={selectedCategory}
+                                                 onChange={(e) => {
+                                                   const cat = e.target.value;
+                                                   setSelectedCategory(cat);
+                                                   setSelectedReason(ABSENCE_REASONS[cat][0] || 'Others');
+                                                 }}
+                                                 className="glass-input text-[11px] py-1.5 w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-customText dark:text-customText-dark"
+                                                 required
+                                               >
+                                                 {Object.keys(ABSENCE_REASONS).map(cat => (
+                                                   <option key={cat} value={cat}>{cat}</option>
+                                                 ))}
+                                               </select>
+                                             </div>
+
+                                             <div className="space-y-1">
+                                               <label className="block text-[10px] font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider">
+                                                 Reason
+                                               </label>
+                                               <select
+                                                 value={selectedReason}
+                                                 onChange={(e) => setSelectedReason(e.target.value)}
+                                                 className="glass-input text-[11px] py-1.5 w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-customText dark:text-customText-dark"
+                                                 required
+                                               >
+                                                 {(ABSENCE_REASONS[selectedCategory] || []).map(res => (
+                                                   <option key={res} value={res}>{res}</option>
+                                                 ))}
+                                                 <option value="Others">Others</option>
+                                               </select>
+                                             </div>
+
+                                             {selectedReason === 'Others' && (
+                                               <div className="space-y-1">
+                                                 <label className="block text-[10px] font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider">
+                                                   Custom Reason
+                                                 </label>
+                                                 <input
+                                                   type="text"
+                                                   required
+                                                   value={customReason}
+                                                   onChange={(e) => setCustomReason(e.target.value)}
+                                                   placeholder="Enter customized reason"
+                                                   className="glass-input text-[11px] py-1.5"
+                                                 />
+                                               </div>
+                                             )}
+                                           </div>
 
                                           <div className="mt-2">
                                             <label className="flex items-center gap-2 text-[10px] font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider cursor-pointer">
@@ -894,18 +981,59 @@ const AbsentControllerDashboard = () => {
 
                                     {answeredCall === true && (
                                       <>
-                                        <div className="space-y-1">
-                                          <label className="block text-[10px] font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider">
-                                            Reason for absence
-                                          </label>
-                                          <input
-                                            type="text"
-                                            required
-                                            value={absentReason}
-                                            onChange={(e) => setAbsentReason(e.target.value)}
-                                            placeholder="e.g. Sick Leave, Emergency"
-                                            className="glass-input text-[11px] py-1.5"
-                                          />
+                                        <div className="space-y-2">
+                                          <div className="space-y-1">
+                                            <label className="block text-[10px] font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider">
+                                              Category
+                                            </label>
+                                            <select
+                                              value={selectedCategory}
+                                              onChange={(e) => {
+                                                const cat = e.target.value;
+                                                setSelectedCategory(cat);
+                                                setSelectedReason(ABSENCE_REASONS[cat][0] || 'Others');
+                                              }}
+                                              className="glass-input text-[11px] py-1.5 w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-customText dark:text-customText-dark"
+                                              required
+                                            >
+                                              {Object.keys(ABSENCE_REASONS).map(cat => (
+                                                <option key={cat} value={cat}>{cat}</option>
+                                              ))}
+                                            </select>
+                                          </div>
+
+                                          <div className="space-y-1">
+                                            <label className="block text-[10px] font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider">
+                                              Reason
+                                            </label>
+                                            <select
+                                              value={selectedReason}
+                                              onChange={(e) => setSelectedReason(e.target.value)}
+                                              className="glass-input text-[11px] py-1.5 w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-customText dark:text-customText-dark"
+                                              required
+                                            >
+                                              {(ABSENCE_REASONS[selectedCategory] || []).map(res => (
+                                                <option key={res} value={res}>{res}</option>
+                                              ))}
+                                              <option value="Others">Others</option>
+                                            </select>
+                                          </div>
+
+                                          {selectedReason === 'Others' && (
+                                            <div className="space-y-1">
+                                              <label className="block text-[10px] font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider">
+                                                Custom Reason
+                                              </label>
+                                              <input
+                                                type="text"
+                                                required
+                                                value={customReason}
+                                                onChange={(e) => setCustomReason(e.target.value)}
+                                                placeholder="Enter customized reason"
+                                                className="glass-input text-[11px] py-1.5"
+                                              />
+                                            </div>
+                                          )}
                                         </div>
 
                                         <div className="mt-2">

@@ -371,10 +371,19 @@ router.get('/absentees', authMiddleware, async (req, res) => {
     });
 
     let callLogs = [];
+    let callerMap = {};
     if (user.role !== 'CR') {
       callLogs = await prisma.absenteeCallLog.findMany({
         where: { date: date },
         orderBy: { createdAt: 'desc' }
+      });
+      const callerIds = [...new Set(callLogs.map(cl => cl.calledById))];
+      const callers = await prisma.user.findMany({
+        where: { id: { in: callerIds } },
+        select: { id: true, name: true, role: true }
+      });
+      callers.forEach(c => {
+        callerMap[c.id] = { name: c.name, role: c.role };
       });
     }
 
@@ -422,7 +431,8 @@ router.get('/absentees', authMiddleware, async (req, res) => {
             id: matchingCallLog.id,
             answered: matchingCallLog.answered,
             reason: matchingCallLog.reason,
-            createdAt: matchingCallLog.createdAt
+            createdAt: matchingCallLog.createdAt,
+            caller: callerMap[matchingCallLog.calledById] || null
           } : null;
         }
       }

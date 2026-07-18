@@ -20,6 +20,19 @@ import {
 } from 'lucide-react';
 import Loading from '../components/Loading';
 
+const ABSENCE_REASONS = {
+  "Medical": ["Fever", "Hospital", "Injury", "Medical Check-up"],
+  "Family": ["Marriage", "Emergency", "Death", "Sick Family Member"],
+  "Academic": ["Exam", "Project", "Internship", "Workshop"],
+  "Transport": ["Bus Missed", "Vehicle Breakdown", "Traffic"],
+  "Personal": ["Personal Work", "Stress", "Overslept"],
+  "Official": ["Bank", "Passport", "Government Work"],
+  "College Activity": ["Sports", "NSS", "Cultural Event"],
+  "Weather": ["Heavy Rain", "Flood", "Cyclone"],
+  "Work": ["Part-time Job", "Family Business"],
+  "Other": ["Travel", "Festival", "Miscellaneous"]
+};
+
 const FacultyDashboard = () => {
   const { token, user } = useAuth();
 
@@ -46,7 +59,9 @@ const FacultyDashboard = () => {
   const [answeredCall, setAnsweredCall] = useState(true); // default to Yes (true)
   const [callType, setCallType] = useState('ABSENT'); // 'ABSENT' or 'INFO'
   const [callRecipient, setCallRecipient] = useState('PARENT'); // 'PARENT' or 'STUDENT'
-  const [callRemark, setCallRemark] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('Medical');
+  const [selectedReason, setSelectedReason] = useState('Fever');
+  const [customReason, setCustomReason] = useState('');
   const [savingCallLog, setSavingCallLog] = useState(false);
   const [callHistory, setCallHistory] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
@@ -261,7 +276,9 @@ const FacultyDashboard = () => {
   const openCallModal = (student) => {
     setSelectedStudent(student);
     setAnsweredCall(true);
-    setCallRemark('');
+    setSelectedCategory('Medical');
+    setSelectedReason('Fever');
+    setCustomReason('');
     setCallHistory([]);
     const status = attendanceMap[student.id] || 'Present';
     setCallType(status === 'Absent' ? 'ABSENT' : 'INFO');
@@ -277,6 +294,10 @@ const FacultyDashboard = () => {
     setSavingCallLog(true);
     setHistoryError('');
 
+    const finalReason = answeredCall
+      ? (selectedReason === 'Others' ? `${selectedCategory} - ${customReason}` : `${selectedCategory} - ${selectedReason}`)
+      : null;
+
     try {
       const res = await fetch('/api/student-attendance/call-log', {
         method: 'POST',
@@ -288,7 +309,7 @@ const FacultyDashboard = () => {
           studentId: selectedStudent.id,
           date: todayDate,
           answered: answeredCall,
-          reason: callRemark,
+          reason: finalReason,
           callType: callType,
           recipient: callRecipient
         })
@@ -296,7 +317,9 @@ const FacultyDashboard = () => {
 
       const data = await res.json();
       if (res.ok) {
-        setCallRemark('');
+        setSelectedCategory('Medical');
+        setSelectedReason('Fever');
+        setCustomReason('');
         // Reload history & update absentees log display
         loadStudentCallHistory(selectedStudent.id);
         loadAbsenteesOnly();
@@ -350,6 +373,32 @@ const FacultyDashboard = () => {
             </select>
           </div>
         </div>
+      </div>
+
+      {/* Tab Switcher */}
+      <div className="flex border-b border-slate-200 dark:border-slate-800 no-print">
+        <button
+          onClick={() => setActiveTab('attendance')}
+          className={`flex items-center gap-2 py-3 px-6 text-sm font-semibold border-b-2 transition-all ${
+            activeTab === 'attendance'
+              ? 'border-primary text-primary-dark dark:text-primary font-bold'
+              : 'border-transparent text-customText-muted dark:text-customText-mutedDark hover:text-customText'
+          }`}
+        >
+          <Users size={16} />
+          <span>Attendance Registry</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('calls')}
+          className={`flex items-center gap-2 py-3 px-6 text-sm font-semibold border-b-2 transition-all ${
+            activeTab === 'calls'
+              ? 'border-primary text-primary-dark dark:text-primary font-bold'
+              : 'border-transparent text-customText-muted dark:text-customText-mutedDark hover:text-customText'
+          }`}
+        >
+          <PhoneCall size={16} />
+          <span>Parent Call Logs</span>
+        </button>
       </div>
 
       {/* Direct Call Registry Portal */}
@@ -590,18 +639,57 @@ const FacultyDashboard = () => {
                                 </div>
                               </div>
 
-                              {/* Remarks */}
-                              <div className="space-y-1">
-                                <label className="block text-[10px] font-bold text-slate-450">Remarks</label>
-                                <textarea
-                                  required={answeredCall}
-                                  value={callRemark}
-                                  onChange={(e) => setCallRemark(e.target.value)}
-                                  placeholder={answeredCall ? "e.g. parent informed..." : "No remarks needed for unanswered calls"}
-                                  className="glass-input text-xs py-1.5 px-2 h-14 resize-none"
-                                  disabled={!answeredCall}
-                                />
-                              </div>
+                              {/* Category and Reason */}
+                              {answeredCall && (
+                                <>
+                                  <div className="space-y-1">
+                                    <label className="block text-[10px] font-bold text-slate-450">Category</label>
+                                    <select
+                                      value={selectedCategory}
+                                      onChange={(e) => {
+                                        const cat = e.target.value;
+                                        setSelectedCategory(cat);
+                                        setSelectedReason(ABSENCE_REASONS[cat][0] || 'Others');
+                                      }}
+                                      className="glass-input text-[11px] py-1.5 w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-customText dark:text-customText-dark"
+                                      required
+                                    >
+                                      {Object.keys(ABSENCE_REASONS).map(cat => (
+                                        <option key={cat} value={cat}>{cat}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+
+                                  <div className="space-y-1">
+                                    <label className="block text-[10px] font-bold text-slate-450">Reason</label>
+                                    <select
+                                      value={selectedReason}
+                                      onChange={(e) => setSelectedReason(e.target.value)}
+                                      className="glass-input text-[11px] py-1.5 w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-customText dark:text-customText-dark"
+                                      required
+                                    >
+                                      {(ABSENCE_REASONS[selectedCategory] || []).map(res => (
+                                        <option key={res} value={res}>{res}</option>
+                                      ))}
+                                      <option value="Others">Others</option>
+                                    </select>
+                                  </div>
+
+                                  {selectedReason === 'Others' && (
+                                    <div className="space-y-1">
+                                      <label className="block text-[10px] font-bold text-slate-450">Custom Reason</label>
+                                      <input
+                                        type="text"
+                                        required
+                                        value={customReason}
+                                        onChange={(e) => setCustomReason(e.target.value)}
+                                        placeholder="Enter customized reason"
+                                        className="glass-input text-[11px] py-1.5"
+                                      />
+                                    </div>
+                                  )}
+                                </>
+                              )}
 
                               <div className="flex justify-end gap-2 pt-1.5">
                                 <button
@@ -707,6 +795,112 @@ const FacultyDashboard = () => {
               )}
             </>
           )}
+        </div>
+      )}
+
+      {activeTab === 'calls' && (
+        <div className="space-y-6">
+          <div className="glass-card p-6 border border-slate-200/50 dark:border-slate-800/45">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="font-bold text-base text-customText dark:text-customText-dark flex items-center gap-2">
+                <AlertCircle className="text-red-500" size={20} />
+                <span>Today's Absentees Call Status ({absentees.length})</span>
+              </h3>
+              <span className="text-xs bg-slate-100 dark:bg-slate-800 text-customText-muted dark:text-customText-mutedDark px-2.5 py-1 rounded-md font-semibold">
+                Date: {todayDate}
+              </span>
+            </div>
+
+            {loadingAbsentees ? (
+              <div className="flex items-center justify-center py-10">
+                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
+              </div>
+            ) : absentees.length === 0 ? (
+              <div className="text-center py-12 bg-slate-50/50 dark:bg-slate-900/30 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 text-customText-muted dark:text-customText-mutedDark">
+                🎉 No absentees logged for {selectedSection} today!
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {absentees.map((student) => {
+                  const hasCallLog = !!student.callLog;
+                  const isAnswered = student.callLog?.answered;
+                  const timing = student.callLog?.createdAt ? new Date(student.callLog.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null;
+                  const callerName = student.callLog?.caller?.name || (student.callLog?.isPreExcused ? 'System' : 'Unknown');
+                  const callerRole = student.callLog?.caller?.role || '';
+                  
+                  return (
+                    <div 
+                      key={student.id} 
+                      className={`p-5 rounded-2xl border transition-all duration-300 ${
+                        hasCallLog 
+                          ? isAnswered 
+                            ? 'bg-emerald-500/5 border-emerald-500/20' 
+                            : 'bg-red-500/5 border-red-500/20'
+                          : 'bg-slate-50 dark:bg-slate-900/40 border-slate-200 dark:border-slate-800'
+                      }`}
+                    >
+                      <div className="flex justify-between items-start mb-3">
+                        <div>
+                          <h4 className="text-sm font-bold text-customText dark:text-customText-dark uppercase">
+                            {student.rollNumber}
+                          </h4>
+                          <span className="text-[11px] text-customText-muted dark:text-customText-mutedDark font-semibold">
+                            {student.name}
+                          </span>
+                        </div>
+                        <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                          student.status === 'Late'
+                            ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-450 border border-amber-250 dark:border-amber-800'
+                            : 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-450 border border-red-250 dark:border-red-800'
+                        }`}>
+                          {student.status}
+                        </span>
+                      </div>
+
+                      <div className="pt-3 border-t border-slate-200/50 dark:border-slate-800/20 space-y-2">
+                        {hasCallLog ? (
+                          <div className="space-y-1.5">
+                            <div className="flex justify-between text-xs">
+                              <span className="text-customText-muted dark:text-customText-mutedDark">Call Status:</span>
+                              <span className={`font-bold ${isAnswered ? 'text-emerald-600 dark:text-emerald-440' : 'text-red-650 dark:text-red-450'}`}>
+                                {isAnswered ? 'Answered' : 'Not Answered'}
+                              </span>
+                            </div>
+                            {student.callLog.reason && (
+                              <div className="flex justify-between text-xs gap-4">
+                                <span className="text-customText-muted dark:text-customText-mutedDark shrink-0">Reason:</span>
+                                <span className="font-semibold text-right text-customText dark:text-customText-dark italic">
+                                  "{student.callLog.reason}"
+                                </span>
+                              </div>
+                            )}
+                            <div className="flex justify-between text-xs">
+                              <span className="text-customText-muted dark:text-customText-mutedDark">Called By:</span>
+                              <span className="font-semibold text-customText dark:text-customText-dark">
+                                {callerName} {callerRole && `(${callerRole})`}
+                              </span>
+                            </div>
+                            {timing && (
+                              <div className="flex justify-between text-xs">
+                                <span className="text-customText-muted dark:text-customText-mutedDark">Timing:</span>
+                                <span className="font-semibold text-customText dark:text-customText-dark">
+                                  {timing}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="text-center py-2 text-xs text-customText-muted dark:text-customText-mutedDark italic">
+                            Parent not called yet today.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
