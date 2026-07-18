@@ -52,6 +52,8 @@ const AbsentControllerDashboard = () => {
   const [preExcusedStart, setPreExcusedStart] = useState('');
   const [preExcusedEnd, setPreExcusedEnd] = useState('');
 
+  const [searchQuery, setSearchQuery] = useState('');
+
   // Student history modal state
   const [selectedHistoryStudent, setSelectedHistoryStudent] = useState(null);
   const [absentHistory, setAbsentHistory] = useState([]);
@@ -260,8 +262,14 @@ const AbsentControllerDashboard = () => {
     );
   }
 
-  const morningAbsentees = absentees.filter(s => s.attendanceSession === 'morning');
-  const afternoonAbsentees = absentees.filter(s => s.attendanceSession === 'afternoon');
+  const filteredAbsentees = absentees.filter(s => 
+    s.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    s.rollNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (s.section && s.section.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
+
+  const morningAbsentees = filteredAbsentees.filter(s => s.attendanceSession === 'morning');
+  const afternoonAbsentees = filteredAbsentees.filter(s => s.attendanceSession === 'afternoon');
 
   return (
     <div className="space-y-6">
@@ -321,6 +329,20 @@ const AbsentControllerDashboard = () => {
           <AlertCircle size={16} className="text-red-500" />
           <span>All Section Absentees</span>
         </button>
+      </div>
+
+      {/* Search Bar */}
+      <div className="relative w-full max-w-md no-print">
+        <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
+          <Search size={16} />
+        </span>
+        <input
+          type="text"
+          placeholder="Search absentees by name, roll number, or section..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="glass-input pl-10 pr-4 py-2 w-full text-sm placeholder-slate-400 border border-slate-200 dark:border-slate-800 rounded-xl bg-white/40 dark:bg-slate-900/40 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-customText dark:text-customText-dark"
+        />
       </div>
 
       {error && (
