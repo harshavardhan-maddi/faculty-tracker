@@ -730,6 +730,36 @@ const FacultyDashboard = () => {
                               </button>
                             </div>
 
+                            {/* Call Logs Detail if any */}
+                            {(() => {
+                              const absenteeInfo = absentees.find(a => a.id === student.id);
+                              const callLog = absenteeInfo?.callLog;
+                              if (!callLog) return null;
+                              return (
+                                <div className={`mt-2 p-2 rounded-xl text-[10px] ${
+                                  callLog.isPreExcused
+                                    ? 'bg-sky-500/10 text-sky-700 dark:text-sky-450 border border-sky-500/20'
+                                    : callLog.answered 
+                                      ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-450 border border-emerald-500/20' 
+                                      : 'bg-red-500/10 text-red-700 dark:text-red-450 border border-red-500/20'
+                                }`}>
+                                  <p className="font-bold flex items-center gap-1.5">
+                                    {callLog.isPreExcused ? <Calendar size={10} /> : callLog.answered ? <CheckCircle2 size={10} /> : <XCircle size={10} />}
+                                    <span>
+                                      {callLog.isPreExcused 
+                                        ? 'Pre-informed' 
+                                        : callLog.answered ? 'Parent Called' : 'Not Answered'}
+                                    </span>
+                                  </p>
+                                  {callLog.reason && (
+                                    <p className="mt-0.5 font-medium italic text-[9px] opacity-90 truncate">
+                                      "{callLog.reason}"
+                                    </p>
+                                  )}
+                                </div>
+                              );
+                            })()}
+
                             {/* Segmented P/A/L Buttons */}
                             <div className="flex items-center gap-1 mt-4 bg-slate-100 dark:bg-slate-800 p-0.5 rounded-xl border border-slate-200/50 dark:border-slate-700/50">
                               <button
