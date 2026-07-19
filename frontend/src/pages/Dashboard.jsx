@@ -79,6 +79,7 @@ const Dashboard = () => {
 
   // HOD Student Registry States
   const [students, setStudents] = useState([]);
+  const [selectedStudentIds, setSelectedStudentIds] = useState([]);
   const [searchStudentQuery, setSearchStudentQuery] = useState('');
   const [filterStudentSection, setFilterStudentSection] = useState('');
   const [showAddStudentModal, setShowAddStudentModal] = useState(false);
@@ -587,6 +588,49 @@ const Dashboard = () => {
     }
   };
 
+  const handleBulkDeleteStudents = async (mode) => {
+    let confirmMsg = '';
+    let payload = {};
+
+    if (mode === 'selected') {
+      if (selectedStudentIds.length === 0) return;
+      confirmMsg = `Are you sure you want to delete the ${selectedStudentIds.length} selected students? This action cannot be undone.`;
+      payload = { studentIds: selectedStudentIds };
+    } else if (mode === 'section') {
+      if (!filterStudentSection) return;
+      confirmMsg = `⚠️ WARNING: Are you sure you want to delete ALL students in the section "${filterStudentSection}"? This will permanently delete all student profiles and attendance records for this section.`;
+      payload = { section: filterStudentSection };
+    } else {
+      return;
+    }
+
+    if (!window.confirm(confirmMsg)) return;
+
+    setError('');
+    setSuccess('');
+    try {
+      const res = await fetch('/api/student-attendance/students/bulk-delete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSuccess(data.message || 'Students deleted successfully.');
+        setSelectedStudentIds([]);
+        fetchStudents();
+        fetchDashboardData(true);
+      } else {
+        setError(data.message || 'Failed to delete students');
+      }
+    } catch (err) {
+      setError('Network connection issue during deletion');
+    }
+  };
+
   const parseCSVText = (text) => {
     const lines = text.split('\n');
     const parsed = [];
@@ -687,10 +731,33 @@ const Dashboard = () => {
     .sort((a, b) => getStatusPriority(a.status) - getStatusPriority(b.status));
 
   // Filter registered students list
-  const filteredStudentsList = students.filter((s) =>
-    s.name.toLowerCase().includes(searchStudentQuery.toLowerCase()) ||
-    s.rollNumber.toLowerCase().includes(searchStudentQuery.toLowerCase())
-  );
+  const filteredStudentsList = students.filter((s) => {
+    const matchesSearch = s.name.toLowerCase().includes(searchStudentQuery.toLowerCase()) ||
+                          s.rollNumber.toLowerCase().includes(searchStudentQuery.toLowerCase());
+    const matchesSection = filterStudentSection ? s.section === filterStudentSection : true;
+    return matchesSearch && matchesSection;
+  });
+
+  const handleSelectStudentToggle = (studentId) => {
+    setSelectedStudentIds(prev => 
+      prev.includes(studentId)
+        ? prev.filter(id => id !== studentId)
+        : [...prev, studentId]
+    );
+  };
+
+  const handleSelectAllFilteredStudents = () => {
+    const allFilteredIds = filteredStudentsList.map(s => s.id);
+    const allSelected = allFilteredIds.every(id => selectedStudentIds.includes(id));
+    if (allSelected) {
+      setSelectedStudentIds(prev => prev.filter(id => !allFilteredIds.includes(id)));
+    } else {
+      setSelectedStudentIds(prev => {
+        const uniqueNewIds = allFilteredIds.filter(id => !prev.includes(id));
+        return [...prev, ...uniqueNewIds];
+      });
+    }
+  };
 
   if (loading) {
     return <Loading />;
@@ -1033,22 +1100,50 @@ const Dashboard = () => {
                 />
               </div>
 
-              <div className="flex items-center gap-2 w-full sm:w-auto">
+              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
                 <span className="text-xs font-bold text-customText-muted uppercase shrink-0">Class Section:</span>
-                <select
-                  value={filterStudentSection}
-                  onChange={(e) => setFilterStudentSection(e.target.value)}
-                  className="glass-input text-xs py-2 w-full sm:w-48"
-                >
-                  <option value="">-- All Sections (Total: {students.length}) --</option>
-                  {classrooms.map((c) => (
-                    <option key={c.id} value={c.className}>
-                      {c.className} ({getSectionCount(c.className)})
-                    </option>
-                  ))}
-                </select>
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <select
+                    value={filterStudentSection}
+                    onChange={(e) => setFilterStudentSection(e.target.value)}
+                    className="glass-input text-xs py-2 w-full sm:w-48"
+                  >
+                    <option value="">-- All Sections (Total: {students.length}) --</option>
+                    {classrooms.map((c) => (
+                      <option key={c.id} value={c.className}>
+                        {c.className} ({getSectionCount(c.className)})
+                      </option>
+                    ))}
+                  </select>
+                  {filterStudentSection && (
+                    <button
+                      onClick={() => handleBulkDeleteStudents('section')}
+                      className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold flex items-center gap-1.5 text-xs transition-colors shrink-0 cursor-pointer shadow-sm"
+                      title={`Delete entire section "${filterStudentSection}"`}
+                    >
+                      <Trash2 size={13} />
+                      <span>Delete Section</span>
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
+
+            {/* Bulk actions banner if students selected */}
+            {selectedStudentIds.length > 0 && (
+              <div className="flex items-center justify-between bg-amber-500/10 border border-amber-500/25 p-3 rounded-xl">
+                <span className="text-xs font-bold text-amber-800 dark:text-amber-450">
+                  Selected {selectedStudentIds.length} students
+                </span>
+                <button
+                  onClick={() => handleBulkDeleteStudents('selected')}
+                  className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold flex items-center gap-1.5 text-xs transition-colors cursor-pointer"
+                >
+                  <Trash2 size={13} />
+                  <span>Delete Selected</span>
+                </button>
+              </div>
+            )}
 
             {/* Student Count Summary Banner */}
             <div className="flex flex-wrap gap-3 text-xs font-bold mt-2">
@@ -1067,6 +1162,14 @@ const Dashboard = () => {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="border-b border-slate-200 dark:border-slate-800 text-xs font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider">
+                    <th className="pb-3 w-8">
+                      <input
+                        type="checkbox"
+                        checked={filteredStudentsList.length > 0 && filteredStudentsList.every(s => selectedStudentIds.includes(s.id))}
+                        onChange={handleSelectAllFilteredStudents}
+                        className="rounded border-slate-300 text-primary focus:ring-primary w-4 h-4 cursor-pointer"
+                      />
+                    </th>
                     <th className="pb-3">Roll Number</th>
                     <th className="pb-3">Name</th>
                     <th className="pb-3">Section/Class</th>
@@ -1078,6 +1181,14 @@ const Dashboard = () => {
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50 text-xs text-customText dark:text-customText-dark">
                   {filteredStudentsList.map((s) => (
                     <tr key={s.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/25 transition-colors">
+                      <td className="py-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedStudentIds.includes(s.id)}
+                          onChange={() => handleSelectStudentToggle(s.id)}
+                          className="rounded border-slate-300 text-primary focus:ring-primary w-4 h-4 cursor-pointer"
+                        />
+                      </td>
                       <td className="py-3 font-semibold text-primary">{s.rollNumber}</td>
                       <td className="py-3 font-bold">{s.name}</td>
                       <td className="py-3 font-semibold">{s.section}</td>
@@ -1111,7 +1222,7 @@ const Dashboard = () => {
                   ))}
                   {filteredStudentsList.length === 0 && (
                     <tr>
-                      <td colSpan="6" className="text-center py-10 text-customText-muted">
+                      <td colSpan="7" className="text-center py-10 text-customText-muted">
                         No students found registered under this category.
                       </td>
                     </tr>

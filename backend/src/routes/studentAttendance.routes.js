@@ -595,6 +595,35 @@ router.delete('/students/:id', authMiddleware, roleMiddleware(['HOD', 'SUB_ADMIN
   }
 });
 
+// 8b. POST /students/bulk-delete - HOD deletes multiple students or a whole section
+router.post('/students/bulk-delete', authMiddleware, roleMiddleware(['HOD']), async (req, res) => {
+  const { studentIds, section } = req.body;
+
+  if (!studentIds && !section) {
+    return res.status(400).json({ message: 'Please specify studentIds or section to delete' });
+  }
+
+  try {
+    let deletedCount = 0;
+    if (studentIds && Array.isArray(studentIds) && studentIds.length > 0) {
+      const deleteResult = await prisma.student.deleteMany({
+        where: { id: { in: studentIds.map(Number) } }
+      });
+      deletedCount = deleteResult.count;
+    } else if (section) {
+      const deleteResult = await prisma.student.deleteMany({
+        where: { section: section }
+      });
+      deletedCount = deleteResult.count;
+    }
+
+    res.json({ message: `Successfully deleted ${deletedCount} students.` });
+  } catch (error) {
+    console.error('Bulk delete students error:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
+
 // 9. POST /students/bulk - HOD/Sub-Admin bulk registers students from CSV/JSON parsed array
 router.post('/students/bulk', authMiddleware, roleMiddleware(['HOD', 'SUB_ADMIN']), async (req, res) => {
   const { section, students } = req.body;
