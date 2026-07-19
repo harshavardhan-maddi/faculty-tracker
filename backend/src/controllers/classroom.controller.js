@@ -20,10 +20,13 @@ const getClassrooms = async (req, res) => {
       studentCountMap[sc.section] = sc._count.id;
     });
 
+    const today = getTodayDay();
+    const isSunday = today === 'Sunday';
+
     const trackingSetting = await prisma.systemSetting.findUnique({
       where: { key: 'trackingEnabled' },
     });
-    const trackingEnabled = trackingSetting ? trackingSetting.value === 'true' : true;
+    const trackingEnabled = isSunday ? false : (trackingSetting ? trackingSetting.value === 'true' : true);
 
     if (!trackingEnabled) {
       const holidayResponse = classrooms.map((c) => ({
@@ -37,7 +40,6 @@ const getClassrooms = async (req, res) => {
       return res.json(holidayResponse);
     }
 
-    const today = getTodayDay();
     const currentTime = getCurrentTimeInHHMM();
 
     const { start: startOfToday, end: endOfToday } = getLocalDayBounds();

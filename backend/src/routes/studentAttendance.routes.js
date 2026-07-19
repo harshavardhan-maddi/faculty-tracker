@@ -3,6 +3,7 @@ const router = express.Router();
 const prisma = require('../db');
 const authMiddleware = require('../middleware/auth.middleware');
 const roleMiddleware = require('../middleware/role.middleware');
+const { getTodayDay } = require('../utils/date');
 
 const getTimingSettings = async () => {
   const defaults = {
@@ -45,6 +46,18 @@ const getTimingSettings = async () => {
 
 const checkCRAttendanceAccess = async (user, className) => {
   if (user.role !== 'CR') return true;
+
+  // Sunday or holiday check
+  const todayDay = getTodayDay();
+  const isSunday = todayDay === 'Sunday';
+  const trackingSetting = await prisma.systemSetting.findUnique({
+    where: { key: 'trackingEnabled' },
+  });
+  const trackingEnabled = isSunday ? false : (trackingSetting ? trackingSetting.value === 'true' : true);
+
+  if (!trackingEnabled) {
+    return false;
+  }
 
   const now = new Date();
   const kolkataTimeString = now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" });
@@ -95,6 +108,22 @@ router.get('/can-submit', authMiddleware, async (req, res) => {
     const className = req.user.className;
     if (!className) {
       return res.json({ canSubmit: false, reason: 'No class assigned' });
+    }
+
+    const todayDay = getTodayDay();
+    const isSunday = todayDay === 'Sunday';
+    const trackingSetting = await prisma.systemSetting.findUnique({
+      where: { key: 'trackingEnabled' },
+    });
+    const trackingEnabled = isSunday ? false : (trackingSetting ? trackingSetting.value === 'true' : true);
+
+    if (!trackingEnabled) {
+      return res.json({ 
+        canSubmit: false, 
+        reason: isSunday 
+          ? 'Today is Sunday. College is on Holiday.' 
+          : 'Attendance submissions are disabled. College is on Holiday.'
+      });
     }
 
     const hasAccess = await checkCRAttendanceAccess(req.user, className);

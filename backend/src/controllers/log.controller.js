@@ -4,10 +4,13 @@ const { getTodayDay, getCurrentTimeInHHMM, getLocalDayBounds, STANDARD_PERIODS }
 
 const createEntryLog = async (req, res) => {
   try {
+    const today = getTodayDay();
+    const isSunday = today === 'Sunday';
+
     const trackingSetting = await prisma.systemSetting.findUnique({
       where: { key: 'trackingEnabled' },
     });
-    const trackingEnabled = trackingSetting ? trackingSetting.value === 'true' : true;
+    const trackingEnabled = isSunday ? false : (trackingSetting ? trackingSetting.value === 'true' : true);
 
     if (!trackingEnabled) {
       return res.status(403).json({ message: 'Tracking is disabled. College is on Holiday.' });
@@ -35,7 +38,6 @@ const createEntryLog = async (req, res) => {
     if (req.user.className !== classroom.className) {
       return res.status(403).json({ message: 'You can only log attendance for your assigned classroom' });
     }
-    const today = getTodayDay();
     const currentTime = getCurrentTimeInHHMM();
 
     const periodConfig = STANDARD_PERIODS.find(p => p.periodNo === parseInt(periodNo));
