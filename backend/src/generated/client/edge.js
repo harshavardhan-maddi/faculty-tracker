@@ -247,7 +247,7 @@ const config = {
       "fromEnvVar": null
     },
     "config": {
-      "engineType": "binary"
+      "engineType": "library"
     },
     "binaryTargets": [
       {
@@ -265,7 +265,7 @@ const config = {
     "isCustomOutput": true
   },
   "relativeEnvPaths": {
-    "rootEnvPath": "../../../.env",
+    "rootEnvPath": null,
     "schemaEnvPath": "../../../.env"
   },
   "relativePath": "../../../prisma",
