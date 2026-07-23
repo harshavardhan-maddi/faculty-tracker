@@ -5,9 +5,16 @@ if (process.env.DATABASE_URL) {
   } else if (url.startsWith("'") && url.endsWith("'")) {
     url = url.slice(1, -1);
   }
+  
+  // Ensure connection limit is set to 1 for serverless environments to prevent pooler exhaustion
+  if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
+    if (!url.includes('connection_limit=')) {
+      const separator = url.includes('?') ? '&' : '?';
+      url += `${separator}connection_limit=1`;
+    }
+  }
   process.env.DATABASE_URL = url;
 }
-
 
 let PrismaClient;
 try {
@@ -23,13 +30,9 @@ try {
 
 let prisma;
 
-if (process.env.NODE_ENV === 'production') {
-  prisma = new PrismaClient();
-} else {
-  if (!global.prisma) {
-    global.prisma = new PrismaClient();
-  }
-  prisma = global.prisma;
+if (!global.prisma) {
+  global.prisma = new PrismaClient();
 }
+prisma = global.prisma;
 
 module.exports = prisma;
