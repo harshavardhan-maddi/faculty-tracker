@@ -8,10 +8,6 @@ if (process.env.DATABASE_URL) {
   process.env.DATABASE_URL = url;
 }
 
-if (process.env.VERCEL) {
-  process.env.PRISMA_CLIENT_ENGINE_TYPE = 'library';
-  process.env.PRISMA_CLI_QUERY_ENGINE_TYPE = 'library';
-}
 
 let PrismaClient;
 try {

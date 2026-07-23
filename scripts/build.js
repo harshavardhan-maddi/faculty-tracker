@@ -3,10 +3,6 @@ const path = require('path');
 
 console.log('[Build Script] Starting build process...');
 
-if (process.env.VERCEL) {
-  process.env.PRISMA_CLIENT_ENGINE_TYPE = 'library';
-  process.env.PRISMA_CLI_QUERY_ENGINE_TYPE = 'library';
-}
 
 try {
   // 1. Install Backend Dependencies
