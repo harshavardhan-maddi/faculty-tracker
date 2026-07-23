@@ -53,6 +53,18 @@ const AbsentControllerDashboard = () => {
   const [preExcusedEnd, setPreExcusedEnd] = useState('');
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [sessionFilter, setSessionFilter] = useState('All'); // 'All' | 'morning' | 'afternoon'
+
+  const handleDownloadReport = (targetSession = sessionFilter) => {
+    const params = new URLSearchParams();
+    params.append('section', activeBoardTab === 'sectionWise' ? selectedSection : 'All');
+    params.append('date', todayDate);
+    if (targetSession && targetSession !== 'All') {
+      params.append('session', targetSession);
+    }
+    params.append('format', 'excel');
+    window.open(`/api/reports/absentees?${params.toString()}`, '_blank');
+  };
 
   // Student history modal state
   const [selectedHistoryStudent, setSelectedHistoryStudent] = useState(null);
@@ -262,14 +274,22 @@ const AbsentControllerDashboard = () => {
     );
   }
 
-  const filteredAbsentees = absentees.filter(s => 
-    s.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    s.rollNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (s.section && s.section.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  const filteredAbsentees = absentees.filter(s => {
+    const matchesSearch = s.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          s.rollNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          (s.section && s.section.toLowerCase().includes(searchQuery.toLowerCase()));
+    if (!matchesSearch) return false;
+    if (sessionFilter === 'morning') return s.attendanceSession === 'morning';
+    if (sessionFilter === 'afternoon') return s.attendanceSession === 'afternoon';
+    return true;
+  });
 
   const morningAbsentees = filteredAbsentees.filter(s => s.attendanceSession === 'morning');
   const afternoonAbsentees = filteredAbsentees.filter(s => s.attendanceSession === 'afternoon');
+  const filteredStudentsList = students.filter(s =>
+    s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    s.rollNumber.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <div className="space-y-6">
@@ -331,18 +351,47 @@ const AbsentControllerDashboard = () => {
         </button>
       </div>
 
-      {/* Search Bar */}
-      <div className="relative w-full max-w-md no-print">
-        <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
-          <Search size={16} />
-        </span>
-        <input
-          type="text"
-          placeholder="Search absentees by name, roll number, or section..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="glass-input pl-10 pr-4 py-2 w-full text-sm placeholder-slate-400 border border-slate-200 dark:border-slate-800 rounded-xl bg-white/40 dark:bg-slate-900/40 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-customText dark:text-customText-dark"
-        />
+      {/* Controls Bar: Search & Session Filter & Download Report */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 no-print">
+        <div className="relative w-full max-w-md">
+          <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
+            <Search size={16} />
+          </span>
+          <input
+            type="text"
+            placeholder="Search absentees & students by name, roll number, or section..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="glass-input pl-10 pr-4 py-2 w-full text-sm placeholder-slate-400 border border-slate-200 dark:border-slate-800 rounded-xl bg-white/40 dark:bg-slate-900/40 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-customText dark:text-customText-dark"
+          />
+        </div>
+
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+          {/* Session Filter Dropdown */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-customText-muted dark:text-customText-mutedDark uppercase">Session:</span>
+            <select
+              value={sessionFilter}
+              onChange={(e) => setSessionFilter(e.target.value)}
+              className="glass-input text-xs py-2 px-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl font-bold"
+            >
+              <option value="All">All Sessions</option>
+              <option value="morning">Morning Absentees</option>
+              <option value="afternoon">Afternoon Absentees</option>
+            </select>
+          </div>
+
+          {/* Download Report Button */}
+          <button
+            onClick={() => handleDownloadReport(sessionFilter)}
+            className="flex items-center gap-1.5 py-2 px-4 rounded-xl text-xs font-extrabold bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-600/20 active:scale-[0.98] transition-all"
+          >
+            <span>Download Report</span>
+            <span className="text-[10px] bg-emerald-800/40 px-1.5 py-0.5 rounded uppercase">
+              {sessionFilter}
+            </span>
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -781,9 +830,27 @@ const AbsentControllerDashboard = () => {
                                   </div>
                                 )}
 
-                                <span className="mt-2 text-center text-xs font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 py-2 px-4 rounded-xl border border-slate-200 dark:border-slate-700">
-                                  Afternoon Entry - Calling Not Allowed
-                                </span>
+                                {isLate ? (
+                                  <span className="mt-2 text-center text-xs font-bold text-amber-600 bg-amber-500/10 py-2 px-4 rounded-xl border border-amber-500/20">
+                                    Late Entry - Calling Restricted
+                                  </span>
+                                ) : student.callLog?.isPreExcused ? (
+                                  <span className="mt-2 text-center text-xs font-bold text-sky-600 bg-sky-500/10 py-2 px-4 rounded-xl border border-sky-500/20">
+                                    No Call Required (Pre-informed)
+                                  </span>
+                                ) : (
+                                  <button
+                                    onClick={() => handleMakeCall(student)}
+                                    className={`mt-2 flex items-center justify-center gap-2 py-2 px-4 rounded-xl text-xs font-bold text-white transition-all active:scale-[0.98] ${
+                                      hasCallLog 
+                                        ? 'bg-slate-600 hover:bg-slate-700' 
+                                        : 'bg-primary-dark hover:bg-primary text-white shadow-md shadow-primary-dark/10'
+                                    }`}
+                                  >
+                                    <PhoneCall size={14} />
+                                    <span>{hasCallLog ? 'Call Again / Update' : 'Call Parent'}</span>
+                                  </button>
+                                )}
                               </div>
                             </div>
                           );
@@ -801,11 +868,11 @@ const AbsentControllerDashboard = () => {
             <div className="glass-card p-6 border border-slate-200/50 dark:border-slate-800/45">
               <h3 className="font-bold text-base text-customText dark:text-customText-dark flex items-center gap-2 mb-6">
                 <Users className="text-slate-500" size={20} />
-                <span>All Students ({students.length})</span>
+                <span>All Students Registry ({filteredStudentsList.length})</span>
               </h3>
 
               <div className="space-y-4 max-h-[600px] overflow-y-auto pr-1">
-                {students.map((student) => (
+                {filteredStudentsList.map((student) => (
                   <div
                     key={student.id}
                     className="p-4 bg-slate-50/50 dark:bg-slate-800/20 border border-slate-200/45 dark:border-slate-800/40 rounded-2xl flex flex-col gap-3 transition-all duration-200 shadow-sm hover:shadow-md"

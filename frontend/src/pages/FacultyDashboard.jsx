@@ -720,14 +720,20 @@ const FacultyDashboard = () => {
                                   {student.name}
                                 </p>
                               </div>
-                              <button
-                                type="button"
-                                onClick={() => openCallModal(student)}
-                                className="p-1.5 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary-dark dark:text-primary transition-colors ml-2 shrink-0 active:scale-[0.93]"
-                                title="Call parent or student to pass information"
-                              >
-                                <PhoneCall size={14} />
-                              </button>
+                              {status === 'Late' ? (
+                                <span className="text-[9px] font-bold text-amber-600 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 shrink-0 ml-2">
+                                  Late - Call Restricted
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => openCallModal(student)}
+                                  className="p-1.5 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary-dark dark:text-primary transition-colors ml-2 shrink-0 active:scale-[0.93]"
+                                  title="Call parent or student to pass information"
+                                >
+                                  <PhoneCall size={14} />
+                                </button>
+                              )}
                             </div>
 
                             {/* Call Logs Detail if any */}
@@ -855,84 +861,192 @@ const FacultyDashboard = () => {
                 🎉 No absentees logged for {selectedSection} today!
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {absentees.map((student) => {
-                  const hasCallLog = !!student.callLog;
-                  const isAnswered = student.callLog?.answered;
-                  const timing = student.callLog?.createdAt ? new Date(student.callLog.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null;
-                  const callerName = student.callLog?.caller?.name || (student.callLog?.isPreExcused ? 'System' : 'Unknown');
-                  const callerRole = student.callLog?.caller?.role || '';
-                  
-                  return (
-                    <div 
-                      key={student.id} 
-                      className={`p-5 rounded-2xl border transition-all duration-300 ${
-                        hasCallLog 
-                          ? isAnswered 
-                            ? 'bg-emerald-500/5 border-emerald-500/20' 
-                            : 'bg-red-500/5 border-red-500/20'
-                          : 'bg-slate-50 dark:bg-slate-900/40 border-slate-200 dark:border-slate-800'
-                      }`}
-                    >
-                      <div className="flex justify-between items-start mb-3">
-                        <div>
-                          <h4 className="text-sm font-bold text-customText dark:text-customText-dark uppercase">
-                            {student.rollNumber}
-                          </h4>
-                          <span className="text-[11px] text-customText-muted dark:text-customText-mutedDark font-semibold">
-                            {student.name}
-                          </span>
-                        </div>
-                        <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${
-                          student.status === 'Late'
-                            ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-450 border border-amber-250 dark:border-amber-800'
-                            : 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-450 border border-red-250 dark:border-red-800'
-                        }`}>
-                          {student.status}
-                        </span>
-                      </div>
-
-                      <div className="pt-3 border-t border-slate-200/50 dark:border-slate-800/20 space-y-2">
-                        {hasCallLog ? (
-                          <div className="space-y-1.5">
-                            <div className="flex justify-between text-xs">
-                              <span className="text-customText-muted dark:text-customText-mutedDark">Call Status:</span>
-                              <span className={`font-bold ${isAnswered ? 'text-emerald-600 dark:text-emerald-440' : 'text-red-650 dark:text-red-450'}`}>
-                                {isAnswered ? 'Answered' : 'Not Answered'}
-                              </span>
-                            </div>
-                            {student.callLog.reason && (
-                              <div className="flex justify-between text-xs gap-4">
-                                <span className="text-customText-muted dark:text-customText-mutedDark shrink-0">Reason:</span>
-                                <span className="font-semibold text-right text-customText dark:text-customText-dark italic">
-                                  "{student.callLog.reason}"
-                                </span>
-                              </div>
-                            )}
-                            <div className="flex justify-between text-xs">
-                              <span className="text-customText-muted dark:text-customText-mutedDark">Called By:</span>
-                              <span className="font-semibold text-customText dark:text-customText-dark">
-                                {callerName} {callerRole && `(${callerRole})`}
-                              </span>
-                            </div>
-                            {timing && (
-                              <div className="flex justify-between text-xs">
-                                <span className="text-customText-muted dark:text-customText-mutedDark">Timing:</span>
-                                <span className="font-semibold text-customText dark:text-customText-dark">
-                                  {timing}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <div className="text-center py-2 text-xs text-customText-muted dark:text-customText-mutedDark italic">
-                            Parent not called yet today.
-                          </div>
-                        )}
-                      </div>
+              <div className="space-y-8">
+                {/* Morning Session Absentees */}
+                <div>
+                  <h4 className="font-extrabold text-xs text-primary uppercase tracking-wider mb-4 flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+                    <span>Morning Session Absentees ({absentees.filter(a => a.attendanceSession === 'morning').length})</span>
+                  </h4>
+                  {absentees.filter(a => a.attendanceSession === 'morning').length === 0 ? (
+                    <div className="text-center py-6 bg-slate-50/50 dark:bg-slate-900/30 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 text-xs text-customText-muted dark:text-customText-mutedDark">
+                      No morning absentees.
                     </div>
-                  );
-                })}
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {absentees.filter(a => a.attendanceSession === 'morning').map((student) => {
+                        const hasCallLog = !!student.callLog;
+                        const isAnswered = student.callLog?.answered;
+                        const timing = student.callLog?.createdAt ? new Date(student.callLog.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null;
+                        const callerName = student.callLog?.caller?.name || (student.callLog?.isPreExcused ? 'System' : 'Unknown');
+                        const callerRole = student.callLog?.caller?.role || '';
+                        
+                        return (
+                          <div 
+                            key={student.id} 
+                            className={`p-5 rounded-2xl border transition-all duration-300 ${
+                              hasCallLog 
+                                ? isAnswered 
+                                  ? 'bg-emerald-500/5 border-emerald-500/20' 
+                                  : 'bg-red-500/5 border-red-500/20'
+                                : 'bg-slate-50 dark:bg-slate-900/40 border-slate-200 dark:border-slate-800'
+                            }`}
+                          >
+                            <div className="flex justify-between items-start mb-3">
+                              <div>
+                                <h4 className="text-sm font-bold text-customText dark:text-customText-dark uppercase">
+                                  {student.rollNumber}
+                                </h4>
+                                <span className="text-[11px] text-customText-muted dark:text-customText-mutedDark font-semibold">
+                                  {student.name}
+                                </span>
+                              </div>
+                              <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                                student.status === 'Late'
+                                  ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-450 border border-amber-250 dark:border-amber-800'
+                                  : 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-450 border border-red-250 dark:border-red-800'
+                              }`}>
+                                {student.status}
+                              </span>
+                            </div>
+
+                            <div className="pt-3 border-t border-slate-200/50 dark:border-slate-800/20 space-y-2">
+                              {hasCallLog ? (
+                                <div className="space-y-1.5">
+                                  <div className="flex justify-between text-xs">
+                                    <span className="text-customText-muted dark:text-customText-mutedDark">Call Status:</span>
+                                    <span className={`font-bold ${isAnswered ? 'text-emerald-600 dark:text-emerald-440' : 'text-red-650 dark:text-red-450'}`}>
+                                      {isAnswered ? 'Answered' : 'Not Answered'}
+                                    </span>
+                                  </div>
+                                  {student.callLog.reason && (
+                                    <div className="flex justify-between text-xs gap-4">
+                                      <span className="text-customText-muted dark:text-customText-mutedDark shrink-0">Reason:</span>
+                                      <span className="font-semibold text-right text-customText dark:text-customText-dark italic">
+                                        "{student.callLog.reason}"
+                                      </span>
+                                    </div>
+                                  )}
+                                  <div className="flex justify-between text-xs">
+                                    <span className="text-customText-muted dark:text-customText-mutedDark">Called By:</span>
+                                    <span className="font-semibold text-customText dark:text-customText-dark">
+                                      {callerName} {callerRole && `(${callerRole})`}
+                                    </span>
+                                  </div>
+                                  {timing && (
+                                    <div className="flex justify-between text-xs">
+                                      <span className="text-customText-muted dark:text-customText-mutedDark">Timing:</span>
+                                      <span className="font-semibold text-customText dark:text-customText-dark">
+                                        {timing}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              ) : (
+                                <div className="text-center py-2 text-xs text-customText-muted dark:text-customText-mutedDark italic">
+                                  Parent not called yet today.
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Afternoon Session Absentees */}
+                <div className="pt-4 border-t border-slate-200/50 dark:border-slate-800/10">
+                  <h4 className="font-extrabold text-xs text-slate-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-slate-400" />
+                    <span>Afternoon Session Absentees ({absentees.filter(a => a.attendanceSession === 'afternoon').length})</span>
+                  </h4>
+                  {absentees.filter(a => a.attendanceSession === 'afternoon').length === 0 ? (
+                    <div className="text-center py-6 bg-slate-50/50 dark:bg-slate-900/30 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 text-xs text-customText-muted dark:text-customText-mutedDark">
+                      No afternoon absentees.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {absentees.filter(a => a.attendanceSession === 'afternoon').map((student) => {
+                        const hasCallLog = !!student.callLog;
+                        const isAnswered = student.callLog?.answered;
+                        const timing = student.callLog?.createdAt ? new Date(student.callLog.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null;
+                        const callerName = student.callLog?.caller?.name || (student.callLog?.isPreExcused ? 'System' : 'Unknown');
+                        const callerRole = student.callLog?.caller?.role || '';
+                        
+                        return (
+                          <div 
+                            key={student.id} 
+                            className={`p-5 rounded-2xl border transition-all duration-300 ${
+                              hasCallLog 
+                                ? isAnswered 
+                                  ? 'bg-emerald-500/5 border-emerald-500/20' 
+                                  : 'bg-red-500/5 border-red-500/20'
+                                : 'bg-slate-50 dark:bg-slate-900/40 border-slate-200 dark:border-slate-800'
+                            }`}
+                          >
+                            <div className="flex justify-between items-start mb-3">
+                              <div>
+                                <h4 className="text-sm font-bold text-customText dark:text-customText-dark uppercase">
+                                  {student.rollNumber}
+                                </h4>
+                                <span className="text-[11px] text-customText-muted dark:text-customText-mutedDark font-semibold">
+                                  {student.name}
+                                </span>
+                              </div>
+                              <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                                student.status === 'Late'
+                                  ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-450 border border-amber-250 dark:border-amber-800'
+                                  : 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-450 border border-red-250 dark:border-red-800'
+                              }`}>
+                                {student.status}
+                              </span>
+                            </div>
+
+                            <div className="pt-3 border-t border-slate-200/50 dark:border-slate-800/20 space-y-2">
+                              {hasCallLog ? (
+                                <div className="space-y-1.5">
+                                  <div className="flex justify-between text-xs">
+                                    <span className="text-customText-muted dark:text-customText-mutedDark">Call Status:</span>
+                                    <span className={`font-bold ${isAnswered ? 'text-emerald-600 dark:text-emerald-440' : 'text-red-650 dark:text-red-450'}`}>
+                                      {isAnswered ? 'Answered' : 'Not Answered'}
+                                    </span>
+                                  </div>
+                                  {student.callLog.reason && (
+                                    <div className="flex justify-between text-xs gap-4">
+                                      <span className="text-customText-muted dark:text-customText-mutedDark shrink-0">Reason:</span>
+                                      <span className="font-semibold text-right text-customText dark:text-customText-dark italic">
+                                        "{student.callLog.reason}"
+                                      </span>
+                                    </div>
+                                  )}
+                                  <div className="flex justify-between text-xs">
+                                    <span className="text-customText-muted dark:text-customText-mutedDark">Called By:</span>
+                                    <span className="font-semibold text-customText dark:text-customText-dark">
+                                      {callerName} {callerRole && `(${callerRole})`}
+                                    </span>
+                                  </div>
+                                  {timing && (
+                                    <div className="flex justify-between text-xs">
+                                      <span className="text-customText-muted dark:text-customText-mutedDark">Timing:</span>
+                                      <span className="font-semibold text-customText dark:text-customText-dark">
+                                        {timing}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              ) : (
+                                <div className="text-center py-2 text-xs text-customText-muted dark:text-customText-mutedDark italic">
+                                  Parent not called yet today.
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>

@@ -36,6 +36,7 @@ const Reports = () => {
   const [loadingAbsentees, setLoadingAbsentees] = useState(false);
   const [absenteeReportMode, setAbsenteeReportMode] = useState('single'); // 'single' (date) or 'range' (date range)
   const [absenteeSection, setAbsenteeSection] = useState('All');
+  const [absenteeSession, setAbsenteeSession] = useState('All'); // 'All', 'morning', 'afternoon'
   const [absenteeDate, setAbsenteeDate] = useState('');
   const [absenteeStartDate, setAbsenteeStartDate] = useState('');
   const [absenteeEndDate, setAbsenteeEndDate] = useState('');
@@ -94,6 +95,9 @@ const Reports = () => {
     try {
       const params = new URLSearchParams();
       params.append('section', absenteeSection);
+      if (absenteeSession && absenteeSession !== 'All') {
+        params.append('session', absenteeSession);
+      }
       
       const targetDate = absenteeDate || todayDate;
       if (absenteeReportMode === 'single') {
@@ -129,7 +133,7 @@ const Reports = () => {
     if (reportType === 'absentees') {
       fetchAbsenteesReport();
     }
-  }, [token, reportType, absenteeReportMode, absenteeSection, absenteeDate, absenteeStartDate, absenteeEndDate]);
+  }, [token, reportType, absenteeReportMode, absenteeSection, absenteeSession, absenteeDate, absenteeStartDate, absenteeEndDate]);
 
   // Real-time logs updates via socket
   useEffect(() => {
@@ -178,6 +182,9 @@ const Reports = () => {
   const handleExportAbsenteesCSV = () => {
     const params = new URLSearchParams();
     params.append('section', absenteeSection);
+    if (absenteeSession && absenteeSession !== 'All') {
+      params.append('session', absenteeSession);
+    }
     params.append('format', 'excel');
     
     const targetDate = absenteeDate || todayDate;
@@ -199,6 +206,9 @@ const Reports = () => {
     } else {
       const params = new URLSearchParams();
       params.append('section', absenteeSection);
+      if (absenteeSession && absenteeSession !== 'All') {
+        params.append('session', absenteeSession);
+      }
       
       const targetDate = absenteeDate || todayDate;
       if (absenteeReportMode === 'single') {
@@ -455,7 +465,7 @@ const Reports = () => {
             <span>Filter Criteria ({absenteeReportMode === 'single' ? 'Daily' : 'Date Range'})</span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
             <div>
               <label className="block text-xs font-bold text-customText-muted dark:text-customText-mutedDark uppercase mb-1.5">
                 Class Section
@@ -477,6 +487,21 @@ const Reports = () => {
                   ))}
                 </select>
               </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-customText-muted dark:text-customText-mutedDark uppercase mb-1.5">
+                Session
+              </label>
+              <select
+                value={absenteeSession}
+                onChange={(e) => setAbsenteeSession(e.target.value)}
+                className="glass-input text-xs py-2.5"
+              >
+                <option value="All">All Sessions</option>
+                <option value="morning">Morning Session</option>
+                <option value="afternoon">Afternoon Session</option>
+              </select>
             </div>
 
             {absenteeReportMode === 'single' ? (

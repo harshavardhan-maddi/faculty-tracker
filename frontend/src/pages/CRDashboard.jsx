@@ -44,6 +44,11 @@ const CRDashboard = () => {
   const [lateComerStudentId, setLateComerStudentId] = useState('');
   const [canSubmit, setCanSubmit] = useState(true);
   const [submitReason, setSubmitReason] = useState('');
+  
+  // Session Access States
+  const [selectedSession, setSelectedSession] = useState('morning');
+  const [morningAccess, setMorningAccess] = useState({ allowed: true, startTime: '09:10', endTime: '09:50' });
+  const [afternoonAccess, setAfternoonAccess] = useState({ allowed: true, startTime: '13:30', endTime: '14:10' });
 
   const getTodayDateString = () => {
     const d = new Date();
@@ -82,12 +87,12 @@ const CRDashboard = () => {
   };
 
   // 2. Fetch Students and existing attendance
-  const fetchStudentsAndAttendance = async () => {
+  const fetchStudentsAndAttendance = async (sessionParam = selectedSession) => {
     try {
       setLoadingStudents(true);
       setStudentError('');
 
-      // Check if submission is allowed today
+      // Check if submission is allowed today & get session access
       const accessRes = await fetch('/api/student-attendance/can-submit', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -95,6 +100,8 @@ const CRDashboard = () => {
       if (accessRes.ok) {
         setCanSubmit(accessData.canSubmit);
         setSubmitReason(accessData.reason || '');
+        if (accessData.morningAccess) setMorningAccess(accessData.morningAccess);
+        if (accessData.afternoonAccess) setAfternoonAccess(accessData.afternoonAccess);
       }
 
       // Fetch all students in CR's class
@@ -108,9 +115,9 @@ const CRDashboard = () => {
 
       setStudents(studData);
 
-      // Fetch today's absentees/late comers to pre-populate attendance map
+      // Fetch today's absentees/late comers for the selected session
       const className = user?.className || '';
-      const absRes = await fetch(`/api/student-attendance/absentees?section=${encodeURIComponent(className)}&date=${todayDate}`, {
+      const absRes = await fetch(`/api/student-attendance/absentees?section=${encodeURIComponent(className)}&date=${todayDate}&session=${sessionParam}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const absData = await absRes.json();
@@ -254,28 +261,35 @@ const CRDashboard = () => {
   };
 
   // Student Attendance handlers
+  const isCurrentSessionAccessible = selectedSession === 'morning' ? morningAccess?.allowed : afternoonAccess?.allowed;
+
+  const handleSessionChange = (sessionName) => {
+    setSelectedSession(sessionName);
+    fetchStudentsAndAttendance(sessionName);
+  };
+
   const handleAllPresent = () => {
-    if (!canSubmit) return;
+    if (!isCurrentSessionAccessible) return;
     const newMap = { ...attendanceMap };
     students.forEach(s => {
       newMap[s.id] = 'Present';
     });
     setAttendanceMap(newMap);
-    setStudentSuccess('Set all students to Present. (Click Submit to save changes)');
+    setStudentSuccess(`Set all students to Present for ${selectedSession} session. (Click Submit to save changes)`);
   };
 
   const handleAllAbsent = () => {
-    if (!canSubmit) return;
+    if (!isCurrentSessionAccessible) return;
     const newMap = { ...attendanceMap };
     students.forEach(s => {
       newMap[s.id] = 'Absent';
     });
     setAttendanceMap(newMap);
-    setStudentSuccess('Set all students to Absent. (Click Submit to save changes)');
+    setStudentSuccess(`Set all students to Absent for ${selectedSession} session. (Click Submit to save changes)`);
   };
 
   const toggleStudentStatus = (studentId) => {
-    if (!canSubmit) return;
+    if (!isCurrentSessionAccessible) return;
     const current = attendanceMap[studentId] || 'Present';
     const next = (current === 'Present') ? 'Absent' : 'Present';
     
@@ -288,7 +302,11 @@ const CRDashboard = () => {
 
   const handleMarkLateComer = async (e) => {
     e.preventDefault();
-    if (!canSubmit) return;
+    if (!isCurrentSessionAccessible) return;
+    if (selectedSession === 'afternoon') {
+      setStudentError('CR cannot mark late comers for Afternoon session.');
+      return;
+    }
     if (!lateComerStudentId) return;
 
     try {
@@ -302,13 +320,13 @@ const CRDashboard = () => {
         },
         body: JSON.stringify({
           studentId: lateComerStudentId,
-          date: todayDate
+          date: todayDate,
+          session: selectedSession
         })
       });
       const data = await res.json();
       if (res.ok) {
         setStudentSuccess(`Marked ${students.find(s => s.id === Number(lateComerStudentId))?.name} as Late.`);
-        // Update local map to Late
         setAttendanceMap({
           ...attendanceMap,
           [lateComerStudentId]: 'Late'
@@ -323,14 +341,14 @@ const CRDashboard = () => {
   };
 
   const handleSaveAttendance = async () => {
-    if (!canSubmit) return;
+    if (!isCurrentSessionAccessible) return;
     setSavingAttendance(true);
     setStudentError('');
     setStudentSuccess('');
 
     const attendanceData = Object.entries(attendanceMap).map(([id, status]) => ({
       studentId: Number(id),
-      status
+      status: (selectedSession === 'afternoon' && status === 'Late') ? 'Absent' : status
     }));
 
     try {
@@ -343,14 +361,15 @@ const CRDashboard = () => {
         body: JSON.stringify({
           section: user?.className,
           date: todayDate,
+          session: selectedSession,
           attendanceData
         })
       });
 
       const data = await res.json();
       if (res.ok) {
-        setStudentSuccess('Student attendance registry updated successfully!');
-        fetchStudentsAndAttendance(); // Reload
+        setStudentSuccess(`${selectedSession === 'morning' ? 'Morning' : 'Afternoon'} attendance registry updated successfully!`);
+        fetchStudentsAndAttendance(selectedSession); // Reload
       } else {
         setStudentError(data.message || 'Failed to save student attendance');
       }
@@ -589,12 +608,65 @@ const CRDashboard = () => {
       {activeTab === 'students' && (
         <div className="space-y-6">
           
-          {!canSubmit && (
+          {/* Session Switcher Tabs (Morning vs Afternoon) */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50 dark:bg-slate-800/20 p-3 rounded-2xl border border-slate-200/50 dark:border-slate-800/40">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => handleSessionChange('morning')}
+                className={`flex items-center gap-2 py-2.5 px-5 rounded-xl text-xs font-bold transition-all ${
+                  selectedSession === 'morning'
+                    ? 'bg-primary text-white shadow-md shadow-primary/20'
+                    : 'bg-white dark:bg-slate-900 text-customText-muted dark:text-customText-mutedDark border border-slate-200 dark:border-slate-800 hover:text-customText'
+                }`}
+              >
+                <Clock size={14} />
+                <span>Morning Attendance</span>
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-extrabold ${
+                  morningAccess?.allowed
+                    ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
+                    : 'bg-slate-200 dark:bg-slate-800 text-slate-500'
+                }`}>
+                  {morningAccess?.allowed ? 'Active' : 'Locked'}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSessionChange('afternoon')}
+                className={`flex items-center gap-2 py-2.5 px-5 rounded-xl text-xs font-bold transition-all ${
+                  selectedSession === 'afternoon'
+                    ? 'bg-primary text-white shadow-md shadow-primary/20'
+                    : 'bg-white dark:bg-slate-900 text-customText-muted dark:text-customText-mutedDark border border-slate-200 dark:border-slate-800 hover:text-customText'
+                }`}
+              >
+                <Clock size={14} />
+                <span>Afternoon Attendance</span>
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-extrabold ${
+                  afternoonAccess?.allowed
+                    ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
+                    : 'bg-slate-200 dark:bg-slate-800 text-slate-500'
+                }`}>
+                  {afternoonAccess?.allowed ? 'Active' : 'Locked'}
+                </span>
+              </button>
+            </div>
+
+            <div className="text-xs font-semibold text-customText-muted dark:text-customText-mutedDark px-2">
+              Slot: {selectedSession === 'morning' ? `${morningAccess?.startTime} - ${morningAccess?.endTime}` : `${afternoonAccess?.startTime} - ${afternoonAccess?.endTime}`}
+            </div>
+          </div>
+
+          {!isCurrentSessionAccessible && (
             <div className="p-4 bg-amber-500/10 border border-amber-500/25 text-amber-700 dark:text-amber-450 rounded-2xl flex items-start gap-3 text-xs leading-relaxed font-semibold shadow-sm">
               <AlertCircle size={18} className="shrink-0 mt-0.5" />
               <div>
-                <p className="font-extrabold uppercase tracking-wider mb-0.5">Attendance Submission Blocked</p>
-                <p className="opacity-90">{submitReason || 'Attendance submission is closed outside authorized morning and afternoon slots.'}</p>
+                <p className="font-extrabold uppercase tracking-wider mb-0.5">Hitting Attendance Disabled</p>
+                <p className="opacity-90">
+                  {selectedSession === 'morning' 
+                    ? `Morning window (${morningAccess?.startTime} - ${morningAccess?.endTime}) is not currently active. Hitting attendance is disabled.`
+                    : `Afternoon window (${afternoonAccess?.startTime} - ${afternoonAccess?.endTime}) is not currently active. Hitting attendance is disabled.`}
+                </p>
               </div>
             </div>
           )}
@@ -620,9 +692,9 @@ const CRDashboard = () => {
               </span>
               <button
                 onClick={handleAllPresent}
-                disabled={!canSubmit}
+                disabled={!isCurrentSessionAccessible}
                 className={`flex items-center gap-1.5 px-4 py-2 border rounded-xl text-xs font-bold transition-all ${
-                  canSubmit
+                  isCurrentSessionAccessible
                     ? 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-440 border-emerald-500/10 hover:border-emerald-500/35'
                     : 'bg-slate-100 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-750 cursor-not-allowed'
                 }`}
@@ -632,9 +704,9 @@ const CRDashboard = () => {
               </button>
               <button
                 onClick={handleAllAbsent}
-                disabled={!canSubmit}
+                disabled={!isCurrentSessionAccessible}
                 className={`flex items-center gap-1.5 px-4 py-2 border rounded-xl text-xs font-bold transition-all ${
-                  canSubmit
+                  isCurrentSessionAccessible
                     ? 'bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-440 border-red-500/10 hover:border-red-500/35'
                     : 'bg-slate-100 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-750 cursor-not-allowed'
                 }`}
@@ -644,42 +716,48 @@ const CRDashboard = () => {
               </button>
             </div>
 
-            {/* Late Comer Action Form */}
-            <form onSubmit={handleMarkLateComer} className="flex items-center gap-3 w-full md:w-auto">
-              <select
-                value={lateComerStudentId}
-                onChange={(e) => setLateComerStudentId(e.target.value)}
-                className="glass-input text-xs py-2 pr-8"
-                required
-                disabled={!canSubmit}
-              >
-                <option value="">-- Select Late Comer --</option>
-                {students.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.rollNumber} - {s.name}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="submit"
-                disabled={!canSubmit}
-                className={`flex items-center gap-1 py-2 px-3 rounded-xl text-xs font-bold shadow-md active:scale-[0.98] transition-all ${
-                  canSubmit
-                    ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-amber-500/10'
-                    : 'bg-slate-300 dark:bg-slate-750 text-slate-500 cursor-not-allowed shadow-none'
-                }`}
-              >
-                <PlusCircle size={14} />
-                <span>Mark Late</span>
-              </button>
-            </form>
+            {/* Late Comer Action Form - Only available in Morning Session */}
+            {selectedSession === 'morning' ? (
+              <form onSubmit={handleMarkLateComer} className="flex items-center gap-3 w-full md:w-auto">
+                <select
+                  value={lateComerStudentId}
+                  onChange={(e) => setLateComerStudentId(e.target.value)}
+                  className="glass-input text-xs py-2 pr-8"
+                  required
+                  disabled={!isCurrentSessionAccessible}
+                >
+                  <option value="">-- Select Late Comer --</option>
+                  {students.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.rollNumber} - {s.name}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="submit"
+                  disabled={!isCurrentSessionAccessible}
+                  className={`flex items-center gap-1 py-2 px-3 rounded-xl text-xs font-bold shadow-md active:scale-[0.98] transition-all ${
+                    isCurrentSessionAccessible
+                      ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-amber-500/10'
+                      : 'bg-slate-300 dark:bg-slate-750 text-slate-500 cursor-not-allowed shadow-none'
+                  }`}
+                >
+                  <PlusCircle size={14} />
+                  <span>Mark Late</span>
+                </button>
+              </form>
+            ) : (
+              <div className="text-xs font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 py-2 px-4 rounded-xl border border-slate-200 dark:border-slate-700">
+                Marking Late is disabled for Afternoon session
+              </div>
+            )}
           </div>
 
-          {/* Election Cards Grid */}
+          {/* Student Cards Grid */}
           <section className="space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="font-bold text-sm text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider">
-                Student Enrollment Cards ({students.length})
+                {selectedSession === 'morning' ? 'Morning' : 'Afternoon'} Student Cards ({students.length})
               </h3>
               <p className="text-[10px] text-customText-muted dark:text-customText-mutedDark font-semibold">
                 Click any student card to toggle between Present & Absent status.
@@ -706,8 +784,8 @@ const CRDashboard = () => {
                   <div
                     key={s.id}
                     onClick={() => toggleStudentStatus(s.id)}
-                    className={`flex flex-col justify-between p-4 rounded-2xl border-2 cursor-pointer transition-all duration-200 active:scale-[0.97] h-28 shadow-sm ${
-                      !canSubmit ? 'opacity-65 cursor-not-allowed border-dashed hover:border-slate-200 dark:hover:border-slate-800' : ''
+                    className={`flex flex-col justify-between p-4 rounded-2xl border-2 transition-all duration-200 active:scale-[0.97] h-28 shadow-sm ${
+                      isCurrentSessionAccessible ? 'cursor-pointer' : 'opacity-65 cursor-not-allowed border-dashed hover:border-slate-200 dark:hover:border-slate-800'
                     } ${statusClasses}`}
                   >
                     <div className="space-y-0.5">
@@ -739,15 +817,15 @@ const CRDashboard = () => {
             <div className="flex justify-end pt-4 border-t border-slate-200 dark:border-slate-800">
               <button
                 onClick={handleSaveAttendance}
-                disabled={savingAttendance || !canSubmit}
+                disabled={savingAttendance || !isCurrentSessionAccessible}
                 className={`flex items-center justify-center gap-2 btn-primary px-8 py-3.5 font-extrabold shadow-md hover:shadow-lg transition-all active:scale-[0.98] ${
-                  canSubmit
+                  isCurrentSessionAccessible
                     ? 'bg-gradient-to-r from-primary-dark to-primary text-white shadow-primary-dark/10'
                     : 'bg-slate-300 dark:bg-slate-750 text-slate-400 cursor-not-allowed shadow-none'
                 }`}
               >
                 <Save size={18} />
-                <span>{savingAttendance ? 'Submitting Attendance...' : 'Submit Attendance Registry'}</span>
+                <span>{savingAttendance ? 'Submitting Attendance...' : `Submit ${selectedSession === 'morning' ? 'Morning' : 'Afternoon'} Attendance Registry`}</span>
               </button>
             </div>
           )}

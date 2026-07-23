@@ -44,7 +44,7 @@ const getTimingSettings = async () => {
   }
 };
 
-const checkCRAttendanceAccess = async (user, className) => {
+const checkCRAttendanceAccess = async (user, className, targetSession = null) => {
   if (user.role !== 'CR') return true;
 
   // Sunday or holiday check
@@ -77,11 +77,6 @@ const checkCRAttendanceAccess = async (user, className) => {
   const morningEnd = meH * 60 + meM;
   const afternoonStart = asH * 60 + asM;
   const afternoonEnd = aeH * 60 + aeM;
-  
-  const inWindow = (currentMinutes >= morningStart && currentMinutes < morningEnd) ||
-                   (currentMinutes >= afternoonStart && currentMinutes < afternoonEnd);
-  
-  if (inWindow) return true;
 
   const todayKolkata = new Date().toLocaleDateString("en-US", { timeZone: "Asia/Kolkata" });
   const [m, d, y] = todayKolkata.split('/');
@@ -91,23 +86,45 @@ const checkCRAttendanceAccess = async (user, className) => {
   const overrideSetting = await prisma.systemSetting.findUnique({
     where: { key: overrideKey }
   });
+  const isOverridden = (overrideSetting && overrideSetting.value === todayDateStr);
 
-  if (overrideSetting && overrideSetting.value === todayDateStr) {
-    return true;
+  if (targetSession === 'morning') {
+    return (currentMinutes >= morningStart && currentMinutes < morningEnd) || isOverridden;
   }
+  if (targetSession === 'afternoon') {
+    return (currentMinutes >= afternoonStart && currentMinutes < afternoonEnd) || isOverridden;
+  }
+  
+  const inWindow = (currentMinutes >= morningStart && currentMinutes < morningEnd) ||
+                   (currentMinutes >= afternoonStart && currentMinutes < afternoonEnd);
+  
+  if (inWindow || isOverridden) return true;
 
   return false;
 };
 
 router.get('/can-submit', authMiddleware, async (req, res) => {
   try {
+    const className = req.user?.className;
+    const timings = await getTimingSettings();
+
     if (req.user.role !== 'CR') {
-      return res.json({ canSubmit: true });
+      return res.json({ 
+        canSubmit: true,
+        morningAccess: { allowed: true, startTime: timings.morningStart, endTime: timings.morningEnd },
+        afternoonAccess: { allowed: true, startTime: timings.afternoonStart, endTime: timings.afternoonEnd },
+        timings
+      });
     }
     
-    const className = req.user.className;
     if (!className) {
-      return res.json({ canSubmit: false, reason: 'No class assigned' });
+      return res.json({ 
+        canSubmit: false, 
+        reason: 'No class assigned',
+        morningAccess: { allowed: false, startTime: timings.morningStart, endTime: timings.morningEnd, reason: 'No class assigned' },
+        afternoonAccess: { allowed: false, startTime: timings.afternoonStart, endTime: timings.afternoonEnd, reason: 'No class assigned' },
+        timings
+      });
     }
 
     const todayDay = getTodayDay();
@@ -118,23 +135,38 @@ router.get('/can-submit', authMiddleware, async (req, res) => {
     const trackingEnabled = isSunday ? false : (trackingSetting ? trackingSetting.value === 'true' : true);
 
     if (!trackingEnabled) {
+      const holidayMsg = isSunday 
+        ? 'Today is Sunday. College is on Holiday.' 
+        : 'Attendance submissions are disabled. College is on Holiday.';
       return res.json({ 
         canSubmit: false, 
-        reason: isSunday 
-          ? 'Today is Sunday. College is on Holiday.' 
-          : 'Attendance submissions are disabled. College is on Holiday.'
+        reason: holidayMsg,
+        morningAccess: { allowed: false, startTime: timings.morningStart, endTime: timings.morningEnd, reason: holidayMsg },
+        afternoonAccess: { allowed: false, startTime: timings.afternoonStart, endTime: timings.afternoonEnd, reason: holidayMsg },
+        timings
       });
     }
 
-    const hasAccess = await checkCRAttendanceAccess(req.user, className);
-    if (hasAccess) {
-      return res.json({ canSubmit: true });
-    }
+    const morningAllowed = await checkCRAttendanceAccess(req.user, className, 'morning');
+    const afternoonAllowed = await checkCRAttendanceAccess(req.user, className, 'afternoon');
+    const canSubmit = morningAllowed || afternoonAllowed;
 
-    const timings = await getTimingSettings();
     res.json({ 
-      canSubmit: false, 
-      reason: `Attendance window closed. Morning window: ${timings.morningStart} - ${timings.morningEnd}, Afternoon window: ${timings.afternoonStart} - ${timings.afternoonEnd}. Contact HOD/Absent Controller to request access.` 
+      canSubmit, 
+      reason: canSubmit ? '' : `Attendance window closed. Morning window: ${timings.morningStart} - ${timings.morningEnd}, Afternoon window: ${timings.afternoonStart} - ${timings.afternoonEnd}. Contact HOD/Absent Controller to request access.`,
+      morningAccess: { 
+        allowed: morningAllowed, 
+        startTime: timings.morningStart, 
+        endTime: timings.morningEnd,
+        reason: morningAllowed ? 'Active' : `Morning window: ${timings.morningStart} - ${timings.morningEnd}`
+      },
+      afternoonAccess: { 
+        allowed: afternoonAllowed, 
+        startTime: timings.afternoonStart, 
+        endTime: timings.afternoonEnd,
+        reason: afternoonAllowed ? 'Active' : `Afternoon window: ${timings.afternoonStart} - ${timings.afternoonEnd}`
+      },
+      timings
     });
   } catch (error) {
     console.error('Error in can-submit check:', error);
@@ -263,22 +295,39 @@ router.get('/students', authMiddleware, async (req, res) => {
 
 // 3. POST /bulk - Bulk hit student attendance
 router.post('/bulk', authMiddleware, roleMiddleware(['CR', 'HOD', 'SUB_ADMIN', 'FACULTY']), async (req, res) => {
-  const { section, date, attendanceData } = req.body;
+  const { section, date, session, attendanceData } = req.body;
   if (!section || !date || !Array.isArray(attendanceData)) {
     return res.status(400).json({ message: 'Missing required fields' });
   }
 
   try {
-    // If user is CR, verify they are hitting attendance for their own section
-    if (req.user.role === 'CR' && req.user.className !== section) {
-      return res.status(403).json({ message: 'Forbidden: CR can only hit attendance for their own section' });
+    // Determine current hour to identify session if not explicitly provided
+    const now = new Date();
+    const kolkataTimeString = now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" });
+    const kolkataDate = new Date(kolkataTimeString);
+    const hour = kolkataDate.getHours();
+    const targetSession = session || (hour >= 12 ? 'afternoon' : 'morning');
+
+    // If user is CR, verify section and late restriction for afternoon
+    if (req.user.role === 'CR') {
+      if (req.user.className !== section) {
+        return res.status(403).json({ message: 'Forbidden: CR can only hit attendance for their own section' });
+      }
+
+      // CR cannot mark late for afternoon session
+      if (targetSession === 'afternoon') {
+        const hasLateRecord = attendanceData.some(r => r.status === 'Late');
+        if (hasLateRecord) {
+          return res.status(400).json({ message: 'CR cannot mark students as Late for Afternoon session.' });
+        }
+      }
     }
 
-    const hasAccess = await checkCRAttendanceAccess(req.user, section);
+    const hasAccess = await checkCRAttendanceAccess(req.user, section, targetSession);
     if (!hasAccess) {
       const timings = await getTimingSettings();
       return res.status(403).json({ 
-        message: `Attendance window is closed. Morning: ${timings.morningStart}-${timings.morningEnd}, Afternoon: ${timings.afternoonStart}-${timings.afternoonEnd}. Contact HOD/Absent Controller to request access.` 
+        message: `Attendance window for ${targetSession} session is closed. Morning: ${timings.morningStart}-${timings.morningEnd}, Afternoon: ${timings.afternoonStart}-${timings.afternoonEnd}. Contact HOD/Absent Controller to request access.` 
       });
     }
 
@@ -314,12 +363,23 @@ router.post('/bulk', authMiddleware, roleMiddleware(['CR', 'HOD', 'SUB_ADMIN', '
 
 // 4. POST /late-comer - CR marks/updates student as late comer
 router.post('/late-comer', authMiddleware, roleMiddleware(['CR', 'HOD', 'SUB_ADMIN']), async (req, res) => {
-  const { studentId, date } = req.body;
+  const { studentId, date, session } = req.body;
   if (!studentId || !date) {
     return res.status(400).json({ message: 'Missing studentId or date' });
   }
 
   try {
+    const now = new Date();
+    const kolkataTimeString = now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" });
+    const kolkataDate = new Date(kolkataTimeString);
+    const hour = kolkataDate.getHours();
+    const targetSession = session || (hour >= 12 ? 'afternoon' : 'morning');
+
+    // CR cannot mark late for afternoon session
+    if (req.user.role === 'CR' && targetSession === 'afternoon') {
+      return res.status(400).json({ message: 'CR cannot mark students as Late for Afternoon session.' });
+    }
+
     const student = await prisma.student.findUnique({
       where: { id: Number(studentId) }
     });
@@ -333,11 +393,11 @@ router.post('/late-comer', authMiddleware, roleMiddleware(['CR', 'HOD', 'SUB_ADM
       return res.status(403).json({ message: 'Forbidden: CR can only modify students in their own section' });
     }
 
-    const hasAccess = await checkCRAttendanceAccess(req.user, student.section);
+    const hasAccess = await checkCRAttendanceAccess(req.user, student.section, targetSession);
     if (!hasAccess) {
       const timings = await getTimingSettings();
       return res.status(403).json({ 
-        message: `Attendance window is closed. Morning: ${timings.morningStart}-${timings.morningEnd}, Afternoon: ${timings.afternoonStart}-${timings.afternoonEnd}. Contact HOD/Absent Controller to request access.` 
+        message: `Attendance window for ${targetSession} session is closed. Morning: ${timings.morningStart}-${timings.morningEnd}, Afternoon: ${timings.afternoonStart}-${timings.afternoonEnd}. Contact HOD/Absent Controller to request access.` 
       });
     }
 
@@ -371,7 +431,7 @@ router.post('/late-comer', authMiddleware, roleMiddleware(['CR', 'HOD', 'SUB_ADM
 
 // 5. GET /absentees - List of absentees for a given section & date
 router.get('/absentees', authMiddleware, async (req, res) => {
-  const { section, date } = req.query;
+  const { section, date, session } = req.query;
   const user = req.user;
 
   if (!section || !date) {
@@ -416,7 +476,7 @@ router.get('/absentees', authMiddleware, async (req, res) => {
       });
     }
 
-    const formatted = absentees.map(att => {
+    let formatted = absentees.map(att => {
       const s = att.student;
       const matchingCallLog = callLogs.find(cl => cl.studentId === s.id);
       
@@ -468,6 +528,11 @@ router.get('/absentees', authMiddleware, async (req, res) => {
 
       return resObj;
     });
+
+    if (session && session !== 'All') {
+      const targetSession = session.toLowerCase();
+      formatted = formatted.filter(a => a.attendanceSession === targetSession);
+    }
 
     res.json(formatted);
   } catch (error) {

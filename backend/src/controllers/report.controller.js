@@ -188,7 +188,7 @@ const getDashboardStats = async (req, res) => {
 };
 
 const getAbsenteesReport = async (req, res) => {
-  const { section, date, startDate, endDate } = req.query;
+  const { section, date, startDate, endDate, session } = req.query;
 
   const whereClause = {
     status: { in: ['Absent', 'Late'] }
@@ -256,9 +256,15 @@ const getAbsenteesReport = async (req, res) => {
       userMap[u.id] = u.name;
     });
 
-    const reportData = attendances.map(att => {
+    let reportData = attendances.map(att => {
       const s = att.student;
       const callLog = callLogMap[`${att.studentId}_${att.date}`];
+
+      const dateObj = new Date(att.updatedAt);
+      const kolkataTimeString = dateObj.toLocaleString("en-US", { timeZone: "Asia/Kolkata" });
+      const kolkataDate = new Date(kolkataTimeString);
+      const hour = kolkataDate.getHours();
+      const attendanceSession = hour >= 12 ? 'afternoon' : 'morning';
 
       return {
         id: att.id,
@@ -267,6 +273,7 @@ const getAbsenteesReport = async (req, res) => {
         name: s.name,
         section: s.section,
         status: att.status,
+        session: attendanceSession,
         studentMobile: s.studentMobile,
         parentMobile: s.parentMobile,
         called: !!callLog,
@@ -277,9 +284,16 @@ const getAbsenteesReport = async (req, res) => {
       };
     });
 
+    // Filter by session if requested ('morning' or 'afternoon')
+    if (session && session !== 'All') {
+      const targetSession = session.toLowerCase();
+      reportData = reportData.filter(item => item.session === targetSession);
+    }
+
     if (req.query.format === 'excel') {
       const excelRows = reportData.map(item => ({
         'Date': item.date,
+        'Session': item.session === 'morning' ? 'Morning' : 'Afternoon',
         'Roll Number': item.rollNumber,
         'Student Name': item.name,
         'Section': item.section,
