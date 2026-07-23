@@ -15,10 +15,10 @@ if (process.env.VERCEL) {
 
 let PrismaClient;
 try {
-  PrismaClient = require('./generated/client').PrismaClient;
+  PrismaClient = require('@prisma/client').PrismaClient;
 } catch (e1) {
   try {
-    PrismaClient = require('@prisma/client').PrismaClient;
+    PrismaClient = require('./generated/client').PrismaClient;
   } catch (e2) {
     console.error('PrismaClient load error:', e1, e2);
     throw e1;

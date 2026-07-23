@@ -6,6 +6,4 @@ backend/.env
 .env
 .DS_Store
 dist/
-backend/src/generated/client/query-engine*
-backend/src/generated/client/*.exe
-backend/src/generated/client/*.node
+backend/src/generated/
