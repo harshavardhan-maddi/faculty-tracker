@@ -4,14 +4,24 @@ import { useAuth } from '../context/AuthContext';
 const PrintReport = () => {
   const { token } = useAuth();
   const [data, setData] = useState([]);
+  const [monthlyData, setMonthlyData] = useState({ conductedDates: [], students: [], totalConductedDays: 0 });
   const [loading, setLoading] = useState(true);
 
   // Parse parameters from query string
   const params = new URLSearchParams(window.location.search);
+  const reportType = params.get('reportType') || 'absentees';
   const section = params.get('section') || 'All';
   const date = params.get('date');
   const startDate = params.get('startDate');
   const endDate = params.get('endDate');
+  const month = params.get('month') || new Date().toISOString().slice(0, 7);
+
+  const formattedMonthString = () => {
+    if (!month) return '';
+    const [y, m] = month.split('-');
+    const d = new Date(parseInt(y, 10), parseInt(m, 10) - 1, 1);
+    return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  };
 
   const getTodayDateString = () => {
     const d = new Date();
@@ -33,18 +43,32 @@ const PrintReport = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const queryParams = new URLSearchParams();
-        queryParams.append('section', section);
-        if (date) queryParams.append('date', date);
-        if (startDate) queryParams.append('startDate', startDate);
-        if (endDate) queryParams.append('endDate', endDate);
+        if (reportType === 'monthly') {
+          const queryParams = new URLSearchParams();
+          queryParams.append('section', section);
+          queryParams.append('month', month);
 
-        const res = await fetch(`/api/reports/absentees?${queryParams.toString()}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (res.ok) {
-          const result = await res.json();
-          setData(result);
+          const res = await fetch(`/api/reports/monthly-section-attendance?${queryParams.toString()}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          if (res.ok) {
+            const result = await res.json();
+            setMonthlyData(result);
+          }
+        } else {
+          const queryParams = new URLSearchParams();
+          queryParams.append('section', section);
+          if (date) queryParams.append('date', date);
+          if (startDate) queryParams.append('startDate', startDate);
+          if (endDate) queryParams.append('endDate', endDate);
+
+          const res = await fetch(`/api/reports/absentees?${queryParams.toString()}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          if (res.ok) {
+            const result = await res.json();
+            setData(result);
+          }
         }
       } catch (err) {
         console.error('Error fetching print report data:', err);
@@ -56,17 +80,17 @@ const PrintReport = () => {
     if (token) {
       fetchData();
     }
-  }, [token, section, date, startDate, endDate]);
+  }, [token, reportType, section, date, startDate, endDate, month]);
 
   // Auto trigger browser print once data is loaded and DOM is fully mounted
   useEffect(() => {
-    if (!loading && data.length >= 0) {
+    if (!loading) {
       const timer = setTimeout(() => {
         window.print();
       }, 800);
       return () => clearTimeout(timer);
     }
-  }, [loading, data]);
+  }, [loading]);
 
   if (loading) {
     return (
@@ -79,9 +103,109 @@ const PrintReport = () => {
     );
   }
 
+  if (reportType === 'monthly') {
+    const students = monthlyData.students || [];
+    return (
+      <div className="min-h-screen bg-white text-black p-6 font-serif leading-relaxed max-w-5xl mx-auto print:max-w-full print:p-0">
+        {/* College Letterhead Heading */}
+        <div className="text-center border-b-4 border-double border-slate-900 pb-4 mb-6">
+          <h1 className="text-2xl font-black tracking-wide uppercase text-slate-900">
+            NARASARAOPETA ENGINEERING COLLEGE
+          </h1>
+          <h2 className="text-lg font-bold tracking-normal uppercase text-slate-800 mt-1">
+            NARASARAOPET (AUTONOMOUS)
+          </h2>
+          <h3 className="text-base font-extrabold uppercase text-slate-700 tracking-wide mt-1.5">
+            DEPARTMENT OF CSE (EMERGING TECHNOLOGIES)
+          </h3>
+        </div>
+
+        {/* Report Title */}
+        <div className="text-center mb-6">
+          <h4 className="text-lg font-black underline uppercase text-slate-900 tracking-wider">
+            MONTHLY SECTION STUDENT ATTENDANCE REPORT
+          </h4>
+          <div className="flex justify-between items-center text-xs font-bold text-slate-700 mt-4 px-2">
+            <span>Month: {formattedMonthString()}</span>
+            <span>Section: {section === 'All' ? 'All Sections' : section}</span>
+            <span>Total Conducted Working Days: {monthlyData.totalConductedDays}</span>
+            <span>Total Students: {students.length}</span>
+          </div>
+        </div>
+
+        {/* Data Table */}
+        <div className="w-full">
+          <table className="w-full text-left border-collapse border border-slate-900 text-xs">
+            <thead>
+              <tr className="bg-slate-100 text-slate-900 font-bold border-b border-slate-900">
+                <th className="p-2 border border-slate-900 text-center w-10">S.No</th>
+                <th className="p-2 border border-slate-900 w-24">Roll Number</th>
+                <th className="p-2 border border-slate-900">Student Name</th>
+                <th className="p-2 border border-slate-900 text-center w-16">Section</th>
+                <th className="p-2 border border-slate-900 text-center w-16">Conducted</th>
+                <th className="p-2 border border-slate-900 text-center w-14">Present</th>
+                <th className="p-2 border border-slate-900 text-center w-14">Late</th>
+                <th className="p-2 border border-slate-900 text-center w-14">Absent</th>
+                <th className="p-2 border border-slate-900 text-center w-16">Attended</th>
+                <th className="p-2 border border-slate-900 text-center w-16">Percentage</th>
+              </tr>
+            </thead>
+            <tbody>
+              {students.map((item, index) => (
+                <tr key={item.id} className="border-b border-slate-900">
+                  <td className="p-2 border border-slate-900 text-center">{index + 1}</td>
+                  <td className="p-2 border border-slate-900 font-semibold">{item.rollNumber}</td>
+                  <td className="p-2 border border-slate-900 font-bold">{item.name}</td>
+                  <td className="p-2 border border-slate-900 text-center font-medium">{item.section}</td>
+                  <td className="p-2 border border-slate-900 text-center">{item.totalConducted}</td>
+                  <td className="p-2 border border-slate-900 text-center font-bold text-emerald-800">{item.presentCount}</td>
+                  <td className="p-2 border border-slate-900 text-center font-bold text-amber-800">{item.lateCount}</td>
+                  <td className="p-2 border border-slate-900 text-center font-bold text-red-800">{item.absentCount}</td>
+                  <td className="p-2 border border-slate-900 text-center font-black">{item.totalAttended}</td>
+                  <td className="p-2 border border-slate-900 text-center font-black">
+                    {item.percentage}%
+                  </td>
+                </tr>
+              ))}
+              
+              {students.length === 0 && (
+                <tr>
+                  <td colSpan="10" className="text-center p-8 font-bold text-slate-500">
+                    No student attendance records found for this section and month.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Signature Section */}
+        <div className="mt-16 pt-8 border-t border-dashed border-slate-300">
+          <div className="grid grid-cols-4 gap-6 text-center text-xs font-bold text-slate-800">
+            <div className="flex flex-col justify-between h-20">
+              <span className="border-b border-slate-400 w-3/4 mx-auto mb-2"></span>
+              <span>CLASS REPRESENTATIVE</span>
+            </div>
+            <div className="flex flex-col justify-between h-20">
+              <span className="border-b border-slate-400 w-3/4 mx-auto mb-2"></span>
+              <span>ABSENT CONTROLLER</span>
+            </div>
+            <div className="flex flex-col justify-between h-20">
+              <span className="border-b border-slate-400 w-3/4 mx-auto mb-2"></span>
+              <span>HEAD OF DEPARTMENT (HOD)</span>
+            </div>
+            <div className="flex flex-col justify-between h-20">
+              <span className="border-b border-slate-400 w-3/4 mx-auto mb-2"></span>
+              <span>PRINCIPAL</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-white text-black p-8 font-serif leading-relaxed max-w-4xl mx-auto">
-      
       {/* College Letterhead Heading */}
       <div className="text-center border-b-4 border-double border-slate-900 pb-4 mb-6">
         <h1 className="text-2xl font-black tracking-wide uppercase text-slate-900">
@@ -125,7 +249,6 @@ const PrintReport = () => {
           </thead>
           <tbody>
             {data.map((item, index) => {
-              const isLate = item.status === 'Late';
               return (
                 <tr key={item.id} className="border-b border-slate-900">
                   <td className="p-2 border border-slate-900 text-center">{index + 1}</td>

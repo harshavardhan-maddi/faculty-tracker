@@ -348,9 +348,156 @@ const getAbsenteesReport = async (req, res) => {
   }
 };
 
+const getMonthlySectionAttendanceReport = async (req, res) => {
+  const { section, month, format } = req.query;
+
+  const targetMonth = month || new Date().toISOString().slice(0, 7);
+
+  const studentWhere = {};
+  if (section && section !== 'All') {
+    studentWhere.section = section;
+  }
+
+  try {
+    const students = await prisma.student.findMany({
+      where: studentWhere,
+      orderBy: { rollNumber: 'asc' }
+    });
+
+    const studentIds = students.map(s => s.id);
+
+    const attendances = await prisma.attendance.findMany({
+      where: {
+        studentId: { in: studentIds },
+        date: { startsWith: targetMonth }
+      },
+      orderBy: { date: 'asc' }
+    });
+
+    const conductedDates = [...new Set(attendances.map(a => a.date))].sort();
+
+    const attendanceByStudent = {};
+    attendances.forEach(att => {
+      if (!attendanceByStudent[att.studentId]) {
+        attendanceByStudent[att.studentId] = {};
+      }
+      attendanceByStudent[att.studentId][att.date] = att.status;
+    });
+
+    const reportData = students.map(s => {
+      const studentAttMap = attendanceByStudent[s.id] || {};
+      
+      let presentCount = 0;
+      let absentCount = 0;
+      let lateCount = 0;
+
+      const dateMatrix = {};
+      conductedDates.forEach(d => {
+        const st = studentAttMap[d];
+        if (st === 'Present') {
+          presentCount++;
+          dateMatrix[d] = 'P';
+        } else if (st === 'Absent') {
+          absentCount++;
+          dateMatrix[d] = 'A';
+        } else if (st === 'Late') {
+          lateCount++;
+          dateMatrix[d] = 'L';
+        } else {
+          dateMatrix[d] = '-';
+        }
+      });
+
+      const totalConducted = conductedDates.length;
+      const totalAttended = presentCount + lateCount;
+      const percentage = totalConducted > 0 
+        ? Math.round((totalAttended / totalConducted) * 100) 
+        : 0;
+
+      return {
+        id: s.id,
+        rollNumber: s.rollNumber,
+        name: s.name,
+        section: s.section,
+        totalConducted,
+        presentCount,
+        absentCount,
+        lateCount,
+        totalAttended,
+        percentage,
+        dateMatrix
+      };
+    });
+
+    if (format === 'excel') {
+      const excelRows = reportData.map((item, idx) => {
+        const row = {
+          'S.No': idx + 1,
+          'Roll Number': item.rollNumber,
+          'Student Name': item.name,
+          'Section': item.section,
+          'Total Working Days': item.totalConducted,
+          'Days Present': item.presentCount,
+          'Days Late': item.lateCount,
+          'Days Absent': item.absentCount,
+          'Total Attended': item.totalAttended,
+          'Attendance %': `${item.percentage}%`
+        };
+
+        conductedDates.forEach(d => {
+          const parts = d.split('-');
+          const colHeader = parts.length === 3 ? `${parts[2]}/${parts[1]}` : d;
+          row[colHeader] = item.dateMatrix[d] || '-';
+        });
+
+        return row;
+      });
+
+      const ws = XLSX.utils.json_to_sheet(excelRows);
+      const headers = Object.keys(excelRows[0] || {});
+      const colWidths = headers.map(header => ({ wch: Math.max(header.length, 6) }));
+
+      excelRows.forEach(row => {
+        headers.forEach((header, i) => {
+          const val = String(row[header] || '');
+          if (val.length > colWidths[i].wch) {
+            colWidths[i].wch = val.length;
+          }
+        });
+      });
+
+      ws['!cols'] = colWidths.map(w => ({ wch: w.wch + 2 }));
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Monthly Attendance');
+
+      const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+      const cleanSection = (section || 'All').replace(/\s+/g, '_');
+      const filename = `Monthly_Attendance_${cleanSection}_${targetMonth}`;
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}.xlsx"`);
+      return res.send(buffer);
+    }
+
+    res.json({
+      section: section || 'All',
+      month: targetMonth,
+      totalConductedDays: conductedDates.length,
+      conductedDates,
+      students: reportData
+    });
+  } catch (error) {
+    console.error('Error fetching monthly section attendance report:', error);
+    res.status(500).json({ message: error.message || 'Internal Server Error' });
+  }
+};
+
 module.exports = {
   getLogsReport,
   getDashboardStats,
   getAbsenteesReport,
+  getMonthlySectionAttendanceReport,
 };
+
 

@@ -66,6 +66,25 @@ const AbsentControllerDashboard = () => {
     window.open(`/api/reports/absentees?${params.toString()}`, '_blank');
   };
 
+  const handleDownloadMonthlyReport = (format = 'excel') => {
+    const sectionName = activeBoardTab === 'sectionWise' ? selectedSection : 'All';
+    const monthStr = todayDate.slice(0, 7);
+    if (format === 'excel') {
+      const params = new URLSearchParams();
+      params.append('section', sectionName);
+      params.append('month', monthStr);
+      params.append('format', 'excel');
+      window.open(`/api/reports/monthly-section-attendance?${params.toString()}`, '_blank');
+    } else {
+      const params = new URLSearchParams();
+      params.append('reportType', 'monthly');
+      params.append('section', sectionName);
+      params.append('month', monthStr);
+      window.open(`/print-report?${params.toString()}`, '_blank');
+    }
+  };
+
+
   // Student history modal state
   const [selectedHistoryStudent, setSelectedHistoryStudent] = useState(null);
   const [absentHistory, setAbsentHistory] = useState([]);
@@ -381,16 +400,36 @@ const AbsentControllerDashboard = () => {
             </select>
           </div>
 
-          {/* Download Report Button */}
-          <button
-            onClick={() => handleDownloadReport(sessionFilter)}
-            className="flex items-center gap-1.5 py-2 px-4 rounded-xl text-xs font-extrabold bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-600/20 active:scale-[0.98] transition-all"
-          >
-            <span>Download Report</span>
-            <span className="text-[10px] bg-emerald-800/40 px-1.5 py-0.5 rounded uppercase">
-              {sessionFilter}
-            </span>
-          </button>
+          {/* Download Report Buttons */}
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => handleDownloadReport(sessionFilter)}
+              className="flex items-center gap-1.5 py-2 px-3 rounded-xl text-xs font-extrabold bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-600/20 active:scale-[0.98] transition-all"
+              title="Download Daily Absentees Excel"
+            >
+              <span>Excel Absentees</span>
+              <span className="text-[10px] bg-emerald-800/40 px-1 py-0.5 rounded uppercase">
+                {sessionFilter}
+              </span>
+            </button>
+
+            <button
+              onClick={() => handleDownloadMonthlyReport('excel')}
+              className="flex items-center gap-1.5 py-2 px-3 rounded-xl text-xs font-extrabold bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-600/20 active:scale-[0.98] transition-all"
+              title="Download Section Monthly Attendance Excel"
+            >
+              <span>Monthly Excel</span>
+            </button>
+
+            <button
+              onClick={() => handleDownloadMonthlyReport('pdf')}
+              className="flex items-center gap-1.5 py-2 px-3 rounded-xl text-xs font-extrabold bg-slate-800 hover:bg-slate-900 text-white shadow-md active:scale-[0.98] transition-all"
+              title="Download Section Monthly Attendance PDF"
+            >
+              <span>Monthly PDF</span>
+            </button>
+          </div>
+
         </div>
       </div>
 

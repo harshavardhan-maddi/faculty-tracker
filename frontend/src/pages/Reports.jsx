@@ -16,7 +16,7 @@ const Reports = () => {
   const { token, user } = useAuth();
   const { socket } = useSocket();
 
-  // Tab state: 'faculty' or 'absentees'
+  // Tab state: 'faculty', 'absentees', or 'monthly'
   const [reportType, setReportType] = useState(user?.role === 'ABSENT_CONTROLLER' ? 'absentees' : 'faculty');
 
   // Shared classrooms list
@@ -40,6 +40,12 @@ const Reports = () => {
   const [absenteeDate, setAbsenteeDate] = useState('');
   const [absenteeStartDate, setAbsenteeStartDate] = useState('');
   const [absenteeEndDate, setAbsenteeEndDate] = useState('');
+
+  // Section Monthly Attendance states
+  const [monthlySection, setMonthlySection] = useState('All');
+  const [monthlyMonth, setMonthlyMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [monthlyReport, setMonthlyReport] = useState({ conductedDates: [], students: [], totalConductedDays: 0 });
+  const [loadingMonthly, setLoadingMonthly] = useState(false);
 
   const getTodayDateString = () => {
     const d = new Date();
@@ -119,6 +125,26 @@ const Reports = () => {
     }
   };
 
+  // Fetch Section Monthly Attendance Report
+  const fetchMonthlyReport = async () => {
+    setLoadingMonthly(true);
+    try {
+      const params = new URLSearchParams();
+      params.append('section', monthlySection);
+      params.append('month', monthlyMonth);
+
+      const res = await fetch(`/api/reports/monthly-section-attendance?${params.toString()}`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      const data = await res.json();
+      setMonthlyReport(data || { conductedDates: [], students: [], totalConductedDays: 0 });
+    } catch (error) {
+      console.error('Failed to fetch monthly attendance report:', error);
+    } finally {
+      setLoadingMonthly(false);
+    }
+  };
+
   useEffect(() => {
     fetchFilterOptions();
   }, [token]);
@@ -134,6 +160,12 @@ const Reports = () => {
       fetchAbsenteesReport();
     }
   }, [token, reportType, absenteeReportMode, absenteeSection, absenteeSession, absenteeDate, absenteeStartDate, absenteeEndDate]);
+
+  useEffect(() => {
+    if (reportType === 'monthly') {
+      fetchMonthlyReport();
+    }
+  }, [token, reportType, monthlySection, monthlyMonth]);
 
   // Real-time logs updates via socket
   useEffect(() => {
@@ -195,15 +227,36 @@ const Reports = () => {
       if (absenteeEndDate) params.append('endDate', absenteeEndDate);
     }
     
-    // Open in a new tab/iframe to trigger native browser attachment download
     window.open(`/api/reports/absentees?${params.toString()}`, '_blank');
+  };
+
+  // Excel Export for Section Monthly Attendance
+  const handleExportMonthlyExcel = () => {
+    const params = new URLSearchParams();
+    params.append('section', monthlySection);
+    params.append('month', monthlyMonth);
+    params.append('format', 'excel');
+    window.open(`/api/reports/monthly-section-attendance?${params.toString()}`, '_blank');
+  };
+
+  // Combined Export Handler
+  const handleExport = () => {
+    if (reportType === 'faculty') handleExportCSV();
+    else if (reportType === 'absentees') handleExportAbsenteesCSV();
+    else handleExportMonthlyExcel();
+  };
+
+  const isExportDisabled = () => {
+    if (reportType === 'faculty') return logs.length === 0;
+    if (reportType === 'absentees') return absenteesList.length === 0;
+    return !monthlyReport.students || monthlyReport.students.length === 0;
   };
 
   // PDF Export - stand-alone academic document printing route
   const handlePrintPDF = () => {
     if (reportType === 'faculty') {
       window.print();
-    } else {
+    } else if (reportType === 'absentees') {
       const params = new URLSearchParams();
       params.append('section', absenteeSection);
       if (absenteeSession && absenteeSession !== 'All') {
@@ -218,11 +271,15 @@ const Reports = () => {
         if (absenteeEndDate) params.append('endDate', absenteeEndDate);
       }
       
-      // Open print page in a new window/tab
+      window.open(`/print-report?${params.toString()}`, '_blank');
+    } else if (reportType === 'monthly') {
+      const params = new URLSearchParams();
+      params.append('reportType', 'monthly');
+      params.append('section', monthlySection);
+      params.append('month', monthlyMonth);
       window.open(`/print-report?${params.toString()}`, '_blank');
     }
   };
-
 
   return (
     <div className="space-y-6">
@@ -231,21 +288,27 @@ const Reports = () => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 no-print">
         <div>
           <h2 className="text-2xl font-extrabold text-customText dark:text-customText-dark tracking-tight">
-            {reportType === 'faculty' ? 'Faculty Entry Logs' : 'Absentees & Caller Tracking Logs'}
+            {reportType === 'faculty' 
+              ? 'Faculty Entry Logs' 
+              : reportType === 'absentees' 
+              ? 'Absentees & Caller Tracking Logs'
+              : 'Section Monthly Student Attendance Report'}
           </h2>
           <p className="text-sm text-customText-muted dark:text-customText-mutedDark">
             {reportType === 'faculty' 
               ? 'Verify entrance logs, apply custom filter criteria, and download reports' 
-              : 'Audit logged student absentees, parent calling statuses, and entered reasons'}
+              : reportType === 'absentees'
+              ? 'Audit logged student absentees, parent calling statuses, and entered reasons'
+              : 'Monthly section student attendance with days present, conducted working days, and percentage'}
           </p>
         </div>
 
         <div className="flex gap-2">
           <button
-            onClick={reportType === 'faculty' ? handleExportCSV : handleExportAbsenteesCSV}
-            disabled={reportType === 'faculty' ? logs.length === 0 : absenteesList.length === 0}
+            onClick={handleExport}
+            disabled={isExportDisabled()}
             className="btn-secondary"
-            title="Download CSV"
+            title="Export Excel"
           >
             <FileSpreadsheet size={16} />
             <span>Export Excel</span>
@@ -253,9 +316,9 @@ const Reports = () => {
           
           <button
             onClick={handlePrintPDF}
-            disabled={reportType === 'faculty' ? logs.length === 0 : absenteesList.length === 0}
+            disabled={isExportDisabled()}
             className="btn-primary"
-            title="Print Report"
+            title="Export PDF"
           >
             <Printer size={16} />
             <span>Export PDF</span>
@@ -263,9 +326,9 @@ const Reports = () => {
         </div>
       </div>
 
-      {/* Top Report Type Toggle tabs (Hidden for Absent Controller who only views absentees) */}
+      {/* Top Report Type Toggle tabs */}
       {user?.role !== 'ABSENT_CONTROLLER' && (
-        <div className="flex bg-slate-100 dark:bg-slate-950/45 p-1 rounded-xl border border-slate-200/40 dark:border-slate-800/60 max-w-md no-print mb-6">
+        <div className="flex bg-slate-100 dark:bg-slate-950/45 p-1 rounded-xl border border-slate-200/40 dark:border-slate-800/60 max-w-lg no-print mb-6">
           <button
             onClick={() => setReportType('faculty')}
             className={`flex-1 py-2.5 px-3 rounded-lg text-xs font-bold transition-all ${
@@ -285,6 +348,16 @@ const Reports = () => {
             }`}
           >
             Absentees & Call Report
+          </button>
+          <button
+            onClick={() => setReportType('monthly')}
+            className={`flex-1 py-2.5 px-3 rounded-lg text-xs font-bold transition-all ${
+              reportType === 'monthly'
+                ? 'bg-white dark:bg-slate-900 text-primary-dark dark:text-primary shadow-sm'
+                : 'text-customText-muted dark:text-customText-mutedDark hover:text-customText'
+            }`}
+          >
+            Section Monthly Attendance
           </button>
         </div>
       )}
@@ -579,6 +652,73 @@ const Reports = () => {
         </div>
       )}
 
+      {/* FILTER TOOLBAR PANEL FOR SECTION MONTHLY ATTENDANCE */}
+      {reportType === 'monthly' && (
+        <div className="glass-card p-5 border border-slate-200/50 dark:border-slate-800/40 no-print space-y-4">
+          <div className="flex items-center gap-2 mb-2 font-bold text-xs uppercase text-customText-muted dark:text-customText-mutedDark tracking-wider">
+            <Filter size={14} />
+            <span>Select Section & Month for Attendance Report</span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-customText-muted dark:text-customText-mutedDark uppercase mb-1.5">
+                Class Section
+              </label>
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
+                  <Building size={14} />
+                </span>
+                <select
+                  value={monthlySection}
+                  onChange={(e) => setMonthlySection(e.target.value)}
+                  className="glass-input pl-9 text-xs py-2.5"
+                >
+                  <option value="All">All Sections</option>
+                  {classrooms.map((c) => (
+                    <option key={c.id} value={c.className}>
+                      {c.className}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-customText-muted dark:text-customText-mutedDark uppercase mb-1.5">
+                Select Month & Year
+              </label>
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
+                  <Calendar size={14} />
+                </span>
+                <input
+                  type="month"
+                  value={monthlyMonth}
+                  onChange={(e) => setMonthlyMonth(e.target.value)}
+                  className="glass-input pl-9 text-xs py-2.5"
+                />
+              </div>
+            </div>
+          </div>
+
+          {(monthlySection !== 'All' || monthlyMonth !== new Date().toISOString().slice(0, 7)) && (
+            <div className="flex justify-end mt-4">
+              <button
+                onClick={() => {
+                  setMonthlySection('All');
+                  setMonthlyMonth(new Date().toISOString().slice(0, 7));
+                }}
+                className="text-xs font-semibold text-primary hover:underline flex items-center gap-1"
+              >
+                <RefreshCw size={12} />
+                <span>Reset Filters</span>
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* PRINT-READY HEADER FOR FACULTY LOGS */}
       {reportType === 'faculty' && (
         <div className="hidden print:block mb-6 text-center">
@@ -774,6 +914,134 @@ const Reports = () => {
                   )}
                 </tbody>
               </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* REPORT DATA GRID FOR SECTION MONTHLY ATTENDANCE */}
+      {reportType === 'monthly' && (
+        <div className="glass-card p-6 border border-slate-200/50 dark:border-slate-800/40 print-card">
+          {loadingMonthly ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-3">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-primary"></div>
+              <p className="text-xs text-customText-muted">Calculating monthly section attendance records...</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* Summary Stats bar */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+                <div className="p-3.5 rounded-xl bg-primary/5 border border-primary/10 flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] font-bold uppercase text-primary tracking-wider">Total Working Days</span>
+                    <p className="text-xl font-extrabold text-customText dark:text-customText-dark mt-0.5">
+                      {monthlyReport.totalConductedDays} Days
+                    </p>
+                  </div>
+                  <Calendar className="text-primary opacity-80" size={24} />
+                </div>
+                
+                <div className="p-3.5 rounded-xl bg-blue-500/5 border border-blue-500/10 flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] font-bold uppercase text-blue-600 dark:text-blue-400 tracking-wider">Enrolled Students</span>
+                    <p className="text-xl font-extrabold text-customText dark:text-customText-dark mt-0.5">
+                      {(monthlyReport.students || []).length} Students
+                    </p>
+                  </div>
+                  <User className="text-blue-500 opacity-80" size={24} />
+                </div>
+
+                <div className="p-3.5 rounded-xl bg-emerald-500/5 border border-emerald-500/10 flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] font-bold uppercase text-emerald-600 dark:text-emerald-400 tracking-wider">Average Attendance</span>
+                    <p className="text-xl font-extrabold text-customText dark:text-customText-dark mt-0.5">
+                      {monthlyReport.students && monthlyReport.students.length > 0
+                        ? Math.round(monthlyReport.students.reduce((acc, s) => acc + s.percentage, 0) / monthlyReport.students.length)
+                        : 0}%
+                    </p>
+                  </div>
+                  <FileSpreadsheet className="text-emerald-500 opacity-80" size={24} />
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-sm whitespace-nowrap">
+                  <thead>
+                    <tr className="border-b border-slate-200 dark:border-slate-800 text-xs font-semibold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider">
+                      <th className="pb-3 pr-3">S.No</th>
+                      <th className="pb-3 pr-3">Roll Number</th>
+                      <th className="pb-3 pr-3">Student Name</th>
+                      <th className="pb-3 pr-3">Section</th>
+                      <th className="pb-3 pr-3 text-center">Conducted Days</th>
+                      <th className="pb-3 pr-3 text-center">Present</th>
+                      <th className="pb-3 pr-3 text-center">Late</th>
+                      <th className="pb-3 pr-3 text-center">Absent</th>
+                      <th className="pb-3 pr-3 text-center">Attended</th>
+                      <th className="pb-3 pr-3 text-center">Attendance %</th>
+                      {(monthlyReport.conductedDates || []).map((dateStr) => {
+                        const parts = dateStr.split('-');
+                        const label = parts.length === 3 ? `${parts[2]}/${parts[1]}` : dateStr;
+                        return (
+                          <th key={dateStr} className="pb-3 px-1.5 text-center text-[10px] w-8">
+                            {label}
+                          </th>
+                        );
+                      })}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-customText dark:text-customText-dark">
+                    {(monthlyReport.students || []).map((item, idx) => {
+                      const pct = item.percentage;
+                      let badgeColor = 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400';
+                      if (pct < 60) {
+                        badgeColor = 'bg-red-500/10 border-red-500/20 text-red-600 dark:text-red-400';
+                      } else if (pct < 75) {
+                        badgeColor = 'bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400';
+                      }
+
+                      return (
+                        <tr key={item.id} className="hover:bg-slate-50/20 dark:hover:bg-slate-900/10 text-xs">
+                          <td className="py-3 pr-3 font-medium text-customText-muted">{idx + 1}</td>
+                          <td className="py-3 pr-3 font-semibold text-primary">{item.rollNumber}</td>
+                          <td className="py-3 pr-3 font-bold">{item.name}</td>
+                          <td className="py-3 pr-3 font-medium text-customText-muted">{item.section}</td>
+                          <td className="py-3 pr-3 text-center font-semibold">{item.totalConducted}</td>
+                          <td className="py-3 pr-3 text-center text-emerald-600 font-bold">{item.presentCount}</td>
+                          <td className="py-3 pr-3 text-center text-amber-600 font-bold">{item.lateCount}</td>
+                          <td className="py-3 pr-3 text-center text-red-600 font-bold">{item.absentCount}</td>
+                          <td className="py-3 pr-3 text-center font-extrabold">{item.totalAttended}</td>
+                          <td className="py-3 pr-3 text-center">
+                            <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-extrabold border ${badgeColor}`}>
+                              {pct}%
+                            </span>
+                          </td>
+                          {(monthlyReport.conductedDates || []).map((dateStr) => {
+                            const status = item.dateMatrix[dateStr] || '-';
+                            let statusColor = 'text-slate-400';
+                            if (status === 'P') statusColor = 'text-emerald-600 font-bold';
+                            else if (status === 'A') statusColor = 'text-red-600 font-bold';
+                            else if (status === 'L') statusColor = 'text-amber-600 font-bold';
+
+                            return (
+                              <td key={dateStr} className={`py-3 px-1.5 text-center text-[11px] ${statusColor}`}>
+                                {status}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      );
+                    })}
+
+                    {(!monthlyReport.students || monthlyReport.students.length === 0) && (
+                      <tr>
+                        <td colSpan={10 + (monthlyReport.conductedDates || []).length} className="text-center py-12 text-customText-muted dark:text-customText-mutedDark text-sm">
+                          No student attendance records found for the selected section and month.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>
