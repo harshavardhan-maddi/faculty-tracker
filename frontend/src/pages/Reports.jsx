@@ -210,6 +210,48 @@ const Reports = () => {
     document.body.removeChild(link);
   };
 
+  // Authenticated file downloader helper
+  const downloadReportFile = async (url, fallbackFilename) => {
+    try {
+      const res = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!res.ok) {
+        let msg = 'Failed to download report';
+        try {
+          const errData = await res.json();
+          if (errData.message) msg = errData.message;
+        } catch (e) {}
+        throw new Error(msg);
+      }
+
+      let filename = fallbackFilename;
+      const disposition = res.headers.get('Content-Disposition');
+      if (disposition && disposition.includes('filename=')) {
+        const match = disposition.match(/filename="?([^";]+)"?/);
+        if (match && match[1]) {
+          filename = match[1];
+        }
+      }
+
+      const blob = await res.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error('Report download error:', error);
+      alert(error.message || 'Report download failed');
+    }
+  };
+
   // CSV Export for Absentees Report (Trigger Backend Excel XLSX with auto-fit)
   const handleExportAbsenteesCSV = () => {
     const params = new URLSearchParams();
@@ -227,7 +269,7 @@ const Reports = () => {
       if (absenteeEndDate) params.append('endDate', absenteeEndDate);
     }
     
-    window.open(`/api/reports/absentees?${params.toString()}`, '_blank');
+    downloadReportFile(`/api/reports/absentees?${params.toString()}`, `Absentees_Report_${targetDate}.xlsx`);
   };
 
   // Excel Export for Section Monthly Attendance
@@ -236,8 +278,9 @@ const Reports = () => {
     params.append('section', monthlySection);
     params.append('month', monthlyMonth);
     params.append('format', 'excel');
-    window.open(`/api/reports/monthly-section-attendance?${params.toString()}`, '_blank');
+    downloadReportFile(`/api/reports/monthly-section-attendance?${params.toString()}`, `Monthly_Attendance_${monthlySection}_${monthlyMonth}.xlsx`);
   };
+
 
   // Combined Export Handler
   const handleExport = () => {

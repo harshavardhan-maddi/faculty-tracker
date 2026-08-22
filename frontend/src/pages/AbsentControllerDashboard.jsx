@@ -55,6 +55,47 @@ const AbsentControllerDashboard = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [sessionFilter, setSessionFilter] = useState('All'); // 'All' | 'morning' | 'afternoon'
 
+  const downloadReportFile = async (url, fallbackFilename) => {
+    try {
+      const res = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!res.ok) {
+        let msg = 'Failed to download report';
+        try {
+          const errData = await res.json();
+          if (errData.message) msg = errData.message;
+        } catch (e) {}
+        throw new Error(msg);
+      }
+
+      let filename = fallbackFilename;
+      const disposition = res.headers.get('Content-Disposition');
+      if (disposition && disposition.includes('filename=')) {
+        const match = disposition.match(/filename="?([^";]+)"?/);
+        if (match && match[1]) {
+          filename = match[1];
+        }
+      }
+
+      const blob = await res.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error('Report download error:', error);
+      alert(error.message || 'Report download failed');
+    }
+  };
+
   const handleDownloadReport = (targetSession = sessionFilter) => {
     const params = new URLSearchParams();
     params.append('section', activeBoardTab === 'sectionWise' ? selectedSection : 'All');
@@ -63,7 +104,7 @@ const AbsentControllerDashboard = () => {
       params.append('session', targetSession);
     }
     params.append('format', 'excel');
-    window.open(`/api/reports/absentees?${params.toString()}`, '_blank');
+    downloadReportFile(`/api/reports/absentees?${params.toString()}`, `Absentees_Report_${todayDate}.xlsx`);
   };
 
   const handleDownloadMonthlyReport = (format = 'excel') => {
@@ -74,7 +115,7 @@ const AbsentControllerDashboard = () => {
       params.append('section', sectionName);
       params.append('month', monthStr);
       params.append('format', 'excel');
-      window.open(`/api/reports/monthly-section-attendance?${params.toString()}`, '_blank');
+      downloadReportFile(`/api/reports/monthly-section-attendance?${params.toString()}`, `Monthly_Attendance_${sectionName}_${monthStr}.xlsx`);
     } else {
       const params = new URLSearchParams();
       params.append('reportType', 'monthly');
@@ -83,6 +124,7 @@ const AbsentControllerDashboard = () => {
       window.open(`/print-report?${params.toString()}`, '_blank');
     }
   };
+
 
 
   // Student history modal state
