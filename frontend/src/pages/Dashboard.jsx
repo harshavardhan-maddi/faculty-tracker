@@ -29,7 +29,8 @@ import {
   Settings,
   FileText,
   BadgeCheck,
-  DoorOpen
+  DoorOpen,
+  RefreshCw
 } from 'lucide-react';
 import OutpassTicketModal from '../components/OutpassTicketModal';
 import { 
@@ -37,7 +38,10 @@ import {
   hodGrantOutpass, 
   hodRejectOutpass, 
   subscribeToOutpasses,
-  syncHODStudents
+  syncHODStudents,
+  deleteOutpassTicket,
+  clearOldOutpasses,
+  syncOutpassesFromBackend
 } from '../services/outpassService';
 
 const Dashboard = () => {
@@ -86,6 +90,34 @@ const Dashboard = () => {
       setTimeout(() => setOutpassActionSuccess(''), 4500);
     } catch (err) {
       setOutpassActionError(err.message || 'Failed to reject outpass');
+    }
+  };
+
+  const handleDeleteOutpass = async (ticketId, studentName) => {
+    if (!window.confirm(`Permanently delete outpass ticket ${ticketId}${studentName ? ` for ${studentName}` : ''}?`)) {
+      return;
+    }
+    try {
+      setOutpassActionError('');
+      await deleteOutpassTicket(ticketId);
+      setOutpassActionSuccess(`Outpass ticket ${ticketId} deleted successfully.`);
+      setTimeout(() => setOutpassActionSuccess(''), 3500);
+    } catch (err) {
+      setOutpassActionError(err.message || 'Failed to delete outpass ticket');
+    }
+  };
+
+  const handleClearOldOutpasses = async () => {
+    if (!window.confirm('Delete all old completed (Sent Out) and rejected outpass tickets from the database?')) {
+      return;
+    }
+    try {
+      setOutpassActionError('');
+      await clearOldOutpasses();
+      setOutpassActionSuccess('All completed and rejected outpass tickets were cleared.');
+      setTimeout(() => setOutpassActionSuccess(''), 3500);
+    } catch (err) {
+      setOutpassActionError(err.message || 'Failed to clear old tickets');
     }
   };
 
@@ -1620,15 +1652,25 @@ const Dashboard = () => {
                         </div>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() => setSelectedOutpassModalTicket(ticket)}
-                        className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-primary/10 hover:text-primary text-xs font-bold text-customText-muted flex items-center gap-1.5 transition-colors cursor-pointer"
-                        title="View Official Ticket"
-                      >
-                        <FileText size={15} />
-                        <span>Ticket</span>
-                      </button>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedOutpassModalTicket(ticket)}
+                          className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-primary/10 hover:text-primary text-xs font-bold text-customText-muted flex items-center gap-1.5 transition-colors cursor-pointer"
+                          title="View Official Ticket"
+                        >
+                          <FileText size={15} />
+                          <span>Ticket</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteOutpass(ticket.id, ticket.studentName)}
+                          className="p-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-bold flex items-center transition-colors cursor-pointer"
+                          title="Delete Ticket"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
                     </div>
 
                     {/* Stated Reason */}
@@ -1639,9 +1681,9 @@ const Dashboard = () => {
                       <p className="font-semibold text-customText dark:text-customText-dark italic">
                         "{ticket.reason}"
                       </p>
-                      <div className="flex gap-4 pt-1.5 text-[11px] text-customText-muted">
+                      <div className="flex flex-wrap gap-4 pt-1.5 text-[11px] text-customText-muted">
                         <span><strong>Destination:</strong> {ticket.destination}</span>
-                        <span><strong>Expected Return:</strong> {ticket.expectedReturnTime}</span>
+                        {ticket.expectedReturnTime && <span><strong>Expected Return:</strong> {ticket.expectedReturnTime}</span>}
                       </div>
                     </div>
 
@@ -1691,9 +1733,34 @@ const Dashboard = () => {
 
           {/* All Outpass History for HOD */}
           <div className="pt-6 border-t border-slate-200 dark:border-slate-800 space-y-3">
-            <h4 className="text-sm font-black text-customText dark:text-customText-dark uppercase tracking-wider">
-              Department Outpass Log & Clearance Status
-            </h4>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <h4 className="text-sm font-black text-customText dark:text-customText-dark uppercase tracking-wider">
+                Department Outpass Log & Clearance Status
+              </h4>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const tickets = await syncOutpassesFromBackend();
+                    setOutpassTickets(tickets);
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-bold text-customText-muted flex items-center gap-1.5 transition-colors cursor-pointer"
+                  title="Sync latest live tickets from database"
+                >
+                  <RefreshCw size={13} />
+                  <span>Sync</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleClearOldOutpasses}
+                  className="px-3 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                  title="Clear all completed (Sent Out) and rejected tickets"
+                >
+                  <Trash2 size={13} />
+                  <span>Clear Completed / Old Tickets</span>
+                </button>
+              </div>
+            </div>
 
             <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800">
               <table className="w-full text-left text-xs">
@@ -1705,54 +1772,73 @@ const Dashboard = () => {
                     <th className="p-3">Parent Call</th>
                     <th className="p-3">HOD Grant</th>
                     <th className="p-3">Gate Exit</th>
-                    <th className="p-3">Slip</th>
+                    <th className="p-3 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {outpassTickets.slice(0, 10).map((t) => (
-                    <tr key={t.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/50">
-                      <td className="p-3 font-mono font-bold text-primary">{t.id}</td>
-                      <td className="p-3">
-                        <span className="font-bold block">{t.studentName}</span>
-                        <span className="text-[10px] text-customText-muted font-mono">{t.rollNumber} • {t.section}</span>
-                      </td>
-                      <td className="p-3 italic max-w-xs truncate">"{t.reason}"</td>
-                      <td className="p-3">
-                        {t.absentControllerAction?.confirmed ? (
-                          <span className="text-emerald-600 font-bold">✓ Confirmed</span>
-                        ) : (
-                          <span className="text-amber-500 font-medium">Pending Call</span>
-                        )}
-                      </td>
-                      <td className="p-3">
-                        {t.hodAction?.granted ? (
-                          <span className="text-emerald-600 font-bold">✓ Granted</span>
-                        ) : t.status === 'REJECTED' && t.rejectionStage === 'HOD' ? (
-                          <span className="text-rose-600 font-bold">✕ Denied</span>
-                        ) : (
-                          <span className="text-slate-400">Pending</span>
-                        )}
-                      </td>
-                      <td className="p-3">
-                        {t.watchmanAction?.sentOut ? (
-                          <span className="text-purple-600 font-extrabold flex items-center gap-1">
-                            <DoorOpen size={13} /> Sent Out
-                          </span>
-                        ) : (
-                          <span className="text-slate-400">At Campus</span>
-                        )}
-                      </td>
-                      <td className="p-3">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedOutpassModalTicket(t)}
-                          className="text-primary hover:underline font-bold text-[11px]"
-                        >
-                          View Slip
-                        </button>
+                  {outpassTickets.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="p-6 text-center text-customText-muted text-xs">
+                        No outpass tickets found in database.
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    outpassTickets.map((t) => (
+                      <tr key={t.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/50">
+                        <td className="p-3 font-mono font-bold text-primary">{t.id}</td>
+                        <td className="p-3">
+                          <span className="font-bold block">{t.studentName}</span>
+                          <span className="text-[10px] text-customText-muted font-mono">{t.rollNumber} • {t.section}</span>
+                        </td>
+                        <td className="p-3 italic max-w-xs truncate">"{t.reason}"</td>
+                        <td className="p-3">
+                          {t.absentControllerAction?.confirmed ? (
+                            <span className="text-emerald-600 font-bold">✓ Confirmed</span>
+                          ) : (
+                            <span className="text-amber-500 font-medium">Pending Call</span>
+                          )}
+                        </td>
+                        <td className="p-3">
+                          {t.hodAction?.granted ? (
+                            <span className="text-emerald-600 font-bold">✓ Granted</span>
+                          ) : t.status === 'REJECTED' && t.rejectionStage === 'HOD' ? (
+                            <span className="text-rose-600 font-bold">✕ Denied</span>
+                          ) : (
+                            <span className="text-slate-400">Pending</span>
+                          )}
+                        </td>
+                        <td className="p-3">
+                          {t.watchmanAction?.sentOut ? (
+                            <span className="text-purple-600 font-extrabold flex items-center gap-1">
+                              <DoorOpen size={13} /> Sent Out
+                            </span>
+                          ) : (
+                            <span className="text-slate-400">At Campus</span>
+                          )}
+                        </td>
+                        <td className="p-3 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedOutpassModalTicket(t)}
+                              className="px-2.5 py-1 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary font-bold text-[11px] transition-colors cursor-pointer"
+                              title="View slip details"
+                            >
+                              Slip
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteOutpass(t.id, t.studentName)}
+                              className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 transition-colors cursor-pointer"
+                              title="Delete this ticket permanently"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>

@@ -318,9 +318,9 @@ const OutpassTicketModal = ({ ticket, onClose }) => {
 
               <div className="space-y-1">
                 <span className="text-[10px] font-bold text-customText-muted dark:text-customText-mutedDark uppercase">
-                  Destination / Expected Return
+                  Destination / Purpose
                 </span>
-                <p className="font-semibold">{ticket.destination} ({ticket.expectedReturnTime})</p>
+                <p className="font-semibold">{ticket.destination}{ticket.expectedReturnTime ? ` (${ticket.expectedReturnTime})` : ''}</p>
               </div>
             </div>
 

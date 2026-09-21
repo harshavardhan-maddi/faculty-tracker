@@ -67,7 +67,6 @@ const Login = () => {
   const [matchedStudent, setMatchedStudent] = useState(null);
   const [outpassReason, setOutpassReason] = useState('');
   const [outpassDestination, setOutpassDestination] = useState('Home');
-  const [expectedReturnTime, setExpectedReturnTime] = useState('Today before 6:00 PM');
   const [isSubmittingOutpass, setIsSubmittingOutpass] = useState(false);
   const [submittedTicket, setSubmittedTicket] = useState(null);
   
@@ -265,7 +264,7 @@ const Login = () => {
   };
 
   // Step 2: Confirm & Submit Application
-  const handleSubmitOutpass = (e) => {
+  const handleSubmitOutpass = async (e) => {
     e.preventDefault();
     if (!outpassReason.trim()) {
       setVerifyError('Please state your reason for going out.');
@@ -274,7 +273,7 @@ const Login = () => {
 
     setIsSubmittingOutpass(true);
     try {
-      const newTicket = submitOutpassApplication({
+      const newTicket = await submitOutpassApplication({
         rollNumber: matchedStudent.rollNumber,
         studentName: matchedStudent.name,
         section: matchedStudent.section,
@@ -282,7 +281,6 @@ const Login = () => {
         parentMobile: matchedStudent.parentMobile,
         reason: outpassReason.trim(),
         destination: outpassDestination,
-        expectedReturnTime: expectedReturnTime
       });
 
       setSubmittedTicket(newTicket);
@@ -620,32 +618,17 @@ const Login = () => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                    <div>
-                      <label className="block text-[10px] font-bold text-customText-muted uppercase mb-1">
-                        Destination
-                      </label>
-                      <input
-                        type="text"
-                        value={outpassDestination}
-                        onChange={(e) => setOutpassDestination(e.target.value)}
-                        placeholder="e.g. Home / Hospital"
-                        className="glass-input text-xs py-2.5"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-bold text-customText-muted uppercase mb-1">
-                        Expected Return Time
-                      </label>
-                      <input
-                        type="text"
-                        value={expectedReturnTime}
-                        onChange={(e) => setExpectedReturnTime(e.target.value)}
-                        placeholder="e.g. Today before 6:00 PM"
-                        className="glass-input text-xs py-2.5"
-                      />
-                    </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-customText-muted uppercase mb-1">
+                      Destination / Clinic / Home Address
+                    </label>
+                    <input
+                      type="text"
+                      value={outpassDestination}
+                      onChange={(e) => setOutpassDestination(e.target.value)}
+                      placeholder="e.g. Home / Hospital / Government Office"
+                      className="glass-input text-xs py-2.5 w-full"
+                    />
                   </div>
 
                   {/* Action buttons */}

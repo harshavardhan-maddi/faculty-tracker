@@ -17,14 +17,16 @@ import {
   Send,
   ArrowRight,
   ExternalLink,
-  ShieldCheck
+  ShieldCheck,
+  RefreshCw
 } from 'lucide-react';
 import OutpassTicketModal from '../components/OutpassTicketModal';
 import { 
   getAllOutpasses, 
   confirmParentAndForwardToHOD, 
   rejectByAbsentController, 
-  subscribeToOutpasses 
+  subscribeToOutpasses,
+  syncOutpassesFromBackend
 } from '../services/outpassService';
 
 const ABSENCE_REASONS = {
@@ -444,45 +446,88 @@ const AbsentControllerDashboard = () => {
         )}
       </div>
 
-      {/* Tabs Layout */}
-      <div className="flex border-b border-slate-200 dark:border-slate-800 no-print">
-        <button
-          onClick={() => setActiveBoardTab('sectionWise')}
-          className={`flex items-center gap-2 py-3 px-6 text-sm font-semibold border-b-2 transition-all ${
-            activeBoardTab === 'sectionWise' 
-              ? 'border-primary text-primary-dark dark:text-primary font-bold' 
-              : 'border-transparent text-customText-muted dark:text-customText-mutedDark hover:text-customText'
-          }`}
-        >
-          <Users size={16} />
-          <span>Section Wise Absentees</span>
-        </button>
-        <button
-          onClick={() => setActiveBoardTab('allSections')}
-          className={`flex items-center gap-2 py-3 px-6 text-sm font-semibold border-b-2 transition-all ${
-            activeBoardTab === 'allSections' 
-              ? 'border-primary text-primary-dark dark:text-primary font-bold' 
-              : 'border-transparent text-customText-muted dark:text-customText-mutedDark hover:text-customText'
-          }`}
-        >
-          <AlertCircle size={16} className="text-red-500" />
-          <span>All Section Absentees</span>
-        </button>
-        <button
+      {/* Real-time Alert Banner for Incoming Outpasses */}
+      {outpassTickets.filter(t => t.status === 'PENDING_PARENT_CALL').length > 0 && (
+        <div 
           onClick={() => setActiveBoardTab('outpassRequests')}
-          className={`flex items-center gap-2 py-3 px-6 text-sm font-semibold border-b-2 transition-all relative ${
-            activeBoardTab === 'outpassRequests' 
-              ? 'border-primary text-primary-dark dark:text-primary font-bold' 
-              : 'border-transparent text-customText-muted dark:text-customText-mutedDark hover:text-customText'
-          }`}
+          className="p-4 rounded-2xl bg-amber-500/15 border-2 border-amber-500/40 text-amber-950 dark:text-amber-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 cursor-pointer hover:bg-amber-500/25 transition-all no-print shadow-md"
         >
-          <FileText size={16} />
-          <span>Outpass Permissions</span>
-          {outpassTickets.filter(t => t.status === 'PENDING_PARENT_CALL').length > 0 && (
-            <span className="ml-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500 text-white animate-pulse">
-              {outpassTickets.filter(t => t.status === 'PENDING_PARENT_CALL').length}
+          <div className="flex items-center gap-3">
+            <span className="px-2.5 py-1 rounded-xl bg-amber-500 text-white font-black text-xs animate-bounce">
+              ACTION REQUIRED
             </span>
-          )}
+            <div>
+              <p className="text-sm font-extrabold text-amber-900 dark:text-amber-200">
+                🔔 {outpassTickets.filter(t => t.status === 'PENDING_PARENT_CALL').length} Student Outpass Request(s) Awaiting Parent Call!
+              </p>
+              <p className="text-xs text-amber-700 dark:text-amber-300">
+                Student submitted outpass on campus. Click here to verify parent phone & forward to HOD.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="py-2 px-4 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-black shadow-md shadow-amber-600/20 shrink-0"
+          >
+            Review & Call Parent →
+          </button>
+        </div>
+      )}
+
+      {/* Tabs Layout */}
+      <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 no-print flex-wrap">
+        <div className="flex flex-wrap">
+          <button
+            onClick={() => setActiveBoardTab('sectionWise')}
+            className={`flex items-center gap-2 py-3 px-6 text-sm font-semibold border-b-2 transition-all ${
+              activeBoardTab === 'sectionWise' 
+                ? 'border-primary text-primary-dark dark:text-primary font-bold' 
+                : 'border-transparent text-customText-muted dark:text-customText-mutedDark hover:text-customText'
+            }`}
+          >
+            <Users size={16} />
+            <span>Section Wise Absentees</span>
+          </button>
+          <button
+            onClick={() => setActiveBoardTab('allSections')}
+            className={`flex items-center gap-2 py-3 px-6 text-sm font-semibold border-b-2 transition-all ${
+              activeBoardTab === 'allSections' 
+                ? 'border-primary text-primary-dark dark:text-primary font-bold' 
+                : 'border-transparent text-customText-muted dark:text-customText-mutedDark hover:text-customText'
+            }`}
+          >
+            <AlertCircle size={16} className="text-red-500" />
+            <span>All Section Absentees</span>
+          </button>
+          <button
+            onClick={() => setActiveBoardTab('outpassRequests')}
+            className={`flex items-center gap-2 py-3 px-6 text-sm font-semibold border-b-2 transition-all relative ${
+              activeBoardTab === 'outpassRequests' 
+                ? 'border-primary text-primary-dark dark:text-primary font-bold' 
+                : 'border-transparent text-customText-muted dark:text-customText-mutedDark hover:text-customText'
+            }`}
+          >
+            <FileText size={16} />
+            <span>Outpass Permissions</span>
+            {outpassTickets.filter(t => t.status === 'PENDING_PARENT_CALL').length > 0 && (
+              <span className="ml-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500 text-white animate-pulse">
+                {outpassTickets.filter(t => t.status === 'PENDING_PARENT_CALL').length}
+              </span>
+            )}
+          </button>
+        </div>
+
+        <button
+          type="button"
+          onClick={async () => {
+            const tickets = await syncOutpassesFromBackend();
+            setOutpassTickets(tickets);
+          }}
+          className="py-2 px-3 text-xs font-bold text-customText-muted hover:text-primary flex items-center gap-1.5 transition-colors cursor-pointer"
+          title="Refresh live tickets from central server"
+        >
+          <RefreshCw size={13} />
+          <span>Sync Outpasses</span>
         </button>
       </div>
 
@@ -1636,9 +1681,9 @@ const AbsentControllerDashboard = () => {
                       <p className="font-semibold text-customText dark:text-customText-dark italic">
                         "{ticket.reason}"
                       </p>
-                      <div className="flex gap-4 pt-1.5 text-[11px] text-customText-muted">
+                      <div className="flex flex-wrap gap-4 pt-1.5 text-[11px] text-customText-muted">
                         <span><strong>Destination:</strong> {ticket.destination}</span>
-                        <span><strong>Expected Return:</strong> {ticket.expectedReturnTime}</span>
+                        {ticket.expectedReturnTime && <span><strong>Expected Return:</strong> {ticket.expectedReturnTime}</span>}
                       </div>
                     </div>
 

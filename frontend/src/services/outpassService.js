@@ -240,16 +240,20 @@ export const getAllOutpasses = () => {
 };
 
 // Save outpasses and notify listeners (both locally and to backend database)
-const saveOutpasses = async (tickets) => {
+export const saveOutpasses = async (tickets) => {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(tickets));
   // Dispatch custom event for same-tab updates
   window.dispatchEvent(new CustomEvent('lectra_outpass_updated', { detail: tickets }));
 
   // Send to backend database so other devices (Absent Controller, HOD, Watchman) receive it instantly
   try {
-    const res = await fetch('/api/student-attendance/outpass/tickets', {
+    const res = await fetch(`/api/student-attendance/outpass/tickets?_t=${Date.now()}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
+      },
       body: JSON.stringify({ tickets })
     });
     if (res.ok) {
@@ -257,35 +261,85 @@ const saveOutpasses = async (tickets) => {
       if (data.success && Array.isArray(data.tickets)) {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data.tickets));
         window.dispatchEvent(new CustomEvent('lectra_outpass_updated', { detail: data.tickets }));
+        return data.tickets;
       }
     }
   } catch (e) {
     console.warn('Sync outpass network note:', e);
   }
+  return tickets;
 };
 
-// Sync live outpasses from backend database across campus devices
+// Sync live outpasses from backend database across campus devices (Anti-Cached)
 export const syncOutpassesFromBackend = async () => {
   try {
-    const res = await fetch('/api/student-attendance/outpass/tickets');
+    const res = await fetch(`/api/student-attendance/outpass/tickets?_t=${Date.now()}`, {
+      headers: {
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
+      }
+    });
     if (res.ok) {
       const data = await res.json();
       if (data.success && Array.isArray(data.tickets)) {
-        const local = getAllOutpasses();
-        const localMap = new Map(local.map(t => [t.id, t]));
-        data.tickets.forEach(rt => {
-          localMap.set(rt.id, rt);
-        });
-        const merged = Array.from(localMap.values()).sort((a, b) => new Date(b.appliedAt || 0) - new Date(a.appliedAt || 0));
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
-        window.dispatchEvent(new CustomEvent('lectra_outpass_updated', { detail: merged }));
-        return merged;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data.tickets));
+        window.dispatchEvent(new CustomEvent('lectra_outpass_updated', { detail: data.tickets }));
+        return data.tickets;
       }
     }
   } catch (e) {
     // silent fallback to local storage
   }
   return getAllOutpasses();
+};
+
+// Delete an individual outpass ticket (HOD feature)
+export const deleteOutpassTicket = async (ticketId) => {
+  const current = getAllOutpasses().filter(t => t.id !== ticketId);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(current));
+  window.dispatchEvent(new CustomEvent('lectra_outpass_updated', { detail: current }));
+
+  try {
+    const res = await fetch(`/api/student-attendance/outpass/tickets/${encodeURIComponent(ticketId)}`, {
+      method: 'DELETE'
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && Array.isArray(data.tickets)) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data.tickets));
+        window.dispatchEvent(new CustomEvent('lectra_outpass_updated', { detail: data.tickets }));
+        return data.tickets;
+      }
+    }
+  } catch (err) {
+    console.warn('Delete outpass network note:', err);
+  }
+  return current;
+};
+
+// Clear completed (SENT_OUT) and rejected tickets (HOD feature)
+export const clearOldOutpasses = async () => {
+  const activeOnly = getAllOutpasses().filter(t => t.status !== 'SENT_OUT' && t.status !== 'REJECTED');
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(activeOnly));
+  window.dispatchEvent(new CustomEvent('lectra_outpass_updated', { detail: activeOnly }));
+
+  try {
+    const res = await fetch('/api/student-attendance/outpass/tickets/clear-old', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && Array.isArray(data.tickets)) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data.tickets));
+        window.dispatchEvent(new CustomEvent('lectra_outpass_updated', { detail: data.tickets }));
+        return data.tickets;
+      }
+    }
+  } catch (err) {
+    console.warn('Clear old outpasses network note:', err);
+  }
+  return activeOnly;
 };
 
 // Generate unique ticket ID
@@ -296,17 +350,15 @@ const generateTicketId = () => {
 };
 
 // Create a new outpass request (Submitted by Student)
-export const submitOutpassApplication = ({
+export const submitOutpassApplication = async ({
   rollNumber,
   studentName,
   section,
   studentMobile,
   parentMobile,
   reason,
-  destination,
-  expectedReturnTime
+  destination
 }) => {
-  const tickets = getAllOutpasses();
   const now = new Date();
   
   const newTicket = {
@@ -320,7 +372,6 @@ export const submitOutpassApplication = ({
     maskedParentMobile: maskPhoneNumber(parentMobile),
     reason,
     destination: destination || 'Home / Medical Emergency',
-    expectedReturnTime: expectedReturnTime || 'Today before 6:00 PM',
     appliedAt: now.toISOString(),
     appliedDate: now.toLocaleDateString('en-GB'),
     appliedTime: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -334,17 +385,42 @@ export const submitOutpassApplication = ({
     status: 'PENDING_PARENT_CALL',
     
     // Stage 1: Absent Controller Verification Details
-    absentControllerAction: null, // { confirmed: true, calledAt: string, remarks: string, controllerName: string }
+    absentControllerAction: null,
     
     // Stage 2: HOD Approval Details
-    hodAction: null, // { granted: true, approvedAt: string, remarks: string, hodName: string }
+    hodAction: null,
     
     // Stage 3: Watchman Gate Release Details
-    watchmanAction: null, // { sentOut: true, physicalIdVerified: true, exitTime: string, watchmanName: string }
+    watchmanAction: null,
   };
 
-  tickets.unshift(newTicket);
-  saveOutpasses(tickets);
+  // 1. Instantly save to local storage
+  const currentTickets = getAllOutpasses();
+  const updatedLocal = [newTicket, ...currentTickets.filter(t => t.id !== newTicket.id)];
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedLocal));
+  window.dispatchEvent(new CustomEvent('lectra_outpass_updated', { detail: updatedLocal }));
+
+  // 2. Directly sync to central database so Absent Controller, HOD, and Watchman devices receive it
+  try {
+    const res = await fetch(`/api/student-attendance/outpass/tickets?_t=${Date.now()}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache'
+      },
+      body: JSON.stringify({ tickets: [newTicket] })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && Array.isArray(data.tickets)) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data.tickets));
+        window.dispatchEvent(new CustomEvent('lectra_outpass_updated', { detail: data.tickets }));
+      }
+    }
+  } catch (e) {
+    console.warn('Network sync note on submit:', e);
+  }
+
   return newTicket;
 };
 

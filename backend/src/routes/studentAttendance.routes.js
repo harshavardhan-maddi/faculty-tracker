@@ -318,8 +318,13 @@ router.post('/verify-outpass-student', async (req, res) => {
   }
 });
 
-// 1c. GET /outpass/tickets - Fetch live outpass tickets across all campus devices
+// 1c. GET /outpass/tickets - Fetch live outpass tickets across all campus devices (Anti-Cached)
 router.get('/outpass/tickets', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.setHeader('Surrogate-Control', 'no-store');
+
   try {
     const setting = await prisma.systemSetting.findUnique({
       where: { key: 'lectra_outpass_tickets_db' }
@@ -382,6 +387,58 @@ router.post('/outpass/tickets', async (req, res) => {
   } catch (error) {
     console.error('Save outpass tickets error:', error);
     res.status(500).json({ success: false, message: 'Failed to sync outpass tickets' });
+  }
+});
+
+// 1e. DELETE /outpass/tickets/:id - Delete an individual outpass ticket (HOD capability)
+router.delete('/outpass/tickets/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const setting = await prisma.systemSetting.findUnique({
+      where: { key: 'lectra_outpass_tickets_db' }
+    });
+    let existing = [];
+    if (setting && setting.value) {
+      try { existing = JSON.parse(setting.value); } catch(e) {}
+    }
+
+    const filtered = existing.filter(t => t.id !== id);
+
+    await prisma.systemSetting.upsert({
+      where: { key: 'lectra_outpass_tickets_db' },
+      update: { value: JSON.stringify(filtered) },
+      create: { key: 'lectra_outpass_tickets_db', value: JSON.stringify(filtered) }
+    });
+    res.json({ success: true, message: 'Ticket deleted successfully', tickets: filtered });
+  } catch (error) {
+    console.error('Delete outpass ticket error:', error);
+    res.status(500).json({ success: false, message: 'Failed to delete ticket' });
+  }
+});
+
+// 1f. POST /outpass/tickets/clear-old - Clear completed (SENT_OUT) and rejected tickets (HOD capability)
+router.post('/outpass/tickets/clear-old', async (req, res) => {
+  try {
+    const setting = await prisma.systemSetting.findUnique({
+      where: { key: 'lectra_outpass_tickets_db' }
+    });
+    let existing = [];
+    if (setting && setting.value) {
+      try { existing = JSON.parse(setting.value); } catch(e) {}
+    }
+
+    // Keep active tickets (pending calls, forwarded to HOD, or granted but not yet exited)
+    const active = existing.filter(t => t.status !== 'SENT_OUT' && t.status !== 'REJECTED');
+
+    await prisma.systemSetting.upsert({
+      where: { key: 'lectra_outpass_tickets_db' },
+      update: { value: JSON.stringify(active) },
+      create: { key: 'lectra_outpass_tickets_db', value: JSON.stringify(active) }
+    });
+    res.json({ success: true, message: 'Completed and rejected tickets cleared', count: active.length, tickets: active });
+  } catch (error) {
+    console.error('Clear old outpasses error:', error);
+    res.status(500).json({ success: false, message: 'Failed to clear old tickets' });
   }
 });
 
