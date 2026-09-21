@@ -15,6 +15,7 @@ import FingerprintSettings from './pages/FingerprintSettings';
 import AbsentControllerDashboard from './pages/AbsentControllerDashboard';
 import PrintReport from './pages/PrintReport';
 import FacultyDashboard from './pages/FacultyDashboard';
+import WatchmanDashboard from './pages/WatchmanDashboard';
 
 // Custom router resolver to send authenticated users to their correct home dashboard
 const HomeRedirect = () => {
@@ -31,6 +32,9 @@ const HomeRedirect = () => {
   if (user.role === 'FACULTY') {
     return <Navigate to="/faculty-dashboard" replace />;
   }
+  if (user.role === 'WATCHMAN') {
+    return <Navigate to="/watchman-dashboard" replace />;
+  }
   return <Navigate to="/dashboard" replace />;
 };
 
@@ -39,6 +43,18 @@ const AppRoutes = () => {
     <Routes>
       {/* Public Routes */}
       <Route path="/login" element={<Login />} />
+
+      {/* Protected Watchman Routes */}
+      <Route
+        path="/watchman-dashboard"
+        element={
+          <PrivateRoute allowedRoles={['WATCHMAN', 'HOD', 'SUB_ADMIN']}>
+            <Layout>
+              <WatchmanDashboard />
+            </Layout>
+          </PrivateRoute>
+        }
+      />
 
       {/* Protected CR Routes */}
       <Route

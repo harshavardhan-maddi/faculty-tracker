@@ -1,0 +1,368 @@
+// outpassService.js
+// Client-side persistent storage and lifecycle manager for Student Outpasses & Gate Permissions
+
+const STORAGE_KEY = 'lectra_outpass_tickets';
+const STUDENTS_CACHE_KEY = 'lectra_outpass_students_directory';
+
+// Default initial student directory for matching roll numbers
+const DEFAULT_STUDENTS = [
+  {
+    rollNumber: '21NE1A0501',
+    name: 'A. Sai Krishna',
+    section: 'CSE 3rd Year',
+    studentMobile: '9876543210',
+    parentMobile: '9123456780',
+  },
+  {
+    rollNumber: '21NE1A0502',
+    name: 'B. Meghana',
+    section: 'CSE 3rd Year',
+    studentMobile: '9876543211',
+    parentMobile: '9123456781',
+  },
+  {
+    rollNumber: '21NE1A0503',
+    name: 'Ch. Venkat Reddy',
+    section: 'CSE 3rd Year',
+    studentMobile: '9876543212',
+    parentMobile: '9123456782',
+  },
+  {
+    rollNumber: '21NE1A0504',
+    name: 'D. Harshavardhan',
+    section: 'CSE 3rd Year',
+    studentMobile: '9848022338',
+    parentMobile: '9848033449',
+  },
+  {
+    rollNumber: '21NE1A0505',
+    name: 'E. Anusha',
+    section: 'CSE 3rd Year',
+    studentMobile: '9876543214',
+    parentMobile: '9123456784',
+  },
+  {
+    rollNumber: '20NE1A0512',
+    name: 'G. Karthik',
+    section: 'CSE 4th Year',
+    studentMobile: '9700112233',
+    parentMobile: '9700445566',
+  },
+  {
+    rollNumber: '20NE1A0525',
+    name: 'K. Sneha Latha',
+    section: 'CSE 4th Year',
+    studentMobile: '9700112244',
+    parentMobile: '9700445577',
+  },
+  {
+    rollNumber: '22NE1A0410',
+    name: 'M. Pavan Kalyan',
+    section: 'ECE 2nd Year',
+    studentMobile: '9988776655',
+    parentMobile: '9988776600',
+  },
+  {
+    rollNumber: '22NE1A0420',
+    name: 'N. Divya Teja',
+    section: 'ECE 2nd Year',
+    studentMobile: '9988776656',
+    parentMobile: '9988776601',
+  },
+  {
+    rollNumber: '21NE1A0301',
+    name: 'P. Rahul Varma',
+    section: 'MECH 3rd Year',
+    studentMobile: '9440112233',
+    parentMobile: '9440445566',
+  }
+];
+
+// Initialize directory in localStorage if not already present
+export const getStudentsDirectory = () => {
+  try {
+    const raw = localStorage.getItem(STUDENTS_CACHE_KEY);
+    if (!raw) {
+      localStorage.setItem(STUDENTS_CACHE_KEY, JSON.stringify(DEFAULT_STUDENTS));
+      return DEFAULT_STUDENTS;
+    }
+    return JSON.parse(raw);
+  } catch (e) {
+    return DEFAULT_STUDENTS;
+  }
+};
+
+export const registerStudentInDirectory = (student) => {
+  const dir = getStudentsDirectory();
+  const index = dir.findIndex(s => s.rollNumber.toUpperCase() === student.rollNumber.toUpperCase());
+  if (index >= 0) {
+    dir[index] = { ...dir[index], ...student };
+  } else {
+    dir.push(student);
+  }
+  localStorage.setItem(STUDENTS_CACHE_KEY, JSON.stringify(dir));
+  return student;
+};
+
+// Mask phone number showing only last 4 digits (e.g. ••••••7890)
+export const maskPhoneNumber = (phone) => {
+  if (!phone) return '••••••0000';
+  const clean = String(phone).replace(/\D/g, '');
+  if (clean.length <= 4) return clean;
+  const last4 = clean.slice(-4);
+  return `••••••${last4}`;
+};
+
+// Lookup student by roll number
+export const lookupStudentByRoll = (rollNumber) => {
+  if (!rollNumber) return null;
+  const cleanRoll = rollNumber.trim().toUpperCase();
+  const dir = getStudentsDirectory();
+  
+  const found = dir.find(s => s.rollNumber.toUpperCase() === cleanRoll);
+  if (found) {
+    return {
+      ...found,
+      maskedStudentMobile: maskPhoneNumber(found.studentMobile),
+      maskedParentMobile: maskPhoneNumber(found.parentMobile),
+    };
+  }
+
+  // Fallback: If not in static mock, synthesize realistic student info for quick testing
+  // so any valid-looking roll number entered by the user works seamlessly!
+  const defaultClass = cleanRoll.startsWith('20') ? 'CSE 4th Year' :
+                       cleanRoll.startsWith('21') ? 'CSE 3rd Year' :
+                       cleanRoll.startsWith('22') ? 'ECE 2nd Year' : 'CSE 3rd Year';
+  
+  const generated = {
+    rollNumber: cleanRoll,
+    name: `Student (${cleanRoll})`,
+    section: defaultClass,
+    studentMobile: `98480${cleanRoll.slice(-5).replace(/\D/g, '1').padEnd(5, '0')}`,
+    parentMobile: `94401${cleanRoll.slice(-5).replace(/\D/g, '2').padEnd(5, '9')}`,
+  };
+
+  registerStudentInDirectory(generated);
+  return {
+    ...generated,
+    maskedStudentMobile: maskPhoneNumber(generated.studentMobile),
+    maskedParentMobile: maskPhoneNumber(generated.parentMobile),
+  };
+};
+
+// Get all outpasses from storage
+export const getAllOutpasses = () => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw);
+  } catch (e) {
+    console.error('Failed to parse outpasses:', e);
+    return [];
+  }
+};
+
+// Save outpasses and notify listeners
+const saveOutpasses = (tickets) => {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(tickets));
+  // Dispatch custom event for same-tab updates
+  window.dispatchEvent(new CustomEvent('lectra_outpass_updated', { detail: tickets }));
+};
+
+// Generate unique ticket ID
+const generateTicketId = () => {
+  const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const randomNum = Math.floor(1000 + Math.random() * 9000);
+  return `NEC-OUT-${dateStr}-${randomNum}`;
+};
+
+// Create a new outpass request (Submitted by Student)
+export const submitOutpassApplication = ({
+  rollNumber,
+  studentName,
+  section,
+  studentMobile,
+  parentMobile,
+  reason,
+  destination,
+  expectedReturnTime
+}) => {
+  const tickets = getAllOutpasses();
+  const now = new Date();
+  
+  const newTicket = {
+    id: generateTicketId(),
+    rollNumber: rollNumber.trim().toUpperCase(),
+    studentName,
+    section,
+    studentMobile,
+    parentMobile,
+    maskedStudentMobile: maskPhoneNumber(studentMobile),
+    maskedParentMobile: maskPhoneNumber(parentMobile),
+    reason,
+    destination: destination || 'Home / Medical Emergency',
+    expectedReturnTime: expectedReturnTime || 'Today before 6:00 PM',
+    appliedAt: now.toISOString(),
+    appliedDate: now.toLocaleDateString('en-GB'),
+    appliedTime: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    
+    // Status Flow:
+    // 1. PENDING_PARENT_CALL: Student submitted -> Absent Controller needs to call parent
+    // 2. FORWARDED_TO_HOD: Absent Controller called parent & confirmed -> HOD needs to grant permission
+    // 3. PERMISSION_GRANTED: HOD granted permission -> Watchman can verify and release
+    // 4. SENT_OUT: Watchman verified physical ID & released student -> Completed exit
+    // 5. REJECTED: Rejected by Parent or HOD
+    status: 'PENDING_PARENT_CALL',
+    
+    // Stage 1: Absent Controller Verification Details
+    absentControllerAction: null, // { confirmed: true, calledAt: string, remarks: string, controllerName: string }
+    
+    // Stage 2: HOD Approval Details
+    hodAction: null, // { granted: true, approvedAt: string, remarks: string, hodName: string }
+    
+    // Stage 3: Watchman Gate Release Details
+    watchmanAction: null, // { sentOut: true, physicalIdVerified: true, exitTime: string, watchmanName: string }
+  };
+
+  tickets.unshift(newTicket);
+  saveOutpasses(tickets);
+  return newTicket;
+};
+
+// Absent Controller makes call to parent & takes confirmation
+export const confirmParentAndForwardToHOD = (ticketId, { controllerName = 'Absent Controller', remarks = 'Parent confirmed permission over phone call.' } = {}) => {
+  const tickets = getAllOutpasses();
+  const ticket = tickets.find(t => t.id === ticketId);
+  if (!ticket) throw new Error('Outpass application not found');
+
+  const now = new Date();
+  ticket.status = 'FORWARDED_TO_HOD';
+  ticket.absentControllerAction = {
+    confirmed: true,
+    calledAt: now.toISOString(),
+    displayTime: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    displayDate: now.toLocaleDateString('en-GB'),
+    remarks,
+    controllerName
+  };
+
+  saveOutpasses(tickets);
+  return ticket;
+};
+
+// Absent Controller marks parent denied permission
+export const rejectByAbsentController = (ticketId, { controllerName = 'Absent Controller', reason = 'Parent did not grant permission during call.' } = {}) => {
+  const tickets = getAllOutpasses();
+  const ticket = tickets.find(t => t.id === ticketId);
+  if (!ticket) throw new Error('Outpass application not found');
+
+  const now = new Date();
+  ticket.status = 'REJECTED';
+  ticket.rejectionStage = 'ABSENT_CONTROLLER';
+  ticket.rejectionReason = reason;
+  ticket.absentControllerAction = {
+    confirmed: false,
+    calledAt: now.toISOString(),
+    displayTime: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    remarks: reason,
+    controllerName
+  };
+
+  saveOutpasses(tickets);
+  return ticket;
+};
+
+// HOD grants permission
+export const hodGrantOutpass = (ticketId, { hodName = 'Dr. Rajesh Sharma (HOD CSE)', remarks = 'Permission Approved.' } = {}) => {
+  const tickets = getAllOutpasses();
+  const ticket = tickets.find(t => t.id === ticketId);
+  if (!ticket) throw new Error('Outpass application not found');
+
+  const now = new Date();
+  ticket.status = 'PERMISSION_GRANTED';
+  ticket.hodAction = {
+    granted: true,
+    approvedAt: now.toISOString(),
+    displayTime: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    displayDate: now.toLocaleDateString('en-GB'),
+    remarks,
+    hodName
+  };
+
+  saveOutpasses(tickets);
+  return ticket;
+};
+
+// HOD rejects outpass
+export const hodRejectOutpass = (ticketId, { hodName = 'Dr. Rajesh Sharma (HOD)', reason = 'Permission Denied by HOD.' } = {}) => {
+  const tickets = getAllOutpasses();
+  const ticket = tickets.find(t => t.id === ticketId);
+  if (!ticket) throw new Error('Outpass application not found');
+
+  const now = new Date();
+  ticket.status = 'REJECTED';
+  ticket.rejectionStage = 'HOD';
+  ticket.rejectionReason = reason;
+  ticket.hodAction = {
+    granted: false,
+    approvedAt: now.toISOString(),
+    displayTime: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    remarks: reason,
+    hodName
+  };
+
+  saveOutpasses(tickets);
+  return ticket;
+};
+
+// Watchman verifies physical student ID and marks student Sent Out
+export const watchmanReleaseStudent = (ticketId, { watchmanName = 'Main Gate Security Officer', remarks = 'Physical College ID card verified. Student exited campus.' } = {}) => {
+  const tickets = getAllOutpasses();
+  const ticket = tickets.find(t => t.id === ticketId);
+  if (!ticket) throw new Error('Outpass application not found');
+
+  const now = new Date();
+  ticket.status = 'SENT_OUT';
+  ticket.watchmanAction = {
+    sentOut: true,
+    physicalIdVerified: true,
+    exitTime: now.toISOString(),
+    displayTime: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    displayDate: now.toLocaleDateString('en-GB'),
+    remarks,
+    watchmanName
+  };
+
+  saveOutpasses(tickets);
+  return ticket;
+};
+
+// Find outpasses by roll number or ticket ID
+export const searchOutpasses = (query) => {
+  if (!query) return [];
+  const clean = query.trim().toUpperCase();
+  const tickets = getAllOutpasses();
+  return tickets.filter(t => 
+    t.id.toUpperCase().includes(clean) || 
+    t.rollNumber.toUpperCase().includes(clean) ||
+    t.studentName.toUpperCase().includes(clean)
+  );
+};
+
+// Subscribe to outpass store updates
+export const subscribeToOutpasses = (callback) => {
+  const handleCustom = (e) => callback(e.detail);
+  const handleStorage = (e) => {
+    if (e.key === STORAGE_KEY) {
+      callback(getAllOutpasses());
+    }
+  };
+
+  window.addEventListener('lectra_outpass_updated', handleCustom);
+  window.addEventListener('storage', handleStorage);
+
+  return () => {
+    window.removeEventListener('lectra_outpass_updated', handleCustom);
+    window.removeEventListener('storage', handleStorage);
+  };
+};

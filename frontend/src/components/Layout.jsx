@@ -17,7 +17,8 @@ import {
   X, 
   Clock,
   UserCheck,
-  Settings
+  Settings,
+  ShieldCheck
 } from 'lucide-react';
 
 const Layout = ({ children }) => {
@@ -121,6 +122,10 @@ const Layout = ({ children }) => {
   } else if (user?.role === 'FACULTY') {
     navLinks.push(
       { name: 'Faculty Portal', path: '/faculty-dashboard', icon: LayoutDashboard }
+    );
+  } else if (user?.role === 'WATCHMAN') {
+    navLinks.push(
+      { name: 'Gate Security & Outpass', path: '/watchman-dashboard', icon: ShieldCheck }
     );
   }
 

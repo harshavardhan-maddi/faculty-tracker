@@ -12,8 +12,20 @@ import {
   Activity,
   History,
   PhoneCall,
-  X
+  X,
+  FileText,
+  Send,
+  ArrowRight,
+  ExternalLink,
+  ShieldCheck
 } from 'lucide-react';
+import OutpassTicketModal from '../components/OutpassTicketModal';
+import { 
+  getAllOutpasses, 
+  confirmParentAndForwardToHOD, 
+  rejectByAbsentController, 
+  subscribeToOutpasses 
+} from '../services/outpassService';
 
 const ABSENCE_REASONS = {
   "Medical": ["Fever", "Hospital", "Injury", "Medical Check-up"],
@@ -54,6 +66,52 @@ const AbsentControllerDashboard = () => {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [sessionFilter, setSessionFilter] = useState('All'); // 'All' | 'morning' | 'afternoon'
+
+  // Outpass Permissions state
+  const [outpassTickets, setOutpassTickets] = useState([]);
+  const [selectedOutpassModalTicket, setSelectedOutpassModalTicket] = useState(null);
+  const [callingOutpassTicket, setCallingOutpassTicket] = useState(null);
+  const [parentConfirmationRemarks, setParentConfirmationRemarks] = useState('Parent confirmed permission over phone call.');
+  const [outpassActionSuccess, setOutpassActionSuccess] = useState('');
+  const [outpassActionError, setOutpassActionError] = useState('');
+
+  // Load and subscribe to live outpass tickets
+  useEffect(() => {
+    setOutpassTickets(getAllOutpasses());
+    const unsub = subscribeToOutpasses(setOutpassTickets);
+    return () => unsub();
+  }, []);
+
+  // Handlers for Absent Controller outpass actions
+  const handleConfirmParentAndForward = (ticket) => {
+    try {
+      setOutpassActionError('');
+      confirmParentAndForwardToHOD(ticket.id, {
+        controllerName: user?.name || 'Absent Controller',
+        remarks: parentConfirmationRemarks || 'Parent confirmed permission over phone call.'
+      });
+      setCallingOutpassTicket(null);
+      setOutpassActionSuccess(`Confirmed with parent! Outpass for ${ticket.studentName} (${ticket.rollNumber}) has been submitted and forwarded to HOD.`);
+      setTimeout(() => setOutpassActionSuccess(''), 4500);
+    } catch (err) {
+      setOutpassActionError(err.message || 'Failed to forward outpass');
+    }
+  };
+
+  const handleRejectOutpass = (ticket, customReason) => {
+    try {
+      setOutpassActionError('');
+      rejectByAbsentController(ticket.id, {
+        controllerName: user?.name || 'Absent Controller',
+        reason: customReason || 'Parent did not grant permission during phone call.'
+      });
+      setCallingOutpassTicket(null);
+      setOutpassActionSuccess(`Outpass for ${ticket.studentName} was rejected as parent denied permission.`);
+      setTimeout(() => setOutpassActionSuccess(''), 4500);
+    } catch (err) {
+      setOutpassActionError(err.message || 'Failed to reject outpass');
+    }
+  };
 
   const downloadReportFile = async (url, fallbackFilename) => {
     try {
@@ -409,6 +467,22 @@ const AbsentControllerDashboard = () => {
         >
           <AlertCircle size={16} className="text-red-500" />
           <span>All Section Absentees</span>
+        </button>
+        <button
+          onClick={() => setActiveBoardTab('outpassRequests')}
+          className={`flex items-center gap-2 py-3 px-6 text-sm font-semibold border-b-2 transition-all relative ${
+            activeBoardTab === 'outpassRequests' 
+              ? 'border-primary text-primary-dark dark:text-primary font-bold' 
+              : 'border-transparent text-customText-muted dark:text-customText-mutedDark hover:text-customText'
+          }`}
+        >
+          <FileText size={16} />
+          <span>Outpass Permissions</span>
+          {outpassTickets.filter(t => t.status === 'PENDING_PARENT_CALL').length > 0 && (
+            <span className="ml-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500 text-white animate-pulse">
+              {outpassTickets.filter(t => t.status === 'PENDING_PARENT_CALL').length}
+            </span>
+          )}
         </button>
       </div>
 
@@ -1453,6 +1527,233 @@ const AbsentControllerDashboard = () => {
             )}
           </div>
         </div>
+      )}
+
+      {/* 3. OUTPASS PERMISSIONS TAB CONTENT */}
+      {activeBoardTab === 'outpassRequests' && (
+        <div className="space-y-6 animate-fade-in">
+          
+          {/* Action Alerts */}
+          {outpassActionSuccess && (
+            <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-sm font-semibold flex items-center gap-2">
+              <CheckCircle size={18} className="shrink-0" />
+              <span>{outpassActionSuccess}</span>
+            </div>
+          )}
+
+          {outpassActionError && (
+            <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-sm font-semibold flex items-center gap-2">
+              <AlertCircle size={18} className="shrink-0" />
+              <span>{outpassActionError}</span>
+            </div>
+          )}
+
+          {/* Metric Summary Counters */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400">
+              <span className="text-[10px] font-bold uppercase tracking-wider block">Awaiting Parent Call</span>
+              <span className="text-2xl font-black">{outpassTickets.filter(t => t.status === 'PENDING_PARENT_CALL').length}</span>
+            </div>
+            <div className="p-4 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400">
+              <span className="text-[10px] font-bold uppercase tracking-wider block">Forwarded to HOD</span>
+              <span className="text-2xl font-black">{outpassTickets.filter(t => t.status === 'FORWARDED_TO_HOD').length}</span>
+            </div>
+            <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400">
+              <span className="text-[10px] font-bold uppercase tracking-wider block">HOD Granted (Gate Ready)</span>
+              <span className="text-2xl font-black">{outpassTickets.filter(t => t.status === 'PERMISSION_GRANTED').length}</span>
+            </div>
+            <div className="p-4 rounded-2xl bg-purple-500/10 border border-purple-500/20 text-purple-600 dark:text-purple-400">
+              <span className="text-[10px] font-bold uppercase tracking-wider block">Student Sent Out</span>
+              <span className="text-2xl font-black">{outpassTickets.filter(t => t.status === 'SENT_OUT').length}</span>
+            </div>
+          </div>
+
+          {/* Pending Applications Section */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-black text-customText dark:text-customText-dark tracking-tight">
+                  Student Outpass Applications Awaiting Parent Call
+                </h3>
+                <p className="text-xs text-customText-muted">
+                  Call the student's parent to verify and take phone confirmation, then click okay and submit to forward to HOD.
+                </p>
+              </div>
+            </div>
+
+            {outpassTickets.filter(t => t.status === 'PENDING_PARENT_CALL').length === 0 ? (
+              <div className="p-10 text-center rounded-3xl bg-slate-50 dark:bg-slate-900/40 border border-slate-200/60 dark:border-slate-800/60 space-y-2">
+                <CheckCircle size={32} className="mx-auto text-emerald-500" />
+                <h4 className="font-bold text-customText dark:text-customText-dark">
+                  No Pending Outpass Calls
+                </h4>
+                <p className="text-xs text-customText-muted max-w-sm mx-auto">
+                  All student permission requests have been verified and forwarded to HOD.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {outpassTickets.filter(t => t.status === 'PENDING_PARENT_CALL').map((ticket) => (
+                  <div
+                    key={ticket.id}
+                    className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4 relative overflow-hidden"
+                  >
+                    {/* Card Header */}
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <span className="text-[10px] font-mono font-bold text-primary block">
+                          {ticket.id}
+                        </span>
+                        <h4 className="text-lg font-black text-customText dark:text-customText-dark mt-0.5">
+                          {ticket.studentName}
+                        </h4>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="px-2.5 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 font-mono text-xs font-bold text-customText">
+                            {ticket.rollNumber}
+                          </span>
+                          <span className="text-xs text-customText-muted font-medium">
+                            {ticket.section}
+                          </span>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setSelectedOutpassModalTicket(ticket)}
+                        className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-primary/10 hover:text-primary text-xs font-bold text-customText-muted flex items-center gap-1.5 transition-colors cursor-pointer"
+                        title="View Official Ticket"
+                      >
+                        <FileText size={15} />
+                        <span>Ticket</span>
+                      </button>
+                    </div>
+
+                    {/* Stated Reason */}
+                    <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950/40 border border-slate-100 dark:border-slate-800/80 space-y-1 text-xs">
+                      <span className="text-[10px] font-bold text-customText-muted uppercase block">
+                        Reason to Go Out:
+                      </span>
+                      <p className="font-semibold text-customText dark:text-customText-dark italic">
+                        "{ticket.reason}"
+                      </p>
+                      <div className="flex gap-4 pt-1.5 text-[11px] text-customText-muted">
+                        <span><strong>Destination:</strong> {ticket.destination}</span>
+                        <span><strong>Expected Return:</strong> {ticket.expectedReturnTime}</span>
+                      </div>
+                    </div>
+
+                    {/* Auto-Fetched Parent Mobile Number & Phone Call Button */}
+                    <div className="p-3.5 rounded-2xl bg-amber-500/5 border border-amber-500/20 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider block">
+                            Auto-Fetched Parent Mobile
+                          </span>
+                          <p className="text-sm font-mono font-black text-customText dark:text-customText-dark">
+                            +91 {ticket.parentMobile}
+                          </p>
+                        </div>
+                        
+                        {/* Native Click-to-Call Link */}
+                        <a
+                          href={`tel:${ticket.parentMobile}`}
+                          className="flex items-center gap-2 py-2 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black shadow-md shadow-emerald-600/20 transition-all cursor-pointer active:scale-95"
+                        >
+                          <PhoneCall size={14} />
+                          <span>Call Parent</span>
+                        </a>
+                      </div>
+
+                      {/* Parent Confirmation & Submit to HOD Action */}
+                      <div className="pt-2 border-t border-amber-500/20 flex flex-col sm:flex-row gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleConfirmParentAndForward(ticket)}
+                          className="flex-1 py-2.5 px-3.5 rounded-xl bg-primary hover:bg-primary-dark text-white text-xs font-extrabold flex items-center justify-center gap-1.5 shadow-md shadow-primary/20 transition-all cursor-pointer active:scale-95"
+                        >
+                          <CheckCircle size={15} />
+                          <span>Parent Confirmed (OK) & Forward to HOD</span>
+                        </button>
+                        
+                        <button
+                          type="button"
+                          onClick={() => handleRejectOutpass(ticket, 'Parent refused permission during phone call.')}
+                          className="py-2.5 px-3 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-bold transition-colors cursor-pointer"
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    </div>
+
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Outpass Clearance History Section */}
+          <div className="pt-6 border-t border-slate-200 dark:border-slate-800 space-y-3">
+            <h4 className="text-sm font-black text-customText dark:text-customText-dark uppercase tracking-wider">
+              Outpass Processing Log ({outpassTickets.length} Total)
+            </h4>
+
+            <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 text-[10px] font-bold text-customText-muted uppercase">
+                  <tr>
+                    <th className="p-3">Ref ID</th>
+                    <th className="p-3">Student</th>
+                    <th className="p-3">Reason</th>
+                    <th className="p-3">Parent Contact</th>
+                    <th className="p-3">Status</th>
+                    <th className="p-3">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {outpassTickets.slice(0, 10).map((t) => (
+                    <tr key={t.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/50">
+                      <td className="p-3 font-mono font-bold text-primary">{t.id}</td>
+                      <td className="p-3">
+                        <span className="font-bold block">{t.studentName}</span>
+                        <span className="text-[10px] text-customText-muted font-mono">{t.rollNumber} • {t.section}</span>
+                      </td>
+                      <td className="p-3 italic max-w-xs truncate">"{t.reason}"</td>
+                      <td className="p-3 font-mono">{t.parentMobile}</td>
+                      <td className="p-3">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold ${
+                          t.status === 'SENT_OUT' ? 'bg-purple-100 text-purple-700' :
+                          t.status === 'PERMISSION_GRANTED' ? 'bg-emerald-100 text-emerald-700' :
+                          t.status === 'FORWARDED_TO_HOD' ? 'bg-blue-100 text-blue-700' :
+                          t.status === 'REJECTED' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'
+                        }`}>
+                          {t.status.replace(/_/g, ' ')}
+                        </span>
+                      </td>
+                      <td className="p-3">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedOutpassModalTicket(t)}
+                          className="text-primary hover:underline font-bold text-[11px]"
+                        >
+                          View Slip
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+      )}
+
+      {/* Official Outpass Ticket Modal */}
+      {selectedOutpassModalTicket && (
+        <OutpassTicketModal
+          ticket={selectedOutpassModalTicket}
+          onClose={() => setSelectedOutpassModalTicket(null)}
+        />
       )}
 
       {/* STUDENT ABSENT HISTORY MODAL */}

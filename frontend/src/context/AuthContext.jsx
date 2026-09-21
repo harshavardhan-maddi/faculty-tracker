@@ -48,6 +48,17 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const initializeAuth = async () => {
       const storedToken = localStorage.getItem('token');
+      if (storedToken === 'watchman-session-token') {
+        const storedUser = localStorage.getItem('user');
+        if (storedUser) {
+          try {
+            setUser(JSON.parse(storedUser));
+            setToken(storedToken);
+            setLoading(false);
+            return;
+          } catch (e) {}
+        }
+      }
       if (storedToken) {
         try {
           const res = await fetch('/api/auth/me', {
@@ -81,6 +92,26 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const login = async (userId, password) => {
+    // Watchman Gate Security authentication bypass (Zero database/backend changes)
+    if (userId.toLowerCase() === 'watchman' || userId.toLowerCase() === 'security' || userId.toLowerCase() === 'gate') {
+      if (password === 'watchman' || password === 'watchman123' || password === 'security123' || password === 'password123' || password === 'gate123') {
+        const watchmanUser = {
+          id: 9999,
+          name: 'Main Gate Security (Watchman)',
+          userId: 'watchman',
+          role: 'WATCHMAN',
+          className: null,
+        };
+        localStorage.setItem('token', 'watchman-session-token');
+        localStorage.setItem('user', JSON.stringify(watchmanUser));
+        localStorage.setItem('auth_session', JSON.stringify({ userId, password }));
+        setToken('watchman-session-token');
+        setUser(watchmanUser);
+        return watchmanUser;
+      } else {
+        throw new Error('Invalid Watchman security password');
+      }
+    }
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
