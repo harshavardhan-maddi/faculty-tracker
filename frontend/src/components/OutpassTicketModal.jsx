@@ -116,6 +116,15 @@ const OutpassTicketModal = ({ ticket, onClose }) => {
         {/* Scrollable Content Area */}
         <div ref={printAreaRef} className="p-6 sm:p-8 space-y-6 overflow-y-auto print:overflow-visible print:p-6 print:space-y-4 text-customText dark:text-customText-dark">
           
+          {/* Prominent Student Alert */}
+          <div className="p-3.5 rounded-2xl bg-amber-500/15 border-2 border-amber-500/40 text-amber-900 dark:text-amber-200 flex items-center gap-3 font-black text-xs sm:text-sm shadow-sm print:hidden">
+            <AlertCircle size={20} className="text-amber-600 dark:text-amber-400 shrink-0" />
+            <div>
+              <span className="uppercase tracking-wider block text-[10px] font-black text-amber-700 dark:text-amber-400">Important Instruction</span>
+              <span>Note: do not close app till goes out.</span>
+            </div>
+          </div>
+
           {/* Printable College Header */}
           <div className="border-b-2 border-primary/20 pb-5 text-center flex flex-col items-center relative">
             <div className="flex items-center justify-center gap-3 sm:gap-4 mb-2">

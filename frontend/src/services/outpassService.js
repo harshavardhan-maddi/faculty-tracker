@@ -104,6 +104,28 @@ export const registerStudentInDirectory = (student) => {
   return student;
 };
 
+// Sync students fetched from HOD student registry
+export const syncHODStudents = (studentList) => {
+  if (!Array.isArray(studentList)) return;
+  const dir = getStudentsDirectory();
+  const dirMap = new Map(dir.map(s => [s.rollNumber.toUpperCase(), s]));
+  
+  studentList.forEach(s => {
+    if (s.rollNumber) {
+      dirMap.set(s.rollNumber.toUpperCase(), {
+        rollNumber: s.rollNumber.toUpperCase(),
+        name: s.name,
+        section: s.section,
+        studentMobile: s.studentMobile,
+        parentMobile: s.parentMobile
+      });
+    }
+  });
+
+  const merged = Array.from(dirMap.values());
+  localStorage.setItem(STUDENTS_CACHE_KEY, JSON.stringify(merged));
+};
+
 // Mask phone number showing only last 4 digits (e.g. ••••••7890)
 export const maskPhoneNumber = (phone) => {
   if (!phone) return '••••••0000';
@@ -113,12 +135,59 @@ export const maskPhoneNumber = (phone) => {
   return `••••••${last4}`;
 };
 
-// Lookup student by roll number
+// Lookup and match student by Roll Number AND Full Name against HOD registry
+export const lookupStudentByRollAndName = (rollNumber, fullName) => {
+  if (!rollNumber || !fullName) {
+    return { success: false, error: 'Please enter both your Roll Number and Full Name.' };
+  }
+
+  const cleanRoll = rollNumber.trim().toUpperCase();
+  const dir = getStudentsDirectory();
+
+  const studentByRoll = dir.find(s => s.rollNumber.toUpperCase() === cleanRoll);
+  if (!studentByRoll) {
+    return { 
+      success: false, 
+      error: `Roll Number "${cleanRoll}" not found in the student registry added by HOD. Please verify your roll number.` 
+    };
+  }
+
+  // Normalize registered student name
+  const registeredCleanName = (studentByRoll.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const inputCleanName = fullName.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+
+  const inputWords = fullName.trim().toLowerCase().split(/[\s,.-]+/).filter(w => w.length > 1);
+  const registeredWords = (studentByRoll.name || '').toLowerCase().split(/[\s,.-]+/).filter(w => w.length > 1);
+
+  // Flexible match: exact, contains, or word overlap
+  const wordOverlap = inputWords.length > 0 && inputWords.some(w => registeredWords.some(rw => rw.includes(w) || w.includes(rw)));
+  const isMatch = registeredCleanName === inputCleanName ||
+                  registeredCleanName.includes(inputCleanName) ||
+                  inputCleanName.includes(registeredCleanName) ||
+                  wordOverlap;
+
+  if (!isMatch) {
+    return {
+      success: false,
+      error: `Name does not match the registered record for Roll Number ${cleanRoll}. Please enter your full registered name.`
+    };
+  }
+
+  return {
+    success: true,
+    student: {
+      ...studentByRoll,
+      maskedStudentMobile: maskPhoneNumber(studentByRoll.studentMobile),
+      maskedParentMobile: maskPhoneNumber(studentByRoll.parentMobile),
+    }
+  };
+};
+
+// Fallback lookup by roll number
 export const lookupStudentByRoll = (rollNumber) => {
   if (!rollNumber) return null;
   const cleanRoll = rollNumber.trim().toUpperCase();
   const dir = getStudentsDirectory();
-  
   const found = dir.find(s => s.rollNumber.toUpperCase() === cleanRoll);
   if (found) {
     return {
@@ -127,27 +196,7 @@ export const lookupStudentByRoll = (rollNumber) => {
       maskedParentMobile: maskPhoneNumber(found.parentMobile),
     };
   }
-
-  // Fallback: If not in static mock, synthesize realistic student info for quick testing
-  // so any valid-looking roll number entered by the user works seamlessly!
-  const defaultClass = cleanRoll.startsWith('20') ? 'CSE 4th Year' :
-                       cleanRoll.startsWith('21') ? 'CSE 3rd Year' :
-                       cleanRoll.startsWith('22') ? 'ECE 2nd Year' : 'CSE 3rd Year';
-  
-  const generated = {
-    rollNumber: cleanRoll,
-    name: `Student (${cleanRoll})`,
-    section: defaultClass,
-    studentMobile: `98480${cleanRoll.slice(-5).replace(/\D/g, '1').padEnd(5, '0')}`,
-    parentMobile: `94401${cleanRoll.slice(-5).replace(/\D/g, '2').padEnd(5, '9')}`,
-  };
-
-  registerStudentInDirectory(generated);
-  return {
-    ...generated,
-    maskedStudentMobile: maskPhoneNumber(generated.studentMobile),
-    maskedParentMobile: maskPhoneNumber(generated.parentMobile),
-  };
+  return null;
 };
 
 // Get all outpasses from storage

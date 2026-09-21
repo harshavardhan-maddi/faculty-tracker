@@ -36,7 +36,8 @@ import {
   getAllOutpasses, 
   hodGrantOutpass, 
   hodRejectOutpass, 
-  subscribeToOutpasses 
+  subscribeToOutpasses,
+  syncHODStudents
 } from '../services/outpassService';
 
 const Dashboard = () => {
@@ -350,6 +351,7 @@ const Dashboard = () => {
       const data = await res.json();
       if (res.ok) {
         setStudents(data);
+        syncHODStudents(data);
       } else {
         setError(data.message || 'Failed to fetch students list');
       }

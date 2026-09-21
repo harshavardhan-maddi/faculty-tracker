@@ -9,11 +9,9 @@ import {
   Lock, 
   Fingerprint, 
   AlertTriangle, 
-  Info,
   X,
   LogIn,
   ArrowRight,
-  Search,
   FileText,
   CheckCircle2,
   Phone,
@@ -23,15 +21,15 @@ import {
   Clock,
   Download,
   AlertCircle,
-  HelpCircle
+  RotateCcw,
+  Check
 } from 'lucide-react';
 import logo from '../neclogo.png';
 import Loading from '../components/Loading';
 import OutpassTicketModal from '../components/OutpassTicketModal';
 import { 
-  lookupStudentByRoll, 
+  lookupStudentByRollAndName, 
   submitOutpassApplication, 
-  searchOutpasses, 
   getAllOutpasses 
 } from '../services/outpassService';
 
@@ -60,23 +58,21 @@ const Login = () => {
   const [introFadeOut, setIntroFadeOut] = useState(false);
   const [progressWidth, setProgressWidth] = useState('0%');
 
-  // Student Outpass Application Modal & Flow states
-  const [showApplyModal, setShowApplyModal] = useState(false);
-  const [applyStep, setApplyStep] = useState(1); // 1: Enter Roll No -> 2: Verify details & enter reason -> 3: Done
+  // Direct Student Leave Application Flow states
+  // Step 1: Enter Roll No & Full Name -> Step 2: Show Verified Details & Enter Reason -> Step 3: Submitted / Live Ticket
+  const [applyStep, setApplyStep] = useState(1);
   const [rollInput, setRollInput] = useState('');
+  const [nameInput, setNameInput] = useState('');
+  const [verifyError, setVerifyError] = useState('');
   const [matchedStudent, setMatchedStudent] = useState(null);
-  const [rollError, setRollError] = useState('');
   const [outpassReason, setOutpassReason] = useState('');
   const [outpassDestination, setOutpassDestination] = useState('Home');
   const [expectedReturnTime, setExpectedReturnTime] = useState('Today before 6:00 PM');
   const [isSubmittingOutpass, setIsSubmittingOutpass] = useState(false);
+  const [submittedTicket, setSubmittedTicket] = useState(null);
   
   // Active ticket for Ticket Modal viewer
   const [activeTicket, setActiveTicket] = useState(null);
-
-  // Search/Track Existing Ticket state
-  const [trackSearchQuery, setTrackSearchQuery] = useState('');
-  const [trackError, setTrackError] = useState('');
 
   // Intro Animation
   useEffect(() => {
@@ -99,7 +95,7 @@ const Login = () => {
     };
   }, []);
 
-  // Quick navigation router based on user role
+  // Navigation router based on user role
   const routeUserByRole = (userProfile) => {
     if (userProfile.role === 'CR') {
       navigate('/cr-dashboard');
@@ -235,30 +231,35 @@ const Login = () => {
     }
   }, [showBiometricsModal]);
 
-  // Student Outpass Step 1: Look up Roll Number
-  const handleLookupRoll = (e) => {
+  // Step 1: Look up and Match Student by Roll Number AND Full Name against registry
+  const handleVerifyStudent = (e) => {
     e.preventDefault();
+    setVerifyError('');
+
     if (!rollInput.trim()) {
-      setRollError('Please enter your Roll Number');
+      setVerifyError('Please enter your College Roll Number.');
+      return;
+    }
+    if (!nameInput.trim()) {
+      setVerifyError('Please enter your Full Name.');
       return;
     }
 
-    setRollError('');
-    const student = lookupStudentByRoll(rollInput);
-    if (!student) {
-      setRollError('No student record found for this roll number.');
+    const result = lookupStudentByRollAndName(rollInput, nameInput);
+    if (!result.success) {
+      setVerifyError(result.error);
       return;
     }
 
-    setMatchedStudent(student);
-    setApplyStep(2); // Move to Step 2: Show details and ask for reason
+    setMatchedStudent(result.student);
+    setApplyStep(2); // Proceed to Step 2: Show details & enter reason
   };
 
-  // Student Outpass Step 2: Confirm & Submit Application
+  // Step 2: Confirm & Submit Application
   const handleSubmitOutpass = (e) => {
     e.preventDefault();
     if (!outpassReason.trim()) {
-      setRollError('Please state your reason for going out.');
+      setVerifyError('Please state your reason for going out.');
       return;
     }
 
@@ -275,55 +276,27 @@ const Login = () => {
         expectedReturnTime: expectedReturnTime
       });
 
-      // Close application modal and immediately show the official Ticket with download option
-      setShowApplyModal(false);
-      setMatchedStudent(null);
-      setRollInput('');
-      setOutpassReason('');
-      setApplyStep(1);
+      setSubmittedTicket(newTicket);
+      setApplyStep(3);
       
-      // Open ticket modal with generated ticket
+      // Automatically open the Outpass Ticket modal without closing website
       setActiveTicket(newTicket);
     } catch (err) {
-      setRollError(err.message || 'Failed to submit application');
+      setVerifyError(err.message || 'Failed to submit application');
     } finally {
       setIsSubmittingOutpass(false);
     }
   };
 
-  // Search/Track an existing application
-  const handleTrackSearch = (e) => {
-    e.preventDefault();
-    setTrackError('');
-    if (!trackSearchQuery.trim()) {
-      setTrackError('Please enter a Roll Number or Ticket Reference ID');
-      return;
-    }
-
-    const results = searchOutpasses(trackSearchQuery);
-    if (results.length > 0) {
-      setActiveTicket(results[0]);
-      setTrackSearchQuery('');
-    } else {
-      setTrackError(`No outpass applications found matching "${trackSearchQuery}".`);
-    }
-  };
-
-  // Quick fill helper for testing roles
-  const fillQuickCredentials = (userType) => {
-    if (userType === 'HOD') {
-      setUserId('TE_HOD');
-      setPassword('HOD_TE');
-    } else if (userType === 'ABSENT_CONTROLLER') {
-      setUserId('ac123');
-      setPassword('password123');
-    } else if (userType === 'WATCHMAN') {
-      setUserId('watchman');
-      setPassword('watchman123');
-    } else if (userType === 'CR') {
-      setUserId('cr_cse3');
-      setPassword('password123');
-    }
+  // Reset form for a new leave request
+  const handleResetApplication = () => {
+    setMatchedStudent(null);
+    setRollInput('');
+    setNameInput('');
+    setOutpassReason('');
+    setVerifyError('');
+    setApplyStep(1);
+    setSubmittedTicket(null);
   };
 
   return (
@@ -384,187 +357,413 @@ const Login = () => {
         <div className="absolute top-0 left-1/4 w-[500px] h-[500px] rounded-full bg-primary/10 dark:bg-primary-dark/5 blur-3xl pointer-events-none" />
         <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] rounded-full bg-secondary/10 dark:bg-secondary-dark/5 blur-3xl pointer-events-none" />
 
-        {/* 2. Top Navigation Bar with Logo and Required Top-Right Login Button */}
-        <header className="w-full border-b border-slate-200/60 dark:border-slate-800/60 bg-white/70 dark:bg-slate-900/70 backdrop-blur-md sticky top-0 z-30 px-4 sm:px-8 py-3.5 flex items-center justify-between shadow-sm">
+        {/* 2. Top Navigation Bar with Logo and Prominent Staff Login Button */}
+        <header className="w-full border-b border-slate-200/60 dark:border-slate-800/60 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md sticky top-0 z-30 px-4 sm:px-8 py-3.5 flex items-center justify-between shadow-sm">
           
           {/* Left Brand */}
           <div 
             onClick={() => setViewMode('landing')}
             className="flex items-center gap-3 cursor-pointer select-none"
           >
-            <div className="w-10 h-10 rounded-full overflow-hidden shadow-md bg-white p-0.5 border border-slate-200">
+            <div className="w-11 h-11 rounded-full overflow-hidden shadow-md bg-white p-0.5 border border-slate-200">
               <img src={logo} alt="NEC Logo" className="w-full h-full object-contain rounded-full" />
             </div>
             <div>
-              <h1 className="text-sm font-black tracking-tight text-primary-dark dark:text-primary leading-tight uppercase">
+              <h1 className="text-sm sm:text-base font-black tracking-tight text-primary-dark dark:text-primary leading-tight uppercase">
                 Narasaraopeta Engineering College
               </h1>
               <p className="text-[11px] font-extrabold text-customText-muted dark:text-customText-mutedDark">
-                Lectra • <span className="text-primary font-bold">Campus Outpass & Attendance</span>
+                Lectra • <span className="text-primary font-bold">Student Leave & Gate Clearance</span>
               </p>
             </div>
           </div>
 
-          {/* Top Right: Button with icon + "Login" word as requested */}
+          {/* Top Right: Prominent "Staff Login" button (Larger as requested) */}
           <div className="flex items-center gap-3">
             {viewMode === 'login' ? (
               <button
                 type="button"
                 onClick={() => setViewMode('landing')}
-                className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-customText dark:text-customText-dark text-xs font-extrabold shadow-sm transition-all cursor-pointer active:scale-95"
+                className="flex items-center gap-2.5 px-5 py-3 rounded-2xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-customText dark:text-customText-dark text-xs sm:text-sm font-black shadow-sm transition-all cursor-pointer active:scale-95 border border-slate-200 dark:border-slate-700"
               >
-                <FileText size={16} className="text-primary" />
-                <span>Student Outpass Portal</span>
+                <FileText size={18} className="text-primary" />
+                <span>Student Leave Portal</span>
               </button>
             ) : (
               <button
                 type="button"
                 onClick={() => setViewMode('login')}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-gradient-to-r from-primary to-primary-dark text-white hover:opacity-95 text-xs font-black shadow-md shadow-primary/20 transition-all cursor-pointer active:scale-95 border border-primary/30"
+                className="flex items-center gap-2.5 px-6 py-3 rounded-2xl bg-gradient-to-r from-primary to-primary-dark text-white hover:opacity-95 text-sm sm:text-base font-black shadow-lg shadow-primary/25 hover:shadow-xl hover:scale-105 transition-all cursor-pointer border border-primary/30 active:scale-95"
               >
-                <LogIn size={16} />
-                <span>Login</span>
+                <LogIn size={19} />
+                <span>Staff Login</span>
               </button>
             )}
           </div>
         </header>
 
-        {/* 3. Main Body: Switch between Landing Hero and Login Card */}
-        <main className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6 z-10 w-full max-w-6xl mx-auto my-auto">
+        {/* 3. Main Body: Switch between Landing Box and Staff Login Card */}
+        <main className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6 z-10 w-full max-w-4xl mx-auto my-auto">
           
           {viewMode === 'landing' ? (
             
-            /* HERO SECTION: "Apply Permission to Go Out" */
-            <div className="w-full py-6 sm:py-10 flex flex-col items-center text-center animate-fade-in space-y-8">
+            /* DIRECT APPLY LEAVE BOX ON LANDING PAGE */
+            <div className="w-full max-w-2xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 animate-fade-in space-y-6 my-auto relative">
               
-              {/* Badge */}
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-primary-dark dark:text-primary text-xs font-extrabold tracking-wide uppercase shadow-sm">
-                <ShieldCheck size={16} />
-                <span>Official Digital Gate Pass Clearance System</span>
-              </div>
-
-              {/* Hero Title & Subtitle */}
-              <div className="max-w-3xl space-y-3">
-                <h2 className="text-3xl sm:text-5xl font-black text-customText dark:text-customText-dark tracking-tight leading-tight">
-                  Need to Leave Campus?
-                </h2>
-                <p className="text-base sm:text-xl font-bold text-primary-dark dark:text-primary">
-                  Apply permission to go out quickly and securely
-                </p>
-                <p className="text-xs sm:text-sm text-customText-muted dark:text-customText-mutedDark max-w-2xl mx-auto leading-relaxed">
-                  Enter your college roll number to verify your student particulars. Once parent phone call confirmation is verified by the Absent Controller and granted by the HOD, your outpass ticket will be authorized at the campus gate watchman.
-                </p>
-              </div>
-
-              {/* Primary Call to Action Cards */}
-              <div className="w-full max-w-2xl grid grid-cols-1 md:grid-cols-2 gap-5 pt-2">
-                
-                {/* Apply Outpass Card */}
-                <div 
-                  onClick={() => {
-                    setApplyStep(1);
-                    setRollInput('');
-                    setRollError('');
-                    setMatchedStudent(null);
-                    setShowApplyModal(true);
-                  }}
-                  className="p-6 rounded-3xl bg-gradient-to-br from-primary/15 via-white/80 to-white/40 dark:from-primary/10 dark:via-slate-900 dark:to-slate-900/60 border-2 border-primary/30 hover:border-primary shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 cursor-pointer text-left flex flex-col justify-between group relative overflow-hidden"
-                >
-                  <div className="space-y-2">
-                    <div className="w-12 h-12 rounded-2xl bg-primary text-white flex items-center justify-center shadow-lg shadow-primary/30 group-hover:scale-110 transition-transform">
-                      <FileText size={24} />
-                    </div>
-                    <h3 className="text-xl font-black text-customText dark:text-customText-dark group-hover:text-primary transition-colors">
-                      Apply Permission to Go Out
-                    </h3>
-                    <p className="text-xs text-customText-muted dark:text-customText-mutedDark leading-relaxed">
-                      Instant student outpass request with automatic parent verification and live tracking.
-                    </p>
+              {/* Box Header */}
+              <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shadow-sm">
+                    <FileText size={24} />
                   </div>
-
-                  <div className="pt-6 flex items-center gap-2 text-xs font-black text-primary group-hover:translate-x-1 transition-transform">
-                    <span>Click to Apply Permission</span>
-                    <ArrowRight size={16} />
+                  <div>
+                    <h2 className="text-xl sm:text-2xl font-black text-customText dark:text-customText-dark tracking-tight">
+                      Apply Leave / Permission to Go Out
+                    </h2>
+                    <p className="text-xs text-customText-muted dark:text-customText-mutedDark">
+                      {applyStep === 1 && 'Enter your roll number and full name to verify student particulars.'}
+                      {applyStep === 2 && 'Review verified details and provide your reason for leaving campus.'}
+                      {applyStep === 3 && 'Outpass request submitted successfully.'}
+                    </p>
                   </div>
                 </div>
 
-                {/* Track Application / Download Ticket Card */}
-                <div className="p-6 rounded-3xl bg-white/80 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 shadow-xl text-left flex flex-col justify-between space-y-4">
-                  <div className="space-y-2">
-                    <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800 text-primary flex items-center justify-center shadow-sm">
-                      <Search size={22} />
-                    </div>
-                    <h3 className="text-lg font-black text-customText dark:text-customText-dark">
-                      Track / Download Outpass Ticket
-                    </h3>
-                    <p className="text-xs text-customText-muted dark:text-customText-mutedDark leading-relaxed">
-                      Already submitted? Enter your Roll Number or Ticket ID to check live status and download your ticket with official college logo.
-                    </p>
-                  </div>
+                {applyStep > 1 && (
+                  <button
+                    type="button"
+                    onClick={handleResetApplication}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-bold text-customText-muted transition-colors cursor-pointer"
+                    title="Start fresh"
+                  >
+                    <RotateCcw size={14} />
+                    <span>Reset</span>
+                  </button>
+                )}
+              </div>
 
-                  <form onSubmit={handleTrackSearch} className="space-y-2 pt-2">
-                    <div className="relative">
+              {/* Error banner */}
+              {verifyError && (
+                <div className="p-3.5 bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-bold rounded-xl flex items-center gap-2 animate-pulse">
+                  <AlertCircle size={16} className="shrink-0" />
+                  <span>{verifyError}</span>
+                </div>
+              )}
+
+              {/* STEP 1: Enter Roll Number AND Full Name to Match Details */}
+              {applyStep === 1 && (
+                <form onSubmit={handleVerifyStudent} className="space-y-5">
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider mb-1.5">
+                        Student Roll Number *
+                      </label>
                       <input
                         type="text"
-                        placeholder="Enter Roll No (e.g. 21NE1A0501)"
-                        value={trackSearchQuery}
+                        value={rollInput}
                         onChange={(e) => {
-                          setTrackSearchQuery(e.target.value);
-                          if (trackError) setTrackError('');
+                          setRollInput(e.target.value.toUpperCase());
+                          if (verifyError) setVerifyError('');
                         }}
-                        className="glass-input text-xs py-2.5 pl-3 pr-20"
+                        placeholder="e.g. 21NE1A0501"
+                        className="glass-input text-sm font-mono uppercase tracking-wider py-3"
+                        autoFocus
+                        required
                       />
-                      <button
-                        type="submit"
-                        className="absolute right-1.5 top-1.5 bottom-1.5 px-3 rounded-xl bg-slate-800 dark:bg-slate-700 hover:bg-primary text-white text-xs font-bold transition-colors cursor-pointer"
-                      >
-                        Search
-                      </button>
                     </div>
 
-                    {trackError && (
-                      <p className="text-[11px] font-semibold text-rose-500 animate-fade-in flex items-center gap-1">
-                        <AlertCircle size={13} /> {trackError}
+                    <div>
+                      <label className="block text-xs font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider mb-1.5">
+                        Student Full Name *
+                      </label>
+                      <input
+                        type="text"
+                        value={nameInput}
+                        onChange={(e) => {
+                          setNameInput(e.target.value);
+                          if (verifyError) setVerifyError('');
+                        }}
+                        placeholder="e.g. A. Sai Krishna"
+                        className="glass-input text-sm py-3"
+                        required
+                      />
+                      <p className="text-[11px] text-customText-muted mt-1">
+                        Must match the student particulars added by HOD.
                       </p>
-                    )}
-                  </form>
-                </div>
+                    </div>
+                  </div>
 
-              </div>
+                  {/* Sample test students helper */}
+                  <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950/40 border border-slate-200/60 dark:border-slate-800/60">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-customText-muted block mb-2">
+                      Registered Students (Click to auto-fill for testing):
+                    </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {[
+                        { roll: '21NE1A0501', name: 'A. Sai Krishna', sec: 'CSE 3rd Year' },
+                        { roll: '21NE1A0502', name: 'B. Meghana', sec: 'CSE 3rd Year' },
+                        { roll: '21NE1A0503', name: 'Ch. Venkat Reddy', sec: 'CSE 3rd Year' },
+                        { roll: '22NE1A0410', name: 'M. Pavan Kalyan', sec: 'ECE 2nd Year' }
+                      ].map((item) => (
+                        <button
+                          key={item.roll}
+                          type="button"
+                          onClick={() => {
+                            setRollInput(item.roll);
+                            setNameInput(item.name);
+                            if (verifyError) setVerifyError('');
+                          }}
+                          className="flex items-center justify-between p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs hover:border-primary hover:bg-primary/5 transition-all text-left cursor-pointer group"
+                        >
+                          <div>
+                            <span className="font-mono font-bold text-primary mr-1.5">{item.roll}</span>
+                            <span className="font-semibold text-customText dark:text-customText-dark">{item.name}</span>
+                          </div>
+                          <span className="text-[10px] text-customText-muted group-hover:text-primary transition-colors">
+                            {item.sec}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
 
-              {/* Quick Workflow Info Pills */}
-              <div className="pt-6 border-t border-slate-200/60 dark:border-slate-800/60 w-full max-w-4xl">
-                <span className="text-[10px] font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-widest block mb-4">
-                  4-Step Campus Permission Protocol
-                </span>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-left">
-                  <div className="p-3.5 rounded-2xl bg-white/50 dark:bg-slate-900/40 border border-slate-200/50 dark:border-slate-800/50 text-xs">
-                    <span className="font-extrabold text-primary block mb-0.5">1. Student</span>
-                    <span className="text-customText-muted">Applies with Roll No & Reason</span>
+                  <button
+                    type="submit"
+                    className="w-full btn-primary py-3.5 text-sm font-black flex items-center justify-center gap-2 shadow-lg shadow-primary/20"
+                  >
+                    <span>Match Student Details</span>
+                    <ArrowRight size={17} />
+                  </button>
+                </form>
+              )}
+
+              {/* STEP 2: Show Matched Details (Last 4 Digits Only, Non-Modifiable) & Enter Reason */}
+              {applyStep === 2 && matchedStudent && (
+                <form onSubmit={handleSubmitOutpass} className="space-y-5">
+                  
+                  {/* Verified Student Details Card */}
+                  <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800 space-y-3">
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-200/60 dark:border-slate-800/60">
+                      <span className="text-[11px] font-extrabold uppercase tracking-wider text-primary">
+                        Matched Student Details (Verified Record)
+                      </span>
+                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-black border border-emerald-500/20 flex items-center gap-1">
+                        <Check size={12} />
+                        <span>Verified by HOD Registry</span>
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs">
+                      <div>
+                        <span className="text-[10px] font-bold text-customText-muted uppercase block mb-0.5">
+                          Student Full Name
+                        </span>
+                        <p className="font-black text-sm text-customText dark:text-customText-dark">
+                          {matchedStudent.name}
+                        </p>
+                      </div>
+
+                      <div>
+                        <span className="text-[10px] font-bold text-customText-muted uppercase block mb-0.5">
+                          Roll Number
+                        </span>
+                        <p className="font-mono font-black text-sm text-primary">
+                          {matchedStudent.rollNumber}
+                        </p>
+                      </div>
+
+                      <div>
+                        <span className="text-[10px] font-bold text-customText-muted uppercase block mb-0.5">
+                          Section Name
+                        </span>
+                        <p className="font-extrabold text-customText dark:text-customText-dark">
+                          {matchedStudent.section}
+                        </p>
+                      </div>
+
+                      <div>
+                        <span className="text-[10px] font-bold text-customText-muted uppercase block mb-0.5">
+                          Student Mobile Number (Last 4 Digits)
+                        </span>
+                        <p className="font-mono font-bold text-customText dark:text-customText-dark">
+                          {matchedStudent.maskedStudentMobile}
+                        </p>
+                      </div>
+
+                      <div className="sm:col-span-2">
+                        <span className="text-[10px] font-bold text-customText-muted uppercase block mb-0.5">
+                          Parent Mobile Number (Last 4 Digits)
+                        </span>
+                        <p className="font-mono font-black text-emerald-600 dark:text-emerald-400">
+                          {matchedStudent.maskedParentMobile}
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                  <div className="p-3.5 rounded-2xl bg-white/50 dark:bg-slate-900/40 border border-slate-200/50 dark:border-slate-800/50 text-xs">
-                    <span className="font-extrabold text-primary block mb-0.5">2. Controller</span>
-                    <span className="text-customText-muted">Calls Parent for Confirmation</span>
+
+                  {/* Reason for Going Out */}
+                  <div className="space-y-2">
+                    <label className="block text-xs font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider">
+                      Reason for Going Out *
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={outpassReason}
+                      onChange={(e) => setOutpassReason(e.target.value)}
+                      placeholder="State reason for going out (e.g. Medical emergency, high fever, visiting doctor with prescription...)"
+                      className="glass-input text-xs py-2.5 resize-none w-full"
+                      required
+                    />
+
+                    {/* Quick Reason Chips */}
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      {[
+                        'Medical Emergency / Clinic',
+                        'Severe Fever / Headache',
+                        'Urgent Family Matter',
+                        'Official Bank Work',
+                        'Special Event / Travel'
+                      ].map((reasonChip) => (
+                        <button
+                          key={reasonChip}
+                          type="button"
+                          onClick={() => setOutpassReason(reasonChip)}
+                          className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-primary/10 hover:text-primary text-[11px] font-semibold text-customText-muted transition-colors cursor-pointer"
+                        >
+                          + {reasonChip}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                  <div className="p-3.5 rounded-2xl bg-white/50 dark:bg-slate-900/40 border border-slate-200/50 dark:border-slate-800/50 text-xs">
-                    <span className="font-extrabold text-primary block mb-0.5">3. HOD</span>
-                    <span className="text-customText-muted">Grants Outpass Permission</span>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <div>
+                      <label className="block text-[10px] font-bold text-customText-muted uppercase mb-1">
+                        Destination
+                      </label>
+                      <input
+                        type="text"
+                        value={outpassDestination}
+                        onChange={(e) => setOutpassDestination(e.target.value)}
+                        placeholder="e.g. Home / Hospital"
+                        className="glass-input text-xs py-2.5"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-customText-muted uppercase mb-1">
+                        Expected Return Time
+                      </label>
+                      <input
+                        type="text"
+                        value={expectedReturnTime}
+                        onChange={(e) => setExpectedReturnTime(e.target.value)}
+                        placeholder="e.g. Today before 6:00 PM"
+                        className="glass-input text-xs py-2.5"
+                      />
+                    </div>
                   </div>
-                  <div className="p-3.5 rounded-2xl bg-white/50 dark:bg-slate-900/40 border border-slate-200/50 dark:border-slate-800/50 text-xs">
-                    <span className="font-extrabold text-primary block mb-0.5">4. Watchman</span>
-                    <span className="text-customText-muted">Checks Physical ID & Sends Out</span>
+
+                  {/* Action buttons */}
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setApplyStep(1)}
+                      className="btn-secondary py-3 px-5 text-xs font-bold cursor-pointer"
+                      disabled={isSubmittingOutpass}
+                    >
+                      Change Details
+                    </button>
+                    <button
+                      type="submit"
+                      className="btn-primary flex-1 py-3 text-xs sm:text-sm font-black flex items-center justify-center gap-2 shadow-lg shadow-primary/25 cursor-pointer"
+                      disabled={isSubmittingOutpass}
+                    >
+                      {isSubmittingOutpass ? (
+                        <span>Submitting Application...</span>
+                      ) : (
+                        <>
+                          <CheckCircle2 size={18} />
+                          <span>Submit Application</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                </form>
+              )}
+
+              {/* STEP 3: Automatically Generated Outpass Ticket Confirmation on Screen */}
+              {applyStep === 3 && submittedTicket && (
+                <div className="space-y-5 animate-fade-in text-center py-2">
+                  <div className="w-16 h-16 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center mx-auto shadow-inner">
+                    <CheckCircle2 size={36} />
+                  </div>
+
+                  <div>
+                    <h3 className="text-xl font-black text-customText dark:text-customText-dark">
+                      Application Submitted Successfully!
+                    </h3>
+                    <p className="text-xs text-customText-muted mt-1">
+                      Ticket Ref ID: <span className="font-mono font-bold text-primary">{submittedTicket.id}</span>
+                    </p>
+                  </div>
+
+                  {/* MANDATORY PROMINENT NOTE: do not close app till goes out */}
+                  <div className="p-4 rounded-2xl bg-amber-500/15 border-2 border-amber-500/40 text-amber-900 dark:text-amber-200 flex items-center justify-center gap-3 font-black text-sm shadow-sm text-left">
+                    <AlertCircle size={22} className="text-amber-600 dark:text-amber-400 shrink-0 animate-pulse" />
+                    <div>
+                      <span className="uppercase tracking-wider block text-[10px] font-black text-amber-700 dark:text-amber-400">
+                        Notice
+                      </span>
+                      <span>Note: do not close app till goes out.</span>
+                    </div>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-800 text-left text-xs space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-customText-muted font-bold">Student:</span>
+                      <span className="font-black">{submittedTicket.studentName} ({submittedTicket.rollNumber})</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-customText-muted font-bold">Section:</span>
+                      <span className="font-semibold">{submittedTicket.section}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-customText-muted font-bold">Live Status:</span>
+                      <span className="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-600 font-bold border border-amber-500/20 text-[11px]">
+                        Awaiting Parent Call Confirmation
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setActiveTicket(submittedTicket)}
+                      className="btn-primary flex-1 py-3 text-xs font-black flex items-center justify-center gap-2 cursor-pointer shadow-md"
+                    >
+                      <FileText size={16} />
+                      <span>View / Download Outpass Ticket</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleResetApplication}
+                      className="btn-secondary py-3 px-5 text-xs font-bold cursor-pointer"
+                    >
+                      Apply Another Leave
+                    </button>
                   </div>
                 </div>
-              </div>
+              )}
 
             </div>
 
           ) : (
 
-            /* STAFF & SECURITY LOGIN CARD */
+            /* STAFF LOGIN CARD (Cleaned up, no Quick Demo Accounts) */
             <div className="w-full max-w-md glass-card p-8 border border-white/60 dark:border-slate-800/65 relative z-10 animate-fade-in my-auto">
               
-              {/* Back to Portal button */}
+              {/* Back to Student Portal button */}
               <button
                 type="button"
                 onClick={() => setViewMode('landing')}
@@ -573,7 +772,7 @@ const Login = () => {
                 ← Back to Portal
               </button>
 
-              {/* Fingerprint Login Option at Card Top Right */}
+              {/* Fingerprint Login Option */}
               <div className="absolute top-6 right-6 z-20">
                 <button
                   type="button"
@@ -597,10 +796,10 @@ const Login = () => {
                   <img src={logo} alt="NEC Logo" className="w-14 h-14 rounded-full object-contain relative z-10 shadow-md" />
                 </div>
                 <h2 className="text-2xl font-extrabold text-customText dark:text-customText-dark tracking-tight">
-                  Staff & Security Login
+                  Staff Login
                 </h2>
                 <p className="text-xs text-customText-muted dark:text-customText-mutedDark mt-1">
-                  Access HOD, Absent Controller, Faculty, and Watchman Portals
+                  Authorized personnel portal authentication
                 </p>
               </div>
 
@@ -634,7 +833,7 @@ const Login = () => {
                       type="text"
                       value={userId}
                       onChange={(e) => setUserId(e.target.value)}
-                      placeholder="e.g. TE_HOD, ac123, or watchman"
+                      placeholder="Enter authorized User ID"
                       className="glass-input pl-10 text-xs"
                       disabled={loading || biometricsLoading}
                       required
@@ -671,7 +870,7 @@ const Login = () => {
 
                 <button
                   type="submit"
-                  className="w-full btn-primary mt-2 py-3 text-xs font-bold"
+                  className="w-full btn-primary mt-2 py-3 text-xs font-bold cursor-pointer"
                   disabled={loading || biometricsLoading}
                 >
                   {loading ? (
@@ -685,324 +884,21 @@ const Login = () => {
                 </button>
               </form>
 
-              {/* Quick Credentials Switcher for Seamless Testing */}
-              <div className="mt-6 pt-4 border-t border-slate-200/50 dark:border-slate-800/50">
-                <span className="text-[10px] font-extrabold text-customText-muted uppercase tracking-wider block text-center mb-2">
-                  Quick Demo Accounts
-                </span>
-                <div className="grid grid-cols-3 gap-1.5 text-[11px]">
-                  <button
-                    type="button"
-                    onClick={() => fillQuickCredentials('ABSENT_CONTROLLER')}
-                    className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-primary/10 hover:text-primary font-bold text-customText-muted text-center transition-colors cursor-pointer"
-                  >
-                    Absent Controller
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => fillQuickCredentials('HOD')}
-                    className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-primary/10 hover:text-primary font-bold text-customText-muted text-center transition-colors cursor-pointer"
-                  >
-                    HOD (Approval)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => fillQuickCredentials('WATCHMAN')}
-                    className="p-1.5 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 hover:bg-purple-500/20 font-bold text-center transition-colors cursor-pointer"
-                  >
-                    Gate Watchman
-                  </button>
-                </div>
-              </div>
-
             </div>
           )}
 
         </main>
 
-        {/* 4. Footer */}
+        {/* 4. Footer (Removed "NEC Narasaraopet Lectra Outpass System") */}
         <footer className="w-full text-center py-4 border-t border-slate-200/40 dark:border-slate-800/40 bg-white/40 dark:bg-slate-900/40 backdrop-blur-sm z-10">
-          <div className="inline-flex items-center justify-center gap-2.5 px-3.5 py-1.5 rounded-xl bg-slate-100/60 dark:bg-slate-900/40 border border-slate-200/40 dark:border-slate-800/40 text-xs font-semibold text-customText-muted dark:text-customText-mutedDark shadow-sm">
-            <a 
-              href="https://nrtec.in" 
-              target="_blank" 
-              rel="noopener noreferrer" 
-              className="text-primary-dark dark:text-primary font-bold hover:underline"
-            >
-              NEC Narasaraopet
-            </a>
-            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-extrabold select-none">✕</span>
-            <span>Lectra Outpass System</span>
-          </div>
+          <p className="text-xs text-customText-muted dark:text-customText-mutedDark font-medium">
+            © {new Date().getFullYear()} Narasaraopeta Engineering College (Autonomous)
+          </p>
         </footer>
 
       </div>
 
-      {/* 5. Student Outpass Application Modal (Step 1 -> Step 2 -> Submit) */}
-      {showApplyModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in overflow-y-auto">
-          <div className="fixed inset-0" onClick={() => !isSubmittingOutpass && setShowApplyModal(false)} />
-          
-          <div className="relative w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 z-10 p-6 sm:p-8 space-y-6 my-auto max-h-[92vh] overflow-y-auto">
-            
-            {/* Modal Header */}
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-primary/10 text-primary flex items-center justify-center">
-                  <FileText size={20} />
-                </div>
-                <div>
-                  <h3 className="font-black text-lg text-customText dark:text-customText-dark">
-                    Apply Permission to Go Out
-                  </h3>
-                  <p className="text-xs text-customText-muted">
-                    Step {applyStep} of 2: {applyStep === 1 ? 'Enter Roll Number' : 'Verify Details & Stated Reason'}
-                  </p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setShowApplyModal(false)}
-                className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            {/* Error banner */}
-            {rollError && (
-              <div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-semibold rounded-xl flex items-center gap-2 animate-pulse">
-                <AlertCircle size={15} className="shrink-0" />
-                <span>{rollError}</span>
-              </div>
-            )}
-
-            {/* STEP 1: Enter Roll Number */}
-            {applyStep === 1 && (
-              <form onSubmit={handleLookupRoll} className="space-y-5">
-                <div>
-                  <label className="block text-xs font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider mb-2">
-                    Enter Student Roll Number
-                  </label>
-                  <input
-                    type="text"
-                    value={rollInput}
-                    onChange={(e) => {
-                      setRollInput(e.target.value.toUpperCase());
-                      if (rollError) setRollError('');
-                    }}
-                    placeholder="e.g. 21NE1A0501"
-                    className="glass-input text-sm font-mono uppercase tracking-wider py-3"
-                    autoFocus
-                    required
-                  />
-                  <p className="text-[11px] text-customText-muted mt-1.5">
-                    Your details will be fetched and verified automatically.
-                  </p>
-                </div>
-
-                {/* Sample roll numbers for testing */}
-                <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-950/40 border border-slate-200/50 dark:border-slate-800/50">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-customText-muted block mb-1.5">
-                    Sample Verified Roll Numbers (Click to test):
-                  </span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {['21NE1A0501', '21NE1A0502', '21NE1A0503', '20NE1A0512', '22NE1A0410'].map((r) => (
-                      <button
-                        key={r}
-                        type="button"
-                        onClick={() => {
-                          setRollInput(r);
-                          if (rollError) setRollError('');
-                        }}
-                        className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-mono font-bold text-primary hover:bg-primary/10 transition-colors cursor-pointer"
-                      >
-                        {r}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex gap-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowApplyModal(false)}
-                    className="btn-secondary flex-1 py-3 text-xs font-bold"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="btn-primary flex-1 py-3 text-xs font-bold flex items-center justify-center gap-2"
-                  >
-                    <span>Match Details</span>
-                    <ArrowRight size={15} />
-                  </button>
-                </div>
-              </form>
-            )}
-
-            {/* STEP 2: Show Matched Details (Last 4 Digits Only, Non-Editable) & Ask Reason */}
-            {applyStep === 2 && matchedStudent && (
-              <form onSubmit={handleSubmitOutpass} className="space-y-5">
-                
-                {/* Non-modifiable Student Details Card */}
-                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800 space-y-3">
-                  <div className="flex items-center justify-between pb-2 border-b border-slate-200/60 dark:border-slate-800/60">
-                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-primary">
-                      Matched Student Details (Read-Only)
-                    </span>
-                    <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 text-[10px] font-extrabold border border-emerald-500/20">
-                      Verified
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3 text-xs">
-                    <div>
-                      <span className="text-[10px] font-bold text-customText-muted uppercase block">
-                        Student Name
-                      </span>
-                      <p className="font-extrabold text-customText dark:text-customText-dark">
-                        {matchedStudent.name}
-                      </p>
-                    </div>
-
-                    <div>
-                      <span className="text-[10px] font-bold text-customText-muted uppercase block">
-                        Roll Number
-                      </span>
-                      <p className="font-mono font-extrabold text-primary">
-                        {matchedStudent.rollNumber}
-                      </p>
-                    </div>
-
-                    <div>
-                      <span className="text-[10px] font-bold text-customText-muted uppercase block">
-                        Section
-                      </span>
-                      <p className="font-bold text-customText dark:text-customText-dark">
-                        {matchedStudent.section}
-                      </p>
-                    </div>
-
-                    <div>
-                      <span className="text-[10px] font-bold text-customText-muted uppercase block">
-                        Student Mobile
-                      </span>
-                      <p className="font-mono font-bold text-customText dark:text-customText-dark">
-                        {matchedStudent.maskedStudentMobile}
-                      </p>
-                    </div>
-
-                    <div className="col-span-2">
-                      <span className="text-[10px] font-bold text-customText-muted uppercase block">
-                        Parent Mobile (Only Last 4 Digits Visible)
-                      </span>
-                      <p className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                        {matchedStudent.maskedParentMobile}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Reason for Going Out */}
-                <div className="space-y-2">
-                  <label className="block text-xs font-bold text-customText-muted dark:text-customText-mutedDark uppercase tracking-wider">
-                    Reason for Going Out *
-                  </label>
-                  <textarea
-                    rows={3}
-                    value={outpassReason}
-                    onChange={(e) => setOutpassReason(e.target.value)}
-                    placeholder="Enter reason (e.g. Severe headache, visiting clinic with prescription...)"
-                    className="glass-input text-xs py-2.5 resize-none w-full"
-                    required
-                  />
-
-                  {/* Quick Reason Chips */}
-                  <div className="flex flex-wrap gap-1.5 pt-1">
-                    {[
-                      'Medical Emergency / Clinic',
-                      'Severe Fever / Headache',
-                      'Urgent Family Matter',
-                      'Official Bank Work',
-                      'Special Event / Travel'
-                    ].map((reasonChip) => (
-                      <button
-                        key={reasonChip}
-                        type="button"
-                        onClick={() => setOutpassReason(reasonChip)}
-                        className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-primary/10 hover:text-primary text-[11px] font-semibold text-customText-muted transition-colors cursor-pointer"
-                      >
-                        + {reasonChip}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 text-xs">
-                  <div>
-                    <label className="block text-[10px] font-bold text-customText-muted uppercase mb-1">
-                      Destination
-                    </label>
-                    <input
-                      type="text"
-                      value={outpassDestination}
-                      onChange={(e) => setOutpassDestination(e.target.value)}
-                      placeholder="e.g. Home / Local Hospital"
-                      className="glass-input text-xs py-2"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] font-bold text-customText-muted uppercase mb-1">
-                      Expected Return
-                    </label>
-                    <input
-                      type="text"
-                      value={expectedReturnTime}
-                      onChange={(e) => setExpectedReturnTime(e.target.value)}
-                      placeholder="e.g. 5:30 PM"
-                      className="glass-input text-xs py-2"
-                    />
-                  </div>
-                </div>
-
-                {/* Action buttons */}
-                <div className="flex gap-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setApplyStep(1)}
-                    className="btn-secondary py-3 px-4 text-xs font-bold"
-                    disabled={isSubmittingOutpass}
-                  >
-                    Back
-                  </button>
-                  <button
-                    type="submit"
-                    className="btn-primary flex-1 py-3 text-xs font-bold flex items-center justify-center gap-2"
-                    disabled={isSubmittingOutpass}
-                  >
-                    {isSubmittingOutpass ? (
-                      <span>Submitting...</span>
-                    ) : (
-                      <>
-                        <CheckCircle2 size={16} />
-                        <span>Submit Application</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-
-              </form>
-            )}
-
-          </div>
-        </div>
-      )}
-
-      {/* 6. Active Ticket Viewer & Download Modal */}
+      {/* 5. Active Ticket Viewer & Download Modal */}
       {activeTicket && (
         <OutpassTicketModal
           ticket={activeTicket}
@@ -1010,7 +906,7 @@ const Login = () => {
         />
       )}
 
-      {/* 7. Biometric Scan Modal (Standard) */}
+      {/* 6. Biometric Scan Modal */}
       {showBiometricsModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div 
