@@ -239,11 +239,53 @@ export const getAllOutpasses = () => {
   }
 };
 
-// Save outpasses and notify listeners
-const saveOutpasses = (tickets) => {
+// Save outpasses and notify listeners (both locally and to backend database)
+const saveOutpasses = async (tickets) => {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(tickets));
   // Dispatch custom event for same-tab updates
   window.dispatchEvent(new CustomEvent('lectra_outpass_updated', { detail: tickets }));
+
+  // Send to backend database so other devices (Absent Controller, HOD, Watchman) receive it instantly
+  try {
+    const res = await fetch('/api/student-attendance/outpass/tickets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tickets })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && Array.isArray(data.tickets)) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data.tickets));
+        window.dispatchEvent(new CustomEvent('lectra_outpass_updated', { detail: data.tickets }));
+      }
+    }
+  } catch (e) {
+    console.warn('Sync outpass network note:', e);
+  }
+};
+
+// Sync live outpasses from backend database across campus devices
+export const syncOutpassesFromBackend = async () => {
+  try {
+    const res = await fetch('/api/student-attendance/outpass/tickets');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && Array.isArray(data.tickets)) {
+        const local = getAllOutpasses();
+        const localMap = new Map(local.map(t => [t.id, t]));
+        data.tickets.forEach(rt => {
+          localMap.set(rt.id, rt);
+        });
+        const merged = Array.from(localMap.values()).sort((a, b) => new Date(b.appliedAt || 0) - new Date(a.appliedAt || 0));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+        window.dispatchEvent(new CustomEvent('lectra_outpass_updated', { detail: merged }));
+        return merged;
+      }
+    }
+  } catch (e) {
+    // silent fallback to local storage
+  }
+  return getAllOutpasses();
 };
 
 // Generate unique ticket ID
@@ -426,7 +468,7 @@ export const searchOutpasses = (query) => {
   );
 };
 
-// Subscribe to outpass store updates
+// Subscribe to outpass store updates (with live cross-device backend polling)
 export const subscribeToOutpasses = (callback) => {
   const handleCustom = (e) => callback(e.detail);
   const handleStorage = (e) => {
@@ -438,8 +480,17 @@ export const subscribeToOutpasses = (callback) => {
   window.addEventListener('lectra_outpass_updated', handleCustom);
   window.addEventListener('storage', handleStorage);
 
+  // Sync initially
+  syncOutpassesFromBackend().then(callback);
+
+  // Poll backend every 1.5 seconds for instant cross-device updates (Student -> Controller -> HOD -> Watchman)
+  const pollInterval = setInterval(() => {
+    syncOutpassesFromBackend().then(callback);
+  }, 1500);
+
   return () => {
     window.removeEventListener('lectra_outpass_updated', handleCustom);
     window.removeEventListener('storage', handleStorage);
+    clearInterval(pollInterval);
   };
 };

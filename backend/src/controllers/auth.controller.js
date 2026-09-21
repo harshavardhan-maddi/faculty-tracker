@@ -2,6 +2,33 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const prisma = require('../db');
 
+const WATCHMAN_SETTINGS_KEY = 'custom_watchman_accounts';
+
+const getWatchmanAccounts = async () => {
+  try {
+    const setting = await prisma.systemSetting.findUnique({
+      where: { key: WATCHMAN_SETTINGS_KEY }
+    });
+    if (!setting || !setting.value) return [];
+    return JSON.parse(setting.value);
+  } catch (err) {
+    console.error('Error reading watchman accounts:', err);
+    return [];
+  }
+};
+
+const saveWatchmanAccounts = async (accounts) => {
+  try {
+    await prisma.systemSetting.upsert({
+      where: { key: WATCHMAN_SETTINGS_KEY },
+      update: { value: JSON.stringify(accounts) },
+      create: { key: WATCHMAN_SETTINGS_KEY, value: JSON.stringify(accounts) }
+    });
+  } catch (err) {
+    console.error('Error saving watchman accounts:', err);
+  }
+};
+
 const login = async (req, res) => {
   const { userId, password } = req.body;
 
@@ -10,6 +37,65 @@ const login = async (req, res) => {
   }
 
   try {
+    // 1. Check custom watchman accounts created by HOD
+    const watchmen = await getWatchmanAccounts();
+    const matchedWatchman = watchmen.find(w => w.userId.toLowerCase() === userId.toLowerCase());
+    
+    if (matchedWatchman) {
+      let isMatch = false;
+      if (matchedWatchman.password.startsWith('$2a$') || matchedWatchman.password.startsWith('$2b$')) {
+        isMatch = await bcrypt.compare(password, matchedWatchman.password);
+      } else {
+        isMatch = matchedWatchman.password === password;
+      }
+
+      if (isMatch) {
+        const token = jwt.sign(
+          {
+            id: matchedWatchman.id,
+            userId: matchedWatchman.userId,
+            role: 'WATCHMAN',
+            name: matchedWatchman.name,
+            className: null,
+          },
+          process.env.JWT_SECRET || 'supersecret_facultytrackerkey_2026',
+          { expiresIn: '24h' }
+        );
+        return res.json({
+          token,
+          user: {
+            id: matchedWatchman.id,
+            userId: matchedWatchman.userId,
+            name: matchedWatchman.name,
+            role: 'WATCHMAN',
+            className: null,
+          },
+        });
+      } else {
+        return res.status(401).json({ message: 'Invalid User ID or password' });
+      }
+    }
+
+    // 2. Check default watchman credentials fallback
+    if (userId.toLowerCase() === 'watchman' || userId.toLowerCase() === 'security' || userId.toLowerCase() === 'gate') {
+      if (password === 'watchman' || password === 'watchman123' || password === 'security123' || password === 'password123' || password === 'gate123') {
+        const defaultWatchman = {
+          id: 9999,
+          userId: 'watchman',
+          name: 'Main Gate Security (Watchman)',
+          role: 'WATCHMAN',
+          className: null,
+        };
+        const token = jwt.sign(
+          defaultWatchman,
+          process.env.JWT_SECRET || 'supersecret_facultytrackerkey_2026',
+          { expiresIn: '24h' }
+        );
+        return res.json({ token, user: defaultWatchman });
+      }
+    }
+
+    // 3. Check regular users in database
     const user = await prisma.user.findUnique({
       where: { userId },
     });
@@ -22,7 +108,6 @@ const login = async (req, res) => {
     if (!isMatch) {
       return res.status(401).json({ message: 'Invalid User ID or password' });
     }
-
 
     const token = jwt.sign(
       {
@@ -56,10 +141,16 @@ const register = async (req, res) => {
   const { name, userId, password, className, role } = req.body;
 
   if (!name || !userId || !password || !role) {
-    return res.status(400).json({ message: 'All fields except class_name (for HOD/Sub Admin) are required' });
+    return res.status(400).json({ message: 'All fields except class_name (for HOD/Sub Admin/Watchman) are required' });
   }
 
   try {
+    // Check if user ID already exists in watchmen or DB
+    const watchmen = await getWatchmanAccounts();
+    if (watchmen.some(w => w.userId.toLowerCase() === userId.toLowerCase())) {
+      return res.status(400).json({ message: 'User ID already exists' });
+    }
+
     const existingUser = await prisma.user.findUnique({
       where: { userId },
     });
@@ -70,6 +161,33 @@ const register = async (req, res) => {
 
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
+
+    // Support WATCHMAN role registered by HOD
+    if (role === 'WATCHMAN') {
+      const newWatchman = {
+        id: 90000 + Math.floor(Math.random() * 9000),
+        name,
+        userId,
+        password: hashedPassword,
+        role: 'WATCHMAN',
+        className: null,
+        createdAt: new Date().toISOString(),
+      };
+
+      watchmen.unshift(newWatchman);
+      await saveWatchmanAccounts(watchmen);
+
+      return res.status(201).json({
+        message: 'Gate Watchman user created successfully',
+        user: {
+          id: newWatchman.id,
+          userId: newWatchman.userId,
+          name: newWatchman.name,
+          role: 'WATCHMAN',
+          className: null,
+        },
+      });
+    }
 
     const newUser = await prisma.user.create({
       data: {
@@ -99,10 +217,20 @@ const register = async (req, res) => {
 
 const deleteUser = async (req, res) => {
   const { id } = req.params;
+  const numId = parseInt(id);
 
   try {
+    // Check if watchman user
+    const watchmen = await getWatchmanAccounts();
+    const watchmanIndex = watchmen.findIndex(w => w.id === numId);
+    if (watchmanIndex >= 0) {
+      watchmen.splice(watchmanIndex, 1);
+      await saveWatchmanAccounts(watchmen);
+      return res.json({ message: 'Watchman user deleted successfully' });
+    }
+
     const user = await prisma.user.findUnique({
-      where: { id: parseInt(id) },
+      where: { id: numId },
     });
 
     if (!user) {
@@ -114,7 +242,7 @@ const deleteUser = async (req, res) => {
     }
 
     await prisma.user.delete({
-      where: { id: parseInt(id) },
+      where: { id: numId },
     });
 
     res.json({ message: 'User deleted successfully' });
@@ -139,7 +267,18 @@ const getUsers = async (req, res) => {
         createdAt: 'desc',
       },
     });
-    res.json(users);
+
+    const watchmen = await getWatchmanAccounts();
+    const formattedWatchmen = watchmen.map(w => ({
+      id: w.id,
+      name: w.name,
+      userId: w.userId,
+      role: 'WATCHMAN',
+      className: null,
+      createdAt: w.createdAt || new Date().toISOString(),
+    }));
+
+    res.json([...users, ...formattedWatchmen]);
   } catch (error) {
     console.error('Get users error:', error);
     res.status(500).json({ message: 'Internal Server Error' });
@@ -148,6 +287,17 @@ const getUsers = async (req, res) => {
 
 const me = async (req, res) => {
   try {
+    if (req.user.role === 'WATCHMAN') {
+      return res.json({
+        id: req.user.id,
+        name: req.user.name,
+        userId: req.user.userId,
+        role: 'WATCHMAN',
+        className: null,
+        createdAt: new Date().toISOString(),
+      });
+    }
+
     const user = await prisma.user.findUnique({
       where: { id: req.user.id },
       select: {
@@ -159,12 +309,14 @@ const me = async (req, res) => {
         createdAt: true,
       },
     });
+
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
+
     res.json(user);
   } catch (error) {
-    console.error('Get me error:', error);
+    console.error('Get profile error:', error);
     res.status(500).json({ message: 'Internal Server Error' });
   }
 };

@@ -175,6 +175,8 @@ const ManageUsers = () => {
                 if (u.role === 'SUB_ADMIN') roleBadge = 'bg-primary/10 text-primary-dark dark:text-primary border border-primary/10';
                 if (u.role === 'CR') roleBadge = 'bg-green-500/10 text-green-700 dark:text-green-400 border border-green-500/10';
                 if (u.role === 'FACULTY') roleBadge = 'bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-500/10';
+                if (u.role === 'ABSENT_CONTROLLER') roleBadge = 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/10';
+                if (u.role === 'WATCHMAN') roleBadge = 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30';
 
                 return (
                   <tr key={u.id} className="hover:bg-slate-50/40 dark:hover:bg-slate-900/10">
@@ -311,10 +313,11 @@ const ManageUsers = () => {
                   className="glass-input text-sm"
                 >
                   <option value="CR">Class Representative (CR)</option>
-                  <option value="SUB_ADMIN">Sub Admin</option>
-                  <option value="HOD">HOD (Head of Department)</option>
+                  <option value="WATCHMAN">Campus Gate Watchman (Security)</option>
                   <option value="ABSENT_CONTROLLER">Absent Controller</option>
                   <option value="FACULTY">Faculty</option>
+                  <option value="SUB_ADMIN">Sub Admin</option>
+                  <option value="HOD">HOD (Head of Department)</option>
                 </select>
               </div>
 

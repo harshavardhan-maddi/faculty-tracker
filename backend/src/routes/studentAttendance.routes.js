@@ -318,6 +318,73 @@ router.post('/verify-outpass-student', async (req, res) => {
   }
 });
 
+// 1c. GET /outpass/tickets - Fetch live outpass tickets across all campus devices
+router.get('/outpass/tickets', async (req, res) => {
+  try {
+    const setting = await prisma.systemSetting.findUnique({
+      where: { key: 'lectra_outpass_tickets_db' }
+    });
+    let tickets = [];
+    if (setting && setting.value) {
+      try {
+        tickets = JSON.parse(setting.value);
+      } catch (parseErr) {
+        tickets = [];
+      }
+    }
+    res.json({ success: true, tickets });
+  } catch (error) {
+    console.error('Fetch outpass tickets error:', error);
+    res.json({ success: true, tickets: [] });
+  }
+});
+
+// 1d. POST /outpass/tickets - Sync/update outpass tickets in database across HOD, Controller & Watchman
+router.post('/outpass/tickets', async (req, res) => {
+  const { tickets } = req.body;
+  if (!Array.isArray(tickets)) {
+    return res.status(400).json({ success: false, message: 'Tickets array required' });
+  }
+
+  try {
+    const setting = await prisma.systemSetting.findUnique({
+      where: { key: 'lectra_outpass_tickets_db' }
+    });
+    let existing = [];
+    if (setting && setting.value) {
+      try {
+        existing = JSON.parse(setting.value);
+      } catch (e) {
+        existing = [];
+      }
+    }
+
+    // Merge by ticket ID: newer fields or updates take precedence
+    const ticketMap = new Map();
+    existing.forEach(t => {
+      if (t && t.id) ticketMap.set(t.id, t);
+    });
+    tickets.forEach(t => {
+      if (t && t.id) {
+        const prev = ticketMap.get(t.id) || {};
+        ticketMap.set(t.id, { ...prev, ...t });
+      }
+    });
+
+    const merged = Array.from(ticketMap.values()).sort((a, b) => new Date(b.appliedAt || 0) - new Date(a.appliedAt || 0));
+
+    await prisma.systemSetting.upsert({
+      where: { key: 'lectra_outpass_tickets_db' },
+      update: { value: JSON.stringify(merged) },
+      create: { key: 'lectra_outpass_tickets_db', value: JSON.stringify(merged) }
+    });
+    res.json({ success: true, count: merged.length, tickets: merged });
+  } catch (error) {
+    console.error('Save outpass tickets error:', error);
+    res.status(500).json({ success: false, message: 'Failed to sync outpass tickets' });
+  }
+});
+
 // 2. GET /students - Fetch students in section (filtered for CRs)
 router.get('/students', authMiddleware, async (req, res) => {
   const { section } = req.query;

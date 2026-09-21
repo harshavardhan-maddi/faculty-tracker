@@ -92,7 +92,31 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const login = async (userId, password) => {
-    // Watchman Gate Security authentication bypass (Zero database/backend changes)
+    // 1. Check custom watchman accounts stored on device
+    try {
+      const customWatchmen = JSON.parse(localStorage.getItem('lectra_custom_watchmen') || '[]');
+      const matchedCustomWatchman = customWatchmen.find(w => w.userId.toLowerCase() === userId.toLowerCase());
+      if (matchedCustomWatchman && matchedCustomWatchman.password === password) {
+        const watchmanUser = {
+          id: matchedCustomWatchman.id || 90001,
+          name: matchedCustomWatchman.name || 'Campus Gate Watchman',
+          userId: matchedCustomWatchman.userId,
+          role: 'WATCHMAN',
+          className: null,
+        };
+        const customToken = `watchman-token-${matchedCustomWatchman.userId}`;
+        localStorage.setItem('token', customToken);
+        localStorage.setItem('user', JSON.stringify(watchmanUser));
+        localStorage.setItem('auth_session', JSON.stringify({ userId, password }));
+        setToken(customToken);
+        setUser(watchmanUser);
+        return watchmanUser;
+      }
+    } catch (e) {
+      console.warn('Custom watchman check error:', e);
+    }
+
+    // 2. Default Watchman Gate Security fallback credentials
     if (userId.toLowerCase() === 'watchman' || userId.toLowerCase() === 'security' || userId.toLowerCase() === 'gate') {
       if (password === 'watchman' || password === 'watchman123' || password === 'security123' || password === 'password123' || password === 'gate123') {
         const watchmanUser = {
@@ -108,10 +132,10 @@ export const AuthProvider = ({ children }) => {
         setToken('watchman-session-token');
         setUser(watchmanUser);
         return watchmanUser;
-      } else {
-        throw new Error('Invalid Watchman security password');
       }
     }
+
+    // 3. Authenticate with backend API
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
@@ -153,6 +177,44 @@ export const AuthProvider = ({ children }) => {
   };
 
   const registerUser = async (name, userId, password, role, className) => {
+    // If registering a Watchman, cache in local custom watchmen registry
+    if (role === 'WATCHMAN') {
+      const customWatchmen = JSON.parse(localStorage.getItem('lectra_custom_watchmen') || '[]');
+      if (customWatchmen.some(w => w.userId.toLowerCase() === userId.toLowerCase())) {
+        throw new Error('Watchman User ID already exists');
+      }
+      const newWatchman = {
+        id: 90000 + Math.floor(Math.random() * 9000),
+        name,
+        userId,
+        password,
+        role: 'WATCHMAN',
+        className: null,
+        createdAt: new Date().toISOString()
+      };
+      customWatchmen.unshift(newWatchman);
+      localStorage.setItem('lectra_custom_watchmen', JSON.stringify(customWatchmen));
+
+      // Also call backend to persist in database system_settings
+      try {
+        const res = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({ name, userId, password, role, className }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          return data.user;
+        }
+      } catch (e) {
+        console.warn('Backend watchman persist notice:', e);
+      }
+      return newWatchman;
+    }
+
     const res = await fetch('/api/auth/register', {
       method: 'POST',
       headers: {
@@ -170,6 +232,17 @@ export const AuthProvider = ({ children }) => {
   };
 
   const deleteUser = async (id) => {
+    // Check if watchman in local registry
+    try {
+      const customWatchmen = JSON.parse(localStorage.getItem('lectra_custom_watchmen') || '[]');
+      const filtered = customWatchmen.filter(w => w.id !== id);
+      if (filtered.length !== customWatchmen.length) {
+        localStorage.setItem('lectra_custom_watchmen', JSON.stringify(filtered));
+      }
+    } catch (e) {
+      console.warn('Local watchman delete notice:', e);
+    }
+
     const res = await fetch(`/api/auth/users/${id}`, {
       method: 'DELETE',
       headers: {
@@ -185,17 +258,42 @@ export const AuthProvider = ({ children }) => {
   };
 
   const getUsersList = async () => {
-    const res = await fetch('/api/auth/users', {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-    });
+    let users = [];
+    try {
+      const res = await fetch('/api/auth/users', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
 
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.message || 'Failed to fetch users list');
+      if (res.ok) {
+        users = await res.json();
+      }
+    } catch (e) {
+      console.warn('Backend users fetch error:', e);
     }
-    return data;
+
+    // Merge custom watchmen from device cache so they always appear immediately
+    try {
+      const customWatchmen = JSON.parse(localStorage.getItem('lectra_custom_watchmen') || '[]');
+      const userIds = new Set(users.map(u => u.userId.toLowerCase()));
+      for (const w of customWatchmen) {
+        if (!userIds.has(w.userId.toLowerCase())) {
+          users.push({
+            id: w.id,
+            name: w.name,
+            userId: w.userId,
+            role: 'WATCHMAN',
+            className: null,
+            createdAt: w.createdAt || new Date().toISOString()
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('Local watchmen merge error:', e);
+    }
+
+    return users;
   };
 
   const updateProfile = async (name, userId, password) => {
