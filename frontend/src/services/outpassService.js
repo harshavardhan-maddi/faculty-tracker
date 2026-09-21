@@ -135,15 +135,43 @@ export const maskPhoneNumber = (phone) => {
   return `••••••${last4}`;
 };
 
-// Lookup and match student by Roll Number AND Full Name against HOD registry
-export const lookupStudentByRollAndName = (rollNumber, fullName) => {
+// Lookup and match student by Roll Number AND Full Name against HOD registry (Live DB + Cache Fallback)
+export const lookupStudentByRollAndName = async (rollNumber, fullName) => {
   if (!rollNumber || !fullName) {
     return { success: false, error: 'Please enter both your Roll Number and Full Name.' };
   }
 
   const cleanRoll = rollNumber.trim().toUpperCase();
-  const dir = getStudentsDirectory();
 
+  // 1. Try Live Backend Database lookup (checks prisma.student registry added by HOD)
+  try {
+    const res = await fetch('/api/student-attendance/verify-outpass-student', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rollNumber: cleanRoll, name: fullName.trim() })
+    });
+
+    const data = await res.json();
+    if (res.ok && data.success && data.student) {
+      // Cache student in directory for future offline access
+      registerStudentInDirectory({
+        rollNumber: data.student.rollNumber,
+        name: data.student.name,
+        section: data.student.section,
+        studentMobile: data.student.studentMobile,
+        parentMobile: data.student.parentMobile
+      });
+      return { success: true, student: data.student };
+    } else if (data && data.message) {
+      // Backend returned explicit validation message (e.g., student not found in HOD registry or name mismatch)
+      return { success: false, error: data.message };
+    }
+  } catch (netErr) {
+    console.warn('Backend student verification network error, falling back to local cache:', netErr);
+  }
+
+  // 2. Fallback to Local Client Directory Cache
+  const dir = getStudentsDirectory();
   const studentByRoll = dir.find(s => s.rollNumber.toUpperCase() === cleanRoll);
   if (!studentByRoll) {
     return { 

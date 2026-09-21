@@ -246,6 +246,78 @@ router.post('/students', authMiddleware, roleMiddleware(['HOD', 'SUB_ADMIN']), a
   }
 });
 
+// 1b. POST /verify-outpass-student - Match student details against HOD student registry
+router.post('/verify-outpass-student', async (req, res) => {
+  const { rollNumber, name } = req.body;
+  if (!rollNumber || !name) {
+    return res.status(400).json({ success: false, message: 'Please enter both your Roll Number and Full Name.' });
+  }
+
+  try {
+    const cleanRoll = String(rollNumber).trim();
+    // Lookup student in HOD student registry
+    const student = await prisma.student.findFirst({
+      where: {
+        OR: [
+          { rollNumber: cleanRoll },
+          { rollNumber: cleanRoll.toUpperCase() },
+          { rollNumber: cleanRoll.toLowerCase() }
+        ]
+      }
+    });
+
+    if (!student) {
+      return res.status(404).json({
+        success: false,
+        message: `Roll Number "${cleanRoll.toUpperCase()}" not found in the student registry added by HOD. Please verify your roll number.`
+      });
+    }
+
+    // Name comparison (normalized + flexible word match)
+    const registeredCleanName = (student.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const inputCleanName = String(name).trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    const inputWords = String(name).trim().toLowerCase().split(/[\s,.-]+/).filter(w => w.length > 1);
+    const registeredWords = (student.name || '').toLowerCase().split(/[\s,.-]+/).filter(w => w.length > 1);
+
+    const wordOverlap = inputWords.length > 0 && inputWords.some(w => registeredWords.some(rw => rw.includes(w) || w.includes(rw)));
+    const isMatch = registeredCleanName === inputCleanName ||
+                    registeredCleanName.includes(inputCleanName) ||
+                    inputCleanName.includes(registeredCleanName) ||
+                    wordOverlap;
+
+    if (!isMatch) {
+      return res.status(400).json({
+        success: false,
+        message: `Name does not match the registered record for Roll Number ${student.rollNumber}. Please enter your registered full name.`
+      });
+    }
+
+    const mask = (ph) => {
+      if (!ph) return '••••••0000';
+      const clean = String(ph).replace(/\D/g, '');
+      return clean.length <= 4 ? clean : `••••••${clean.slice(-4)}`;
+    };
+
+    return res.json({
+      success: true,
+      student: {
+        id: student.id,
+        rollNumber: student.rollNumber,
+        name: student.name,
+        section: student.section,
+        studentMobile: student.studentMobile,
+        parentMobile: student.parentMobile,
+        maskedStudentMobile: mask(student.studentMobile),
+        maskedParentMobile: mask(student.parentMobile)
+      }
+    });
+  } catch (error) {
+    console.error('Verify outpass student error:', error);
+    return res.status(500).json({ success: false, message: 'Server error verifying student particulars.' });
+  }
+});
+
 // 2. GET /students - Fetch students in section (filtered for CRs)
 router.get('/students', authMiddleware, async (req, res) => {
   const { section } = req.query;

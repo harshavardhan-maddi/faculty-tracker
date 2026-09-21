@@ -231,8 +231,10 @@ const Login = () => {
     }
   }, [showBiometricsModal]);
 
-  // Step 1: Look up and Match Student by Roll Number AND Full Name against registry
-  const handleVerifyStudent = (e) => {
+  const [isVerifying, setIsVerifying] = useState(false);
+
+  // Step 1: Look up and Match Student by Roll Number AND Full Name against HOD student registry
+  const handleVerifyStudent = async (e) => {
     e.preventDefault();
     setVerifyError('');
 
@@ -245,14 +247,21 @@ const Login = () => {
       return;
     }
 
-    const result = lookupStudentByRollAndName(rollInput, nameInput);
-    if (!result.success) {
-      setVerifyError(result.error);
-      return;
-    }
+    setIsVerifying(true);
+    try {
+      const result = await lookupStudentByRollAndName(rollInput, nameInput);
+      if (!result.success) {
+        setVerifyError(result.error);
+        return;
+      }
 
-    setMatchedStudent(result.student);
-    setApplyStep(2); // Proceed to Step 2: Show details & enter reason
+      setMatchedStudent(result.student);
+      setApplyStep(2); // Proceed to Step 2: Show details & enter reason
+    } catch (err) {
+      setVerifyError(err.message || 'Error verifying with HOD student registry.');
+    } finally {
+      setIsVerifying(false);
+    }
   };
 
   // Step 2: Confirm & Submit Application
@@ -492,46 +501,22 @@ const Login = () => {
                     </div>
                   </div>
 
-                  {/* Sample test students helper */}
-                  <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950/40 border border-slate-200/60 dark:border-slate-800/60">
-                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-customText-muted block mb-2">
-                      Registered Students (Click to auto-fill for testing):
-                    </span>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {[
-                        { roll: '21NE1A0501', name: 'A. Sai Krishna', sec: 'CSE 3rd Year' },
-                        { roll: '21NE1A0502', name: 'B. Meghana', sec: 'CSE 3rd Year' },
-                        { roll: '21NE1A0503', name: 'Ch. Venkat Reddy', sec: 'CSE 3rd Year' },
-                        { roll: '22NE1A0410', name: 'M. Pavan Kalyan', sec: 'ECE 2nd Year' }
-                      ].map((item) => (
-                        <button
-                          key={item.roll}
-                          type="button"
-                          onClick={() => {
-                            setRollInput(item.roll);
-                            setNameInput(item.name);
-                            if (verifyError) setVerifyError('');
-                          }}
-                          className="flex items-center justify-between p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs hover:border-primary hover:bg-primary/5 transition-all text-left cursor-pointer group"
-                        >
-                          <div>
-                            <span className="font-mono font-bold text-primary mr-1.5">{item.roll}</span>
-                            <span className="font-semibold text-customText dark:text-customText-dark">{item.name}</span>
-                          </div>
-                          <span className="text-[10px] text-customText-muted group-hover:text-primary transition-colors">
-                            {item.sec}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
                   <button
                     type="submit"
-                    className="w-full btn-primary py-3.5 text-sm font-black flex items-center justify-center gap-2 shadow-lg shadow-primary/20"
+                    disabled={isVerifying}
+                    className="w-full btn-primary py-3.5 text-sm font-black flex items-center justify-center gap-2 shadow-lg shadow-primary/20 cursor-pointer"
                   >
-                    <span>Match Student Details</span>
-                    <ArrowRight size={17} />
+                    {isVerifying ? (
+                      <div className="flex items-center gap-2">
+                        <span className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></span>
+                        <span>Verifying with HOD Registry...</span>
+                      </div>
+                    ) : (
+                      <>
+                        <span>Match Student Details</span>
+                        <ArrowRight size={17} />
+                      </>
+                    )}
                   </button>
                 </form>
               )}
