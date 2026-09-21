@@ -293,14 +293,18 @@ const OutpassTicketModal = ({ ticket, onClose }) => {
                 <span className="text-[10px] font-bold text-customText-muted dark:text-customText-mutedDark uppercase">
                   Student Mobile (Masked)
                 </span>
-                <p className="font-mono font-semibold">{ticket.maskedStudentMobile || '••••••' + ticket.studentMobile.slice(-4)}</p>
+                <p className="font-mono font-semibold">
+                  {ticket.maskedStudentMobile || (ticket.studentMobile ? '••••••' + String(ticket.studentMobile).slice(-4) : '••••••0000')}
+                </p>
               </div>
 
               <div className="space-y-1">
                 <span className="text-[10px] font-bold text-customText-muted dark:text-customText-mutedDark uppercase">
                   Parent Contact (Masked)
                 </span>
-                <p className="font-mono font-semibold">{ticket.maskedParentMobile || '••••••' + ticket.parentMobile.slice(-4)}</p>
+                <p className="font-mono font-semibold">
+                  {ticket.maskedParentMobile || (ticket.parentMobile ? '••••••' + String(ticket.parentMobile).slice(-4) : '••••••0000')}
+                </p>
               </div>
 
               <div className="space-y-1">

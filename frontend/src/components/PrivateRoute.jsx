@@ -20,14 +20,18 @@ const PrivateRoute = ({ children, allowedRoles }) => {
     return <Navigate to="/login" replace />;
   }
 
-  if (allowedRoles && !allowedRoles.includes(user.role)) {
-    let defaultRoute = '/dashboard';
-    if (user.role === 'CR') {
+  if (allowedRoles && !allowedRoles.includes(user?.role)) {
+    let defaultRoute = '/login';
+    if (user?.role === 'CR') {
       defaultRoute = '/cr-dashboard';
-    } else if (user.role === 'ABSENT_CONTROLLER') {
+    } else if (user?.role === 'ABSENT_CONTROLLER') {
       defaultRoute = '/absent-controller';
-    } else if (user.role === 'FACULTY') {
+    } else if (user?.role === 'FACULTY') {
       defaultRoute = '/faculty-dashboard';
+    } else if (user?.role === 'WATCHMAN') {
+      defaultRoute = '/watchman-dashboard';
+    } else if (user?.role === 'HOD' || user?.role === 'SUB_ADMIN') {
+      defaultRoute = '/dashboard';
     }
     return <Navigate to={defaultRoute} replace />;
   }

@@ -35,7 +35,10 @@ const HomeRedirect = () => {
   if (user.role === 'WATCHMAN') {
     return <Navigate to="/watchman-dashboard" replace />;
   }
-  return <Navigate to="/dashboard" replace />;
+  if (user.role === 'HOD' || user.role === 'SUB_ADMIN') {
+    return <Navigate to="/dashboard" replace />;
+  }
+  return <Navigate to="/login" replace />;
 };
 
 const AppRoutes = () => {
