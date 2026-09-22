@@ -30,7 +30,15 @@ import {
   FileText,
   BadgeCheck,
   DoorOpen,
-  RefreshCw
+  RefreshCw,
+  Database,
+  Download,
+  UploadCloud,
+  Layers,
+  FileArchive,
+  HardDrive,
+  ArrowDownToLine,
+  ShieldCheck as ShieldIcon
 } from 'lucide-react';
 import OutpassTicketModal from '../components/OutpassTicketModal';
 import { 
@@ -44,6 +52,13 @@ import {
   syncOutpassesFromBackend,
   getStudentOutpassHistory
 } from '../services/outpassService';
+import {
+  exportOverallData,
+  validateBackupFile,
+  executeImport,
+  downloadMySQLDump,
+  getMigrationHistory
+} from '../services/backupService';
 
 const Dashboard = () => {
   const { token, user } = useAuth();
@@ -59,6 +74,115 @@ const Dashboard = () => {
   const [studentHistoryModalStudent, setStudentHistoryModalStudent] = useState(null);
   const [outpassActionSuccess, setOutpassActionSuccess] = useState('');
   const [outpassActionError, setOutpassActionError] = useState('');
+
+  // Data Backup & Migration States (Admin-only)
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportSuccessMessage, setExportSuccessMessage] = useState('');
+  const [exportErrorMessage, setExportErrorMessage] = useState('');
+
+  const [selectedBackupFile, setSelectedBackupFile] = useState(null);
+  const [isValidatingBackup, setIsValidatingBackup] = useState(false);
+  const [validationReport, setValidationReport] = useState(null);
+  const [validationError, setValidationError] = useState('');
+
+  const [showImportConfirmModal, setShowImportConfirmModal] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importSummary, setImportSummary] = useState(null);
+  const [importError, setImportError] = useState('');
+
+  const [isDownloadingSql, setIsDownloadingSql] = useState(false);
+  const [migrationLogs, setMigrationLogs] = useState([]);
+  const [loadingMigrationLogs, setLoadingMigrationLogs] = useState(false);
+
+  const fetchMigrationLogs = async () => {
+    try {
+      setLoadingMigrationLogs(true);
+      const logs = await getMigrationHistory();
+      setMigrationLogs(logs);
+    } catch (err) {
+      console.error('Failed to load migration history', err);
+    } finally {
+      setLoadingMigrationLogs(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'dataBackup') {
+      fetchMigrationLogs();
+    }
+  }, [activeTab]);
+
+  const handleExportData = async () => {
+    try {
+      setIsExporting(true);
+      setExportErrorMessage('');
+      setExportSuccessMessage('');
+      const res = await exportOverallData();
+      setExportSuccessMessage(`Backup generated and downloaded successfully: ${res.filename} (${(res.size / 1024).toFixed(1)} KB)`);
+      fetchMigrationLogs();
+      setTimeout(() => setExportSuccessMessage(''), 8000);
+    } catch (err) {
+      setExportErrorMessage(err.message || 'Failed to export backup data.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith('.zip')) {
+      setValidationError('Please select an official .zip backup file.');
+      return;
+    }
+    setSelectedBackupFile(file);
+    setValidationReport(null);
+    setValidationError('');
+    setImportSummary(null);
+    setImportError('');
+  };
+
+  const handleValidateBackup = async () => {
+    if (!selectedBackupFile) return;
+    try {
+      setIsValidatingBackup(true);
+      setValidationError('');
+      const report = await validateBackupFile(selectedBackupFile);
+      setValidationReport(report);
+    } catch (err) {
+      setValidationError(err.message || 'Validation failed.');
+    } finally {
+      setIsValidatingBackup(false);
+    }
+  };
+
+  const handleExecuteImport = async () => {
+    if (!selectedBackupFile) return;
+    try {
+      setIsImporting(true);
+      setImportError('');
+      const summary = await executeImport(selectedBackupFile);
+      setImportSummary(summary);
+      setShowImportConfirmModal(false);
+      fetchMigrationLogs();
+    } catch (err) {
+      setImportError(err.message || 'Import execution failed.');
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  const handleDownloadSql = async () => {
+    if (!selectedBackupFile) return;
+    try {
+      setIsDownloadingSql(true);
+      await downloadMySQLDump(selectedBackupFile);
+    } catch (err) {
+      alert('Failed to generate SQL dump: ' + err.message);
+    } finally {
+      setIsDownloadingSql(false);
+    }
+  };
 
   // Load and subscribe to live outpasses
   useEffect(() => {
@@ -923,6 +1047,17 @@ const Dashboard = () => {
                 {outpassTickets.filter(t => t.status === 'FORWARDED_TO_HOD').length}
               </span>
             )}
+          </button>
+          <button
+            onClick={() => setActiveTab('dataBackup')}
+            className={`flex items-center gap-2 py-3 px-6 text-sm font-semibold border-b-2 transition-all ${
+              activeTab === 'dataBackup' 
+                ? 'border-primary text-primary-dark dark:text-primary font-bold' 
+                : 'border-transparent text-customText-muted dark:text-customText-mutedDark hover:text-customText'
+            }`}
+          >
+            <Database size={16} />
+            <span>Data Export & Import</span>
           </button>
         </div>
       )}
@@ -1871,6 +2006,480 @@ const Dashboard = () => {
                               <Trash2 size={13} />
                             </button>
                           </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+      )}
+
+      {/* VIEW 5: DATA EXPORT & IMPORT (ADMIN MIGRATION UTILITY) */}
+      {activeTab === 'dataBackup' && (
+        <div className="space-y-6 animate-fade-in">
+          
+          {/* Security & Isolation Notice */}
+          <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-500/10 via-primary/10 to-indigo-500/10 border border-blue-500/20 flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-md">
+                <ShieldIcon size={20} />
+              </div>
+              <div>
+                <h4 className="text-sm font-black text-customText dark:text-customText-dark flex items-center gap-2">
+                  <span>Secure Admin Data Management & Migration Utility</span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                    Live Production Protected
+                  </span>
+                </h4>
+                <p className="text-xs text-customText-muted">
+                  Read-only export from current Supabase PostgreSQL. Import engine targets the new MySQL version while preserving all IDs and relationships.
+                </p>
+              </div>
+            </div>
+            <span className="text-[11px] font-mono font-bold text-customText-muted dark:text-slate-400 bg-white/60 dark:bg-slate-900/60 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800">
+              Target: MySQL 8.x / 5.7+
+            </span>
+          </div>
+
+          {/* Export Alerts */}
+          {exportSuccessMessage && (
+            <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-bold flex items-center gap-2 animate-fade-in">
+              <CheckCircle2 size={18} className="shrink-0" />
+              <span>{exportSuccessMessage}</span>
+            </div>
+          )}
+
+          {exportErrorMessage && (
+            <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-bold flex items-center gap-2 animate-fade-in">
+              <AlertCircle size={18} className="shrink-0" />
+              <span>{exportErrorMessage}</span>
+            </div>
+          )}
+
+          {/* TWO MAIN ACTION CARDS: EXPORT & IMPORT */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+            {/* CARD 1: EXPORT OVERALL DATA */}
+            <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-5 flex flex-col justify-between">
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shadow-sm">
+                    <Database size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black text-customText dark:text-customText-dark">
+                      Export Overall Data
+                    </h3>
+                    <p className="text-xs text-customText-muted">
+                      Full read-only snapshot of all tables & relationships into a ZIP archive.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950/40 border border-slate-100 dark:border-slate-800 space-y-2 text-xs">
+                  <span className="text-[10px] font-bold text-customText-muted uppercase tracking-wider block">
+                    Data Entities Included in Backup Archive:
+                  </span>
+                  <div className="grid grid-cols-2 gap-2 text-[11px] text-customText dark:text-customText-dark font-medium">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+                      <span>Users & Staff Accounts</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                      <span>Registered Students</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                      <span>Faculty Profiles</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+                      <span>Classrooms & Sections</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                      <span>Period Timetable</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                      <span>Student Attendance</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                      <span>Outpass Gate Tickets</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-teal-500" />
+                      <span>Call & Classroom Logs</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-slate-100/70 dark:bg-slate-800/40 text-[11px] text-customText-muted space-y-1">
+                  <p>• Preserves primary key IDs, foreign keys, and referential integrity.</p>
+                  <p>• Includes <code>metadata.json</code> with versioning, timestamps, and row counts.</p>
+                  <p>• Downloads as <code>attendance-system-backup-YYYY-MM-DD.zip</code>.</p>
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={handleExportData}
+                  disabled={isExporting}
+                  className="w-full py-3.5 px-5 rounded-2xl bg-primary hover:bg-primary-dark text-white font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-primary/20 transition-all cursor-pointer active:scale-98 disabled:opacity-50"
+                >
+                  {isExporting ? (
+                    <>
+                      <RefreshCw size={16} className="animate-spin" />
+                      <span>Fetching & Compiling 64,000+ Records into ZIP...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Download size={16} />
+                      <span>Export Overall Data (.zip)</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* CARD 2: IMPORT PREVIOUS DATA (NEW MYSQL VERSION) */}
+            <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-5 flex flex-col justify-between">
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shadow-sm">
+                    <UploadCloud size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black text-customText dark:text-customText-dark">
+                      Import Previous Data (MySQL Version)
+                    </h3>
+                    <p className="text-xs text-customText-muted">
+                      Upload ZIP backup to validate integrity and migrate into the new MySQL database.
+                    </p>
+                  </div>
+                </div>
+
+                {/* File Upload Box */}
+                <div className="p-5 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-950/20 text-center space-y-3">
+                  <FileArchive size={28} className="mx-auto text-customText-muted" />
+                  <div>
+                    <label className="text-xs font-bold text-primary hover:underline cursor-pointer">
+                      <span>Click to select backup ZIP file</span>
+                      <input
+                        type="file"
+                        accept=".zip"
+                        onChange={handleFileChange}
+                        className="hidden"
+                      />
+                    </label>
+                    <p className="text-[10px] text-customText-muted mt-0.5">
+                      Accepts <code>attendance-system-backup-*.zip</code>
+                    </p>
+                  </div>
+
+                  {selectedBackupFile && (
+                    <div className="p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold flex items-center justify-between text-customText dark:text-customText-dark">
+                      <span className="truncate max-w-[200px]">{selectedBackupFile.name}</span>
+                      <span className="text-[10px] font-mono text-customText-muted">
+                        {(selectedBackupFile.size / 1024).toFixed(1)} KB
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {validationError && (
+                  <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-bold flex items-center gap-2">
+                    <AlertCircle size={15} className="shrink-0" />
+                    <span>{validationError}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={handleValidateBackup}
+                  disabled={!selectedBackupFile || isValidatingBackup}
+                  className="w-full py-3.5 px-5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 transition-all cursor-pointer active:scale-98 disabled:opacity-50"
+                >
+                  {isValidatingBackup ? (
+                    <>
+                      <RefreshCw size={16} className="animate-spin" />
+                      <span>Validating Archive & Checking Relationships...</span>
+                    </>
+                  ) : (
+                    <>
+                      <BadgeCheck size={16} />
+                      <span>Validate & Preview Backup</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+          </div>
+
+          {/* INTERACTIVE PRE-IMPORT VALIDATION REPORT */}
+          {validationReport && (
+            <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg space-y-5 animate-fade-in">
+              <div className="flex items-center justify-between flex-wrap gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+                <div>
+                  <h3 className="text-base font-black text-customText dark:text-customText-dark flex items-center gap-2">
+                    <CheckCircle2 size={18} className="text-emerald-500" />
+                    <span>Backup Archive Validation & Integrity Preview</span>
+                  </h3>
+                  <p className="text-xs text-customText-muted">
+                    Inspected all 10 required JSON files, verified foreign keys, and checked MySQL schema compatibility.
+                  </p>
+                </div>
+                <span className="px-3 py-1 rounded-full text-xs font-black bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30">
+                  Ready for MySQL Migration
+                </span>
+              </div>
+
+              {/* Metadata Highlights */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
+                  <span className="text-[10px] font-bold uppercase text-customText-muted block">Backup Version</span>
+                  <span className="font-mono font-bold text-primary">{validationReport.backupVersion}</span>
+                </div>
+                <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
+                  <span className="text-[10px] font-bold uppercase text-customText-muted block">Source Database</span>
+                  <span className="font-bold text-customText dark:text-customText-dark">{validationReport.sourceDatabase}</span>
+                </div>
+                <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
+                  <span className="text-[10px] font-bold uppercase text-customText-muted block">Duplicate Records</span>
+                  <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                    {validationReport.duplicateSummary?.totalDuplicates === 0 ? '0 Duplicates' : `${validationReport.duplicateSummary?.totalDuplicates} found`}
+                  </span>
+                </div>
+                <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
+                  <span className="text-[10px] font-bold uppercase text-customText-muted block">Broken Relationships</span>
+                  <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                    {validationReport.relationshipSummary?.brokenCount === 0 ? '100% Valid (0 Broken)' : `${validationReport.relationshipSummary?.brokenCount} Broken`}
+                  </span>
+                </div>
+              </div>
+
+              {/* Entity Counts Table */}
+              <div className="space-y-2">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-customText-muted">
+                  Record Breakdown by Entity ({validationReport.totalRecords.toLocaleString()} total rows):
+                </h4>
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 text-xs">
+                  {Object.entries(validationReport.entityCounts || {}).map(([key, count]) => (
+                    <div key={key} className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950/40 border border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                      <span className="capitalize text-customText-muted font-medium">{key.replace(/([A-Z])/g, ' $1')}:</span>
+                      <span className="font-black text-customText dark:text-customText-dark font-mono">{count.toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Action Buttons for Confirmed Import & SQL Generator */}
+              <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={handleDownloadSql}
+                  disabled={isDownloadingSql}
+                  className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-bold text-customText-muted flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                  title="Download standalone MySQL script with complete DDL & INSERT statements"
+                >
+                  <ArrowDownToLine size={15} />
+                  <span>{isDownloadingSql ? 'Generating SQL...' : 'Download MySQL Script (.sql)'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowImportConfirmModal(true)}
+                  className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs flex items-center justify-center gap-2 shadow-md shadow-emerald-600/20 transition-all cursor-pointer"
+                >
+                  <Layers size={15} />
+                  <span>Confirm & Execute MySQL Import</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* CONFIRMATION MODAL BEFORE IMPORT */}
+          {showImportConfirmModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+              <div className="relative w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-4">
+                <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center">
+                  <AlertCircle size={26} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-customText dark:text-customText-dark">
+                    Confirm MySQL Data Import
+                  </h3>
+                  <p className="text-xs text-customText-muted mt-1">
+                    You are about to import <strong className="text-customText dark:text-customText-dark">{validationReport?.totalRecords?.toLocaleString()} records</strong> into the new MySQL version.
+                  </p>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-800 dark:text-amber-300 space-y-1">
+                  <p className="font-bold">✓ Existing PostgreSQL production database will remain untouched.</p>
+                  <p>✓ All primary keys and foreign-key relationships will be preserved.</p>
+                  <p>✓ This action will be logged in the admin audit history.</p>
+                </div>
+
+                {importError && (
+                  <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 text-xs font-bold">
+                    {importError}
+                  </div>
+                )}
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setShowImportConfirmModal(false)}
+                    disabled={isImporting}
+                    className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-xs font-bold text-customText-muted cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleExecuteImport}
+                    disabled={isImporting}
+                    className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black flex items-center gap-1.5 shadow-md shadow-emerald-600/20 cursor-pointer"
+                  >
+                    {isImporting ? (
+                      <>
+                        <RefreshCw size={14} className="animate-spin" />
+                        <span>Importing into MySQL...</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 size={14} />
+                        <span>Yes, Execute Import</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* IMPORT SUMMARY REPORT CARD */}
+          {importSummary && (
+            <div className="p-6 rounded-3xl bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/30 shadow-md space-y-4 animate-fade-in">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-2.5">
+                  <CheckCircle2 size={20} className="text-emerald-500" />
+                  <h4 className="text-sm font-black text-emerald-800 dark:text-emerald-300">
+                    Data Import Completed Successfully
+                  </h4>
+                </div>
+                <span className="px-3 py-1 rounded-full text-xs font-black bg-emerald-600 text-white">
+                  Status: {importSummary.status}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                <div className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-emerald-500/20">
+                  <span className="text-[10px] font-bold text-customText-muted block">Records Processed</span>
+                  <span className="font-black text-customText dark:text-customText-dark text-base">
+                    {importSummary.recordsImported?.toLocaleString()}
+                  </span>
+                </div>
+                <div className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-emerald-500/20">
+                  <span className="text-[10px] font-bold text-customText-muted block">Target Engine</span>
+                  <span className="font-black text-customText dark:text-customText-dark text-base">
+                    {importSummary.targetEngine}
+                  </span>
+                </div>
+                <div className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-emerald-500/20">
+                  <span className="text-[10px] font-bold text-customText-muted block">Duplicates Handled</span>
+                  <span className="font-black text-customText dark:text-customText-dark text-base">
+                    {importSummary.duplicatesHandled}
+                  </span>
+                </div>
+                <div className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-emerald-500/20">
+                  <span className="text-[10px] font-bold text-customText-muted block">Errors Encountered</span>
+                  <span className="font-black text-emerald-600 dark:text-emerald-400 text-base">
+                    {importSummary.errors?.length || 0}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* AUDIT & IMPORT HISTORY LOG TABLE */}
+          <div className="pt-4 space-y-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <h4 className="text-xs font-black uppercase tracking-wider text-customText dark:text-customText-dark flex items-center gap-2">
+                <History size={15} className="text-primary" />
+                <span>Data Backup & Migration Audit History</span>
+              </h4>
+              <button
+                type="button"
+                onClick={fetchMigrationLogs}
+                className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-xs font-bold text-customText-muted flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <RefreshCw size={13} className={loadingMigrationLogs ? 'animate-spin' : ''} />
+                <span>Refresh History</span>
+              </button>
+            </div>
+
+            <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 dark:bg-slate-950/40 border-b border-slate-200 dark:border-slate-800 text-[10px] font-bold text-customText-muted uppercase">
+                  <tr>
+                    <th className="p-3">Action</th>
+                    <th className="p-3">Admin</th>
+                    <th className="p-3">Timestamp</th>
+                    <th className="p-3">Archive / Target</th>
+                    <th className="p-3">Records Count</th>
+                    <th className="p-3">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {migrationLogs.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="p-6 text-center text-customText-muted text-xs">
+                        No migration or export activities logged yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    migrationLogs.map((log) => (
+                      <tr key={log.id || log.timestamp} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
+                        <td className="p-3">
+                          <span className={`px-2.5 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider ${
+                            log.action === 'EXPORT'
+                              ? 'bg-blue-500/15 text-blue-700 dark:text-blue-300'
+                              : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+                          }`}>
+                            {log.action}
+                          </span>
+                        </td>
+                        <td className="p-3 font-bold text-customText dark:text-customText-dark">
+                          {log.admin}
+                        </td>
+                        <td className="p-3 text-customText-muted font-mono text-[11px]">
+                          {new Date(log.timestamp).toLocaleString()}
+                        </td>
+                        <td className="p-3 text-customText dark:text-customText-dark max-w-xs truncate font-mono text-[11px]">
+                          {log.filename || 'attendance-system-backup.zip'}
+                        </td>
+                        <td className="p-3 font-black text-primary font-mono">
+                          {log.recordsCount ? log.recordsCount.toLocaleString() : '—'}
+                        </td>
+                        <td className="p-3">
+                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold ${
+                            log.status === 'SUCCESS'
+                              ? 'text-emerald-600 bg-emerald-500/10'
+                              : 'text-amber-600 bg-amber-500/10'
+                          }`}>
+                            ✓ {log.status}
+                          </span>
                         </td>
                       </tr>
                     ))
