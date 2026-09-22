@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import StatCard from '../components/StatCard';
@@ -41,7 +41,8 @@ import {
   syncHODStudents,
   deleteOutpassTicket,
   clearOldOutpasses,
-  syncOutpassesFromBackend
+  syncOutpassesFromBackend,
+  getStudentOutpassHistory
 } from '../services/outpassService';
 
 const Dashboard = () => {
@@ -55,6 +56,7 @@ const Dashboard = () => {
   // HOD Outpass Approvals state
   const [outpassTickets, setOutpassTickets] = useState([]);
   const [selectedOutpassModalTicket, setSelectedOutpassModalTicket] = useState(null);
+  const [studentHistoryModalStudent, setStudentHistoryModalStudent] = useState(null);
   const [outpassActionSuccess, setOutpassActionSuccess] = useState('');
   const [outpassActionError, setOutpassActionError] = useState('');
 
@@ -64,6 +66,14 @@ const Dashboard = () => {
     const unsub = subscribeToOutpasses(setOutpassTickets);
     return () => unsub();
   }, []);
+
+  const handleOpenStudentLeaveHistory = (rollNumber, studentName, section) => {
+    setStudentHistoryModalStudent({
+      rollNumber,
+      name: studentName,
+      section
+    });
+  };
 
   const handleGrantOutpass = (ticket) => {
     try {
@@ -1305,6 +1315,13 @@ const Dashboard = () => {
                       </td>
                       <td className="py-3 text-right flex items-center justify-end gap-1.5">
                         <button
+                          onClick={() => handleOpenStudentLeaveHistory(s.rollNumber, s.name, s.section)}
+                          className="p-1 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/20 rounded-lg transition-colors cursor-pointer"
+                          title="View Student's Leave Applications & History"
+                        >
+                          <History size={14} />
+                        </button>
+                        <button
                           onClick={() => handleEditStudentClick(s)}
                           className="p-1 text-primary hover:bg-primary/10 rounded-lg transition-colors cursor-pointer"
                           title="Edit Student details / Transfer section"
@@ -1655,12 +1672,21 @@ const Dashboard = () => {
                       <div className="flex items-center gap-1.5">
                         <button
                           type="button"
+                          onClick={() => handleOpenStudentLeaveHistory(ticket.rollNumber, ticket.studentName, ticket.section)}
+                          className="p-2 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                          title="View Student's Previous Leave Applications"
+                        >
+                          <History size={15} />
+                          <span>Past Leaves ({outpassTickets.filter(t => t.rollNumber && t.rollNumber.trim().toUpperCase() === ticket.rollNumber.trim().toUpperCase()).length})</span>
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => setSelectedOutpassModalTicket(ticket)}
                           className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-primary/10 hover:text-primary text-xs font-bold text-customText-muted flex items-center gap-1.5 transition-colors cursor-pointer"
-                          title="View Official Ticket"
+                          title="View Official Ticket / Leave Slip"
                         >
                           <FileText size={15} />
-                          <span>Ticket</span>
+                          <span>Slip</span>
                         </button>
                         <button
                           type="button"
@@ -1788,7 +1814,17 @@ const Dashboard = () => {
                         <td className="p-3 font-mono font-bold text-primary">{t.id}</td>
                         <td className="p-3">
                           <span className="font-bold block">{t.studentName}</span>
-                          <span className="text-[10px] text-customText-muted font-mono">{t.rollNumber} • {t.section}</span>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-[10px] text-customText-muted font-mono">{t.rollNumber} • {t.section}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenStudentLeaveHistory(t.rollNumber, t.studentName, t.section)}
+                              className="text-[10px] font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-0.5 cursor-pointer"
+                              title="View Student's Previous Leave History"
+                            >
+                              <History size={10} /> History
+                            </button>
+                          </div>
                         </td>
                         <td className="p-3 italic max-w-xs truncate">"{t.reason}"</td>
                         <td className="p-3">
@@ -1853,6 +1889,224 @@ const Dashboard = () => {
           ticket={selectedOutpassModalTicket}
           onClose={() => setSelectedOutpassModalTicket(null)}
         />
+      )}
+
+      {/* HOD View: Student Leave History Modal */}
+      {studentHistoryModalStudent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto">
+          <div className="relative w-full max-w-3xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden my-8 max-h-[90vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="p-5 bg-gradient-to-r from-blue-600 via-indigo-600 to-primary text-white flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-white/15 flex items-center justify-center border border-white/20">
+                  <History size={20} className="text-white" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black tracking-tight leading-tight">
+                    Student Leave Application History
+                  </h3>
+                  <p className="text-xs text-blue-100 mt-0.5">
+                    {studentHistoryModalStudent.name} • <span className="font-mono font-bold text-white">{studentHistoryModalStudent.rollNumber}</span> • {studentHistoryModalStudent.section || 'All Sections'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setStudentHistoryModalStudent(null)}
+                className="p-2 rounded-xl bg-white/15 hover:bg-white/25 text-white transition-colors cursor-pointer"
+                title="Close"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Quick Metrics & Content */}
+            {(() => {
+              const historyList = outpassTickets.filter(
+                t => t.rollNumber && t.rollNumber.trim().toUpperCase() === studentHistoryModalStudent.rollNumber.trim().toUpperCase()
+              ).sort((a, b) => new Date(b.appliedAt || 0) - new Date(a.appliedAt || 0));
+
+              const todayStr = new Date().toLocaleDateString('en-GB');
+              const todayCount = historyList.filter(t => t.appliedDate === todayStr).length;
+              const grantedCount = historyList.filter(t => t.status === 'PERMISSION_GRANTED' || t.status === 'SENT_OUT').length;
+              const sentOutCount = historyList.filter(t => t.status === 'SENT_OUT').length;
+              const rejectedCount = historyList.filter(t => t.status === 'REJECTED').length;
+
+              return (
+                <div className="p-5 space-y-4 overflow-y-auto flex-1">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60 text-center">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-customText-muted block">Total Leaves</span>
+                      <span className="text-xl font-black text-customText dark:text-customText-dark">{historyList.length}</span>
+                    </div>
+                    <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-center text-amber-700 dark:text-amber-400">
+                      <span className="text-[10px] font-bold uppercase tracking-wider block">Today's Apps</span>
+                      <span className="text-xl font-black">{todayCount}</span>
+                    </div>
+                    <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-center text-emerald-700 dark:text-emerald-400">
+                      <span className="text-[10px] font-bold uppercase tracking-wider block">Granted / Out</span>
+                      <span className="text-xl font-black">{grantedCount} <span className="text-xs font-normal">({sentOutCount} exited)</span></span>
+                    </div>
+                    <div className="p-3 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-center text-rose-700 dark:text-rose-400">
+                      <span className="text-[10px] font-bold uppercase tracking-wider block">Rejected</span>
+                      <span className="text-xl font-black">{rejectedCount}</span>
+                    </div>
+                  </div>
+
+                  {historyList.length === 0 ? (
+                    <div className="p-8 text-center rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 space-y-2">
+                      <CheckCircle2 size={32} className="mx-auto text-slate-400" />
+                      <h4 className="font-bold text-sm text-customText dark:text-customText-dark">
+                        No Leave Applications on Record
+                      </h4>
+                      <p className="text-xs text-customText-muted">
+                        This student has not submitted any gate leave applications yet.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <h4 className="text-xs font-black uppercase tracking-wider text-customText-muted">
+                        Chronological Applications ({historyList.length})
+                      </h4>
+
+                      {historyList.map((item) => {
+                        const isToday = item.appliedDate === todayStr;
+                        return (
+                          <div
+                            key={item.id}
+                            className={`p-4 rounded-2xl border transition-all ${
+                              isToday
+                                ? 'bg-amber-500/5 dark:bg-amber-500/10 border-amber-500/40 shadow-sm'
+                                : 'bg-white dark:bg-slate-800/50 border-slate-200 dark:border-slate-800'
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-2 flex-wrap">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-mono font-black text-primary">
+                                  {item.id}
+                                </span>
+                                {isToday && (
+                                  <span className="px-2 py-0.5 rounded-full bg-amber-500 text-white text-[10px] font-black uppercase tracking-wider">
+                                    Today's Application
+                                  </span>
+                                )}
+                              </div>
+                              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
+                                item.status === 'SENT_OUT'
+                                  ? 'bg-purple-500/15 text-purple-700 dark:text-purple-300'
+                                  : item.status === 'PERMISSION_GRANTED'
+                                  ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+                                  : item.status === 'FORWARDED_TO_HOD'
+                                  ? 'bg-blue-500/15 text-blue-700 dark:text-blue-300'
+                                  : item.status === 'REJECTED'
+                                  ? 'bg-rose-500/15 text-rose-700 dark:text-rose-300'
+                                  : 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
+                              }`}>
+                                {item.status.replace(/_/g, ' ')}
+                              </span>
+                            </div>
+
+                            {/* Details & Reason */}
+                            <div className="mt-2.5 text-xs space-y-1">
+                              <p className="font-semibold text-customText dark:text-customText-dark">
+                                <span className="text-customText-muted font-normal">Reason: </span>
+                                "{item.reason}"
+                              </p>
+                              <div className="flex flex-wrap gap-4 text-[11px] text-customText-muted">
+                                <span><strong>Applied:</strong> {item.appliedDate} at {item.appliedTime}</span>
+                                <span><strong>Destination:</strong> {item.destination}</span>
+                                {item.expectedReturnTime && <span><strong>Expected Return:</strong> {item.expectedReturnTime}</span>}
+                              </div>
+                            </div>
+
+                            {/* Lifecycle Progression Checkpoints */}
+                            <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800/80 grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px]">
+                              {/* Parent Call Verification */}
+                              <div className="p-2 rounded-xl bg-slate-50 dark:bg-slate-900/40">
+                                <span className="text-[10px] font-bold text-customText-muted block uppercase">1. Parent Call</span>
+                                {item.absentControllerAction?.confirmed ? (
+                                  <div className="text-emerald-600 font-semibold mt-0.5">
+                                    ✓ Confirmed ({item.absentControllerAction.displayTime || 'Verified'})
+                                    <div className="text-[10px] text-customText-muted truncate font-normal">
+                                      By: {item.absentControllerAction.controllerName || 'Controller'}
+                                    </div>
+                                  </div>
+                                ) : item.status === 'REJECTED' && item.rejectionStage === 'ABSENT_CONTROLLER' ? (
+                                  <span className="text-rose-600 font-semibold mt-0.5 block">✕ Rejected by Controller</span>
+                                ) : (
+                                  <span className="text-amber-500 font-medium mt-0.5 block">⏳ Pending Call</span>
+                                )}
+                              </div>
+
+                              {/* HOD Clearance */}
+                              <div className="p-2 rounded-xl bg-slate-50 dark:bg-slate-900/40">
+                                <span className="text-[10px] font-bold text-customText-muted block uppercase">2. HOD Decision</span>
+                                {item.hodAction?.granted ? (
+                                  <div className="text-emerald-600 font-semibold mt-0.5">
+                                    ✓ Granted ({item.hodAction.displayTime || 'Approved'})
+                                    <div className="text-[10px] text-customText-muted truncate font-normal">
+                                      By: {item.hodAction.hodName || 'HOD'}
+                                    </div>
+                                  </div>
+                                ) : item.status === 'REJECTED' && item.rejectionStage === 'HOD' ? (
+                                  <span className="text-rose-600 font-semibold mt-0.5 block">✕ Denied by HOD</span>
+                                ) : item.status === 'FORWARDED_TO_HOD' ? (
+                                  <span className="text-blue-600 font-semibold mt-0.5 block">⚡ Awaiting Your Grant</span>
+                                ) : (
+                                  <span className="text-slate-400 font-normal mt-0.5 block">Awaiting Prior Steps</span>
+                                )}
+                              </div>
+
+                              {/* Watchman Gate Exit */}
+                              <div className="p-2 rounded-xl bg-slate-50 dark:bg-slate-900/40">
+                                <span className="text-[10px] font-bold text-customText-muted block uppercase">3. Gate Clearance</span>
+                                {item.watchmanAction?.sentOut ? (
+                                  <div className="text-purple-600 font-extrabold mt-0.5 flex items-center gap-1">
+                                    <DoorOpen size={12} /> Exited ({item.watchmanAction.displayTime})
+                                    <div className="text-[10px] text-customText-muted truncate font-normal block">
+                                      Watchman: {item.watchmanAction.watchmanName || 'Main Gate'}
+                                    </div>
+                                  </div>
+                                ) : item.status === 'PERMISSION_GRANTED' ? (
+                                  <span className="text-emerald-600 font-semibold mt-0.5 block">At Gate (Pending Exit)</span>
+                                ) : (
+                                  <span className="text-slate-400 font-normal mt-0.5 block">Not cleared yet</span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Actions on this ticket */}
+                            <div className="mt-3 flex items-center justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setSelectedOutpassModalTicket(item)}
+                                className="px-3 py-1.5 rounded-xl bg-primary hover:bg-primary-dark text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+                              >
+                                <FileText size={13} />
+                                <span>View & Download Official Slip (PDF)</span>
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* Modal Footer */}
+            <div className="p-4 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex justify-end shrink-0">
+              <button
+                type="button"
+                onClick={() => setStudentHistoryModalStudent(null)}
+                className="px-4 py-2 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 text-xs font-bold text-customText transition-colors cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* REGISTRATION MODAL FOR STUDENTS (HOD ONLY) */}

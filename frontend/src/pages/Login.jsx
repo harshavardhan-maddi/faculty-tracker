@@ -22,7 +22,9 @@ import {
   Download,
   AlertCircle,
   RotateCcw,
-  Check
+  Check,
+  Search,
+  History
 } from 'lucide-react';
 import logo from '../neclogo.png';
 import Loading from '../components/Loading';
@@ -30,7 +32,9 @@ import OutpassTicketModal from '../components/OutpassTicketModal';
 import { 
   lookupStudentByRollAndName, 
   submitOutpassApplication, 
-  getAllOutpasses 
+  getAllOutpasses,
+  getStudentOutpassHistory,
+  syncOutpassesFromBackend
 } from '../services/outpassService';
 
 const Login = () => {
@@ -72,6 +76,13 @@ const Login = () => {
   
   // Active ticket for Ticket Modal viewer
   const [activeTicket, setActiveTicket] = useState(null);
+
+  // Student Live Application Status & History Viewer States
+  const [statusRollInput, setStatusRollInput] = useState('');
+  const [isSearchingStatus, setIsSearchingStatus] = useState(false);
+  const [hasSearchedStatus, setHasSearchedStatus] = useState(false);
+  const [statusTickets, setStatusTickets] = useState([]);
+  const [statusError, setStatusError] = useState('');
 
   // Intro Animation
   useEffect(() => {
@@ -306,6 +317,31 @@ const Login = () => {
     setSubmittedTicket(null);
   };
 
+  // Check live application status and view student leave history
+  const handleCheckApplicationStatus = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    const clean = statusRollInput.trim().toUpperCase();
+    if (!clean) {
+      setStatusError('Please enter your College Roll Number to check status.');
+      return;
+    }
+    setStatusError('');
+    setIsSearchingStatus(true);
+    try {
+      await syncOutpassesFromBackend();
+      const history = getStudentOutpassHistory(clean);
+      setStatusTickets(history);
+      setHasSearchedStatus(true);
+      if (history.length === 0) {
+        setStatusError(`No leave applications found for Roll Number "${clean}".`);
+      }
+    } catch (err) {
+      setStatusError('Failed to fetch status. Please check your connection.');
+    } finally {
+      setIsSearchingStatus(false);
+    }
+  };
+
   return (
     <>
       {/* 1. Intro Splash Screen */}
@@ -413,9 +449,10 @@ const Login = () => {
         <main className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6 z-10 w-full max-w-4xl mx-auto my-auto">
           
           {viewMode === 'landing' ? (
-            
-            /* DIRECT APPLY LEAVE BOX ON LANDING PAGE */
-            <div className="w-full max-w-2xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 animate-fade-in space-y-6 my-auto relative">
+            <div className="w-full max-w-2xl space-y-6 flex flex-col items-center">
+              
+              {/* DIRECT APPLY LEAVE BOX ON LANDING PAGE */}
+              <div className="w-full bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 animate-fade-in space-y-6 my-auto relative">
               
               {/* Box Header */}
               <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
@@ -711,7 +748,7 @@ const Login = () => {
                       className="btn-primary flex-1 py-3 text-xs font-black flex items-center justify-center gap-2 cursor-pointer shadow-md"
                     >
                       <FileText size={16} />
-                      <span>View / Download Outpass Ticket</span>
+                      <span>View / Download Outpass Slip (PDF)</span>
                     </button>
                     <button
                       type="button"
@@ -725,6 +762,224 @@ const Login = () => {
               )}
 
             </div>
+
+            {/* 2. VIEW APPLICATION STATUS & LEAVE HISTORY CARD */}
+            <div className="w-full bg-white dark:bg-slate-900 rounded-3xl shadow-xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 animate-fade-in space-y-5 relative">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 flex-wrap gap-2">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center shadow-sm">
+                    <Search size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black text-customText dark:text-customText-dark tracking-tight">
+                      View Your Application Status & Leave History
+                    </h3>
+                    <p className="text-xs text-customText-muted">
+                      Enter your roll number to track today's live outpass or download your official pass slip.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Input Form */}
+              <form onSubmit={handleCheckApplicationStatus} className="flex flex-col sm:flex-row gap-2.5">
+                <div className="relative flex-1">
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-400">
+                    <User size={16} />
+                  </span>
+                  <input
+                    type="text"
+                    value={statusRollInput}
+                    onChange={(e) => setStatusRollInput(e.target.value)}
+                    placeholder="Enter College Roll Number (e.g. 21NE1A0501)"
+                    className="glass-input pl-10 py-3 text-xs sm:text-sm font-mono font-bold uppercase w-full tracking-wider"
+                    required
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={isSearchingStatus}
+                  className="btn-primary py-3 px-6 text-xs sm:text-sm font-black flex items-center justify-center gap-2 shadow-md shrink-0 cursor-pointer"
+                >
+                  {isSearchingStatus ? (
+                    <span className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></span>
+                  ) : (
+                    <>
+                      <Search size={16} />
+                      <span>Check Status</span>
+                    </>
+                  )}
+                </button>
+              </form>
+
+              {/* Error notification */}
+              {statusError && (
+                <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-semibold animate-fade-in">
+                  ⚠️ {statusError}
+                </div>
+              )}
+
+              {/* Status Results Display */}
+              {hasSearchedStatus && statusTickets.length > 0 && (() => {
+                const todayDateString = new Date().toLocaleDateString('en-GB');
+                const todayISOString = new Date().toISOString().slice(0, 10);
+                const todayTicket = statusTickets.find(t => {
+                  if (t.appliedDate === todayDateString) return true;
+                  if (t.appliedAt && t.appliedAt.startsWith(todayISOString)) return true;
+                  return false;
+                });
+                const previousTickets = statusTickets.filter(t => t.id !== todayTicket?.id);
+
+                return (
+                  <div className="space-y-4 pt-2 border-t border-slate-100 dark:border-slate-800 animate-fade-in">
+                    
+                    {/* PRESENT DAY'S STATUS HIGHLIGHT CARD */}
+                    {todayTicket ? (
+                      <div className="p-5 rounded-3xl bg-gradient-to-br from-emerald-500/15 via-emerald-500/5 to-transparent border-2 border-emerald-500/50 shadow-lg space-y-4 relative overflow-hidden">
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="px-3 py-1 rounded-full bg-emerald-600 text-white font-black text-[10px] tracking-wider uppercase animate-pulse shadow-sm">
+                              TODAY'S APPLICATION
+                            </span>
+                            <span className="font-mono text-xs font-black text-slate-700 dark:text-slate-300">
+                              {todayTicket.id}
+                            </span>
+                          </div>
+                          <span className={`px-3 py-1 rounded-xl text-xs font-black border ${
+                            todayTicket.status === 'PERMISSION_GRANTED'
+                              ? 'bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border-emerald-500/40'
+                              : todayTicket.status === 'SENT_OUT'
+                              ? 'bg-purple-500/20 text-purple-800 dark:text-purple-300 border-purple-500/40'
+                              : todayTicket.status === 'FORWARDED_TO_HOD'
+                              ? 'bg-blue-500/20 text-blue-800 dark:text-blue-300 border-blue-500/40'
+                              : todayTicket.status === 'REJECTED'
+                              ? 'bg-rose-500/20 text-rose-800 dark:text-rose-300 border-rose-500/40'
+                              : 'bg-amber-500/20 text-amber-800 dark:text-amber-300 border-amber-500/40'
+                          }`}>
+                            {todayTicket.status.replace(/_/g, ' ')}
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                          <div>
+                            <span className="text-[10px] font-bold text-customText-muted uppercase block">Student Name</span>
+                            <p className="font-black text-customText dark:text-customText-dark truncate">{todayTicket.studentName}</p>
+                          </div>
+                          <div>
+                            <span className="text-[10px] font-bold text-customText-muted uppercase block">Roll Number</span>
+                            <p className="font-mono font-black text-primary">{todayTicket.rollNumber}</p>
+                          </div>
+                          <div>
+                            <span className="text-[10px] font-bold text-customText-muted uppercase block">Section</span>
+                            <p className="font-bold text-customText dark:text-customText-dark">{todayTicket.section}</p>
+                          </div>
+                          <div>
+                            <span className="text-[10px] font-bold text-customText-muted uppercase block">Applied At</span>
+                            <p className="font-medium text-customText-muted">{todayTicket.appliedTime}</p>
+                          </div>
+                        </div>
+
+                        <div className="p-3.5 rounded-2xl bg-white/80 dark:bg-slate-900/80 border border-slate-200/70 dark:border-slate-800/70 text-xs space-y-1">
+                          <span className="text-[10px] font-bold text-customText-muted uppercase block">Stated Reason:</span>
+                          <p className="font-semibold italic text-slate-800 dark:text-slate-200">"{todayTicket.reason}"</p>
+                          <span className="text-[11px] text-customText-muted block pt-1">
+                            <strong>Destination:</strong> {todayTicket.destination}
+                          </span>
+                        </div>
+
+                        {/* Approval Stage Progress */}
+                        <div className="grid grid-cols-3 gap-2 text-center text-[10px]">
+                          <div className={`p-2.5 rounded-xl border ${todayTicket.absentControllerAction?.confirmed ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300 font-bold' : 'bg-slate-100 dark:bg-slate-800/60 text-slate-400'}`}>
+                            <span className="block font-black">1. Parent Call</span>
+                            <span>{todayTicket.absentControllerAction?.confirmed ? '✓ Confirmed' : (todayTicket.status === 'REJECTED' ? '✕ Denied' : 'Pending')}</span>
+                          </div>
+                          <div className={`p-2.5 rounded-xl border ${todayTicket.hodAction?.granted ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300 font-bold' : 'bg-slate-100 dark:bg-slate-800/60 text-slate-400'}`}>
+                            <span className="block font-black">2. HOD Permission</span>
+                            <span>{todayTicket.hodAction?.granted ? '✓ Granted' : (todayTicket.status === 'REJECTED' ? '✕ Denied' : 'Pending')}</span>
+                          </div>
+                          <div className={`p-2.5 rounded-xl border ${todayTicket.watchmanAction?.sentOut ? 'bg-purple-500/10 border-purple-500/30 text-purple-700 dark:text-purple-300 font-bold' : 'bg-slate-100 dark:bg-slate-800/60 text-slate-400'}`}>
+                            <span className="block font-black">3. Gate Release</span>
+                            <span>{todayTicket.watchmanAction?.sentOut ? '✓ Exited Campus' : 'At Campus'}</span>
+                          </div>
+                        </div>
+
+                        {/* Download Official PDF Slip Button */}
+                        <button
+                          type="button"
+                          onClick={() => setActiveTicket(todayTicket)}
+                          className="w-full py-3.5 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/25 transition-all cursor-pointer active:scale-98"
+                        >
+                          <Download size={17} />
+                          <span>Download / Print Official Leave Granted Slip (PDF)</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950/40 border border-slate-200/60 dark:border-slate-800/60 text-center text-xs text-customText-muted">
+                        No active leave application submitted for today ({todayDateString}). Previous applications are listed below.
+                      </div>
+                    )}
+
+                    {/* PREVIOUS APPLICATIONS HISTORY */}
+                    {previousTickets.length > 0 && (
+                      <div className="space-y-2.5 pt-2">
+                        <h4 className="text-xs font-black uppercase tracking-wider text-customText-muted flex items-center gap-1.5">
+                          <History size={13} />
+                          <span>Previous Leave Applications ({previousTickets.length})</span>
+                        </h4>
+                        <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                          {previousTickets.map((t) => (
+                            <div
+                              key={t.id}
+                              className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 text-xs"
+                            >
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-bold text-customText dark:text-customText-dark">
+                                    {t.appliedDate}
+                                  </span>
+                                  <span className="font-mono text-[10px] text-customText-muted">
+                                    {t.id}
+                                  </span>
+                                </div>
+                                <p className="font-medium text-customText-muted truncate mt-0.5">
+                                  "{t.reason}" • <span className="font-semibold text-customText">{t.destination}</span>
+                                </p>
+                              </div>
+
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold ${
+                                  t.status === 'PERMISSION_GRANTED'
+                                    ? 'bg-emerald-500/10 text-emerald-700'
+                                    : t.status === 'SENT_OUT'
+                                    ? 'bg-purple-500/10 text-purple-700'
+                                    : t.status === 'REJECTED'
+                                    ? 'bg-rose-500/10 text-rose-700'
+                                    : 'bg-slate-200 text-slate-700'
+                                }`}>
+                                  {t.status.replace(/_/g, ' ')}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => setActiveTicket(t)}
+                                  className="px-2.5 py-1.5 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary text-[11px] font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                                  title="View and download official leave slip"
+                                >
+                                  <FileText size={13} />
+                                  <span>Slip (PDF)</span>
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                  </div>
+                );
+              })()}
+            </div>
+
+          </div>
 
           ) : (
 

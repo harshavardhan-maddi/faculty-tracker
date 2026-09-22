@@ -544,6 +544,15 @@ export const searchOutpasses = (query) => {
   );
 };
 
+// Get all outpass history for a specific student by roll number
+export const getStudentOutpassHistory = (rollNumber) => {
+  if (!rollNumber) return [];
+  const clean = rollNumber.trim().toUpperCase();
+  const tickets = getAllOutpasses();
+  return tickets.filter(t => t.rollNumber && t.rollNumber.trim().toUpperCase() === clean)
+    .sort((a, b) => new Date(b.appliedAt || 0) - new Date(a.appliedAt || 0));
+};
+
 // Subscribe to outpass store updates (with live cross-device backend polling)
 export const subscribeToOutpasses = (callback) => {
   const handleCustom = (e) => callback(e.detail);
