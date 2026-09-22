@@ -69,7 +69,7 @@ The database will listen on `localhost:5432` with username `postgres` and passwo
 Verify or edit `backend/.env`. It should resemble the following:
 ```env
 PORT=5000
-DATABASE_URL="postgresql://postgres:password123@localhost:5432/faculty_tracker?schema=public"
+DATABASE_URL="postgresql://postgres:xxxxxxx@localhost:5432/faculty_tracker?schema=public"
 JWT_SECRET="supersecret_facultytrackerkey_2026"
 NODE_ENV=development
 ```
